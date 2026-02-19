@@ -48,6 +48,24 @@ describe('keyword tokenization', () => {
         PK: 'USER#athlete-1',
         SK: 'KW#guard#TS#2026-01-01T00:00:00.000Z#ENTRY#entry-1',
         entityType: 'KEYWORD_INDEX',
+        visibilityScope: 'shared',
+        entryId: 'entry-1',
+        createdAt: '2026-01-01T00:00:00.000Z'
+      }
+    ]);
+  });
+
+  it('builds private keyword index items with private PK prefix', () => {
+    const items = buildKeywordIndexItems('athlete-1', 'entry-1', '2026-01-01T00:00:00.000Z', ['hook'], {
+      visibilityScope: 'private'
+    });
+
+    expect(items).toEqual([
+      {
+        PK: 'USER_PRIVATE#athlete-1',
+        SK: 'KW#hook#TS#2026-01-01T00:00:00.000Z#ENTRY#entry-1',
+        entityType: 'KEYWORD_INDEX',
+        visibilityScope: 'private',
         entryId: 'entry-1',
         createdAt: '2026-01-01T00:00:00.000Z'
       }

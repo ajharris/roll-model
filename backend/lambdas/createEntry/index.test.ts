@@ -49,6 +49,21 @@ describe('createEntry handler auth', () => {
     const body = JSON.parse(result.body) as { entry: { athleteId: string } };
     expect(body.entry.athleteId).toBe('user-123');
     expect(mockPutItem).toHaveBeenCalledTimes(2);
+    expect(mockBuildKeywordIndexItems).toHaveBeenCalledWith(
+      'user-123',
+      expect.any(String),
+      expect.any(String),
+      ['guard'],
+      { visibilityScope: 'shared' }
+    );
+    expect(mockBuildKeywordIndexItems).toHaveBeenCalledWith(
+      'user-123',
+      expect.any(String),
+      expect.any(String),
+      ['private-note'],
+      { visibilityScope: 'private' }
+    );
+    expect(mockBatchWriteItems).toHaveBeenCalledWith([{ id: 'shared' }, { id: 'private' }]);
   });
 
   it('rejects coach tokens', async () => {
