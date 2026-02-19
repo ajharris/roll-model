@@ -16,7 +16,7 @@ const parseBody = (rawBody: string | null): PostCommentRequest => {
   }
 
   const parsed = JSON.parse(rawBody) as Partial<PostCommentRequest>;
-  if (typeof parsed.entryId !== 'string' || typeof parsed.body !== 'string' || parsed.body.length === 0) {
+  if (typeof parsed.body !== 'string' || parsed.body.length === 0) {
     throw new ApiError({
       code: 'INVALID_REQUEST',
       message: 'Comment payload is invalid.',
@@ -27,15 +27,37 @@ const parseBody = (rawBody: string | null): PostCommentRequest => {
   return parsed as PostCommentRequest;
 };
 
+const resolveEntryId = (entryIdFromPath: string | undefined, entryIdFromBody?: string): string => {
+  if (entryIdFromPath && entryIdFromBody && entryIdFromPath !== entryIdFromBody) {
+    throw new ApiError({
+      code: 'INVALID_REQUEST',
+      message: 'Entry ID mismatch between path and body.',
+      statusCode: 400
+    });
+  }
+
+  const entryId = entryIdFromPath ?? entryIdFromBody;
+  if (!entryId) {
+    throw new ApiError({
+      code: 'INVALID_REQUEST',
+      message: 'Entry ID is required.',
+      statusCode: 400
+    });
+  }
+
+  return entryId;
+};
+
 export const handler: APIGatewayProxyHandler = async (event) => {
   try {
     const auth = getAuthContext(event);
     requireRole(auth, ['coach']);
 
     const payload = parseBody(event.body);
+    const entryId = resolveEntryId(event.pathParameters?.entryId, payload.entryId);
     const entryMeta = await getItem({
       Key: {
-        PK: `ENTRY#${payload.entryId}`,
+        PK: `ENTRY#${entryId}`,
         SK: 'META'
       }
     });
@@ -65,7 +87,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
     const comment: Comment = {
       commentId: uuidv4(),
-      entryId: payload.entryId,
+      entryId,
       coachId: auth.userId,
       createdAt: new Date().toISOString(),
       body: payload.body,
