@@ -1,7 +1,9 @@
 'use client';
 
-import { FormEvent, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import type { FormEvent} from 'react';
+import { useState } from 'react';
+
 import { useAuth } from '@/contexts/AuthContext';
 
 export default function HomePage() {

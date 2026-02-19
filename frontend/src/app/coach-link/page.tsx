@@ -1,6 +1,8 @@
 'use client';
 
-import { FormEvent, useState } from 'react';
+import type { FormEvent} from 'react';
+import { useState } from 'react';
+
 import { Protected } from '@/components/Protected';
 import { apiClient } from '@/lib/apiClient';
 

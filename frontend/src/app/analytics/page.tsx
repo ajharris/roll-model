@@ -2,9 +2,10 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+
 import { Protected } from '@/components/Protected';
 import { apiClient } from '@/lib/apiClient';
-import { Entry } from '@/types/api';
+import type { Entry } from '@/types/api';
 
 export default function AnalyticsPage() {
   const [entries, setEntries] = useState<Entry[]>([]);

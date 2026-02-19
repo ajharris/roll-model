@@ -2,7 +2,8 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { ReactNode } from 'react';
+import type { ReactNode } from 'react';
+
 import { useAuth } from '@/contexts/AuthContext';
 
 export const AppShell = ({ children }: { children: ReactNode }) => {

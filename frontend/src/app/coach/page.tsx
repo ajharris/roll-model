@@ -1,9 +1,11 @@
 'use client';
 
-import { FormEvent, useState } from 'react';
+import type { FormEvent} from 'react';
+import { useState } from 'react';
+
 import { Protected } from '@/components/Protected';
 import { apiClient } from '@/lib/apiClient';
-import { Entry } from '@/types/api';
+import type { Entry } from '@/types/api';
 
 export default function CoachPage() {
   const [athleteId, setAthleteId] = useState('');

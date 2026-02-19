@@ -1,7 +1,8 @@
 import './globals.css';
-import { ReactNode } from 'react';
-import { AuthProvider } from '@/contexts/AuthContext';
+import type { ReactNode } from 'react';
+
 import { AppShell } from '@/components/AppShell';
+import { AuthProvider } from '@/contexts/AuthContext';
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (

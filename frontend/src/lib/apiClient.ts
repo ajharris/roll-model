@@ -1,4 +1,4 @@
-import {
+import type {
   CommentPayload,
   Entry,
   EntryCreatePayload,
@@ -37,13 +37,23 @@ const buildAuthHeaders = () => {
 };
 
 const request = async <T>(path: string, init?: RequestInit): Promise<T> => {
+  const headers = new Headers();
+  headers.set('Content-Type', 'application/json');
+
+  for (const [key, value] of Object.entries(buildAuthHeaders())) {
+    headers.set(key, value);
+  }
+
+  if (init?.headers) {
+    const initHeaders = new Headers(init.headers);
+    initHeaders.forEach((value, key) => {
+      headers.set(key, value);
+    });
+  }
+
   const response = await fetch(`${baseUrl}${path}`, {
     ...init,
-    headers: {
-      'Content-Type': 'application/json',
-      ...buildAuthHeaders(),
-      ...(init?.headers || {}),
-    },
+    headers,
     cache: 'no-store',
   });
 

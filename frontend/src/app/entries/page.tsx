@@ -2,9 +2,10 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
+
 import { Protected } from '@/components/Protected';
 import { apiClient } from '@/lib/apiClient';
-import { Entry } from '@/types/api';
+import type { Entry } from '@/types/api';
 
 export default function EntriesPage() {
   const [entries, setEntries] = useState<Entry[]>([]);

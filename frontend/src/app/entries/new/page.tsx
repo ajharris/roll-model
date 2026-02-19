@@ -1,7 +1,9 @@
 'use client';
 
-import { FormEvent, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import type { FormEvent} from 'react';
+import { useState } from 'react';
+
 import { ChipInput } from '@/components/ChipInput';
 import { Protected } from '@/components/Protected';
 import { apiClient } from '@/lib/apiClient';

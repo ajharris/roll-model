@@ -6,9 +6,11 @@ import {
   CognitoUserPool,
 } from 'amazon-cognito-identity-js';
 import { jwtDecode } from 'jwt-decode';
-import { createContext, ReactNode, useContext, useEffect, useMemo, useState } from 'react';
+import type { ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+
 import { configureApiClient } from '@/lib/apiClient';
-import { UserRole } from '@/types/api';
+import type { UserRole } from '@/types/api';
 
 interface AuthTokens {
   idToken: string;
@@ -70,7 +72,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const signIn = (username: string, password: string) =>
+  const signIn = useCallback((username: string, password: string) =>
     new Promise<void>((resolve, reject) => {
       const cognitoUser = new CognitoUser({ Username: username, Pool: userPool });
       const authDetails = new AuthenticationDetails({ Username: username, Password: password });
@@ -86,14 +88,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         },
         onFailure: (err) => reject(err),
       });
-    });
+    }), []);
 
-  const signOut = () => {
+  const signOut = useCallback(() => {
     setTokens(null);
     setUser(null);
     setRole('unknown');
     sessionStorage.removeItem(sessionKey);
-  };
+  }, []);
 
   const value = useMemo(
     () => ({
@@ -104,7 +106,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       signIn,
       signOut,
     }),
-    [role, tokens, user],
+    [role, signIn, signOut, tokens, user],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

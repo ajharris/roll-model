@@ -1,9 +1,10 @@
 'use client';
 
 import { useState } from 'react';
+
 import { Protected } from '@/components/Protected';
 import { ApiError, apiClient } from '@/lib/apiClient';
-import { ChatThread } from '@/types/api';
+import type { ChatThread } from '@/types/api';
 
 const createThread = (): ChatThread => ({
   id: crypto.randomUUID(),

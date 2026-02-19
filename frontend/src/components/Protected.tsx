@@ -1,7 +1,9 @@
 'use client';
 
-import { ReactNode, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import type { ReactNode} from 'react';
+import { useEffect } from 'react';
+
 import { useAuth } from '@/contexts/AuthContext';
 
 export const Protected = ({

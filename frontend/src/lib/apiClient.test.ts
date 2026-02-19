@@ -25,13 +25,14 @@ describe('apiClient', () => {
       expect.objectContaining({
         method: 'POST',
         cache: 'no-store',
-        headers: expect.objectContaining({
-          'Content-Type': 'application/json',
-          Authorization: 'jwt-token',
-          'X-Authorization-Bearer': 'Bearer jwt-token',
-        }),
       }),
     );
+    const requestInit = fetchMock.mock.calls[0]?.[1] as RequestInit;
+    expect(requestInit.headers).toBeInstanceOf(Headers);
+    const headers = requestInit.headers as Headers;
+    expect(headers.get('Content-Type')).toBe('application/json');
+    expect(headers.get('Authorization')).toBe('jwt-token');
+    expect(headers.get('X-Authorization-Bearer')).toBe('Bearer jwt-token');
   });
 
   it('throws ApiError with API response message on failure', async () => {

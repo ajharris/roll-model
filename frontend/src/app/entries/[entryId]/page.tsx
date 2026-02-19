@@ -2,16 +2,17 @@
 
 import { useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
+
 import { Protected } from '@/components/Protected';
 import { apiClient } from '@/lib/apiClient';
-import { Entry } from '@/types/api';
+import type { Entry } from '@/types/api';
 
 export default function EntryDetailPage() {
   const { entryId } = useParams<{ entryId: string }>();
   const [entry, setEntry] = useState<Entry | null>(null);
 
   useEffect(() => {
-    apiClient.getEntries().then((entries) => setEntry(entries.find((e) => e.entryId === entryId) ?? null));
+    void apiClient.getEntries().then((entries) => setEntry(entries.find((e) => e.entryId === entryId) ?? null));
   }, [entryId]);
 
   return (

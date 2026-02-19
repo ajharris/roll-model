@@ -1,6 +1,7 @@
 'use client';
 
-import { KeyboardEvent, useState } from 'react';
+import type { KeyboardEvent} from 'react';
+import { useState } from 'react';
 
 export const ChipInput = ({
   label,
