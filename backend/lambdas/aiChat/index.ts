@@ -7,6 +7,7 @@ import { normalizeToken, tokenizeText } from '../../shared/keywords';
 import { callOpenAI } from '../../shared/openai';
 import { ApiError, errorResponse, response } from '../../shared/responses';
 import { batchGetEntries, queryKeywordMatches, rankKeywordMatches } from '../../shared/retrieval';
+import { isCoachLinkActive } from '../../shared/links';
 import type {
   AIChatContext,
   AIChatRequest,
@@ -86,7 +87,7 @@ const ensureCoachLink = async (coachId: string, athleteId: string): Promise<void
     }
   });
 
-  if (!link.Item) {
+  if (!isCoachLinkActive(link.Item)) {
     throw new ApiError({
       code: 'FORBIDDEN',
       message: 'Coach is not linked to this athlete.',

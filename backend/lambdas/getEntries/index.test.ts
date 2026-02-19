@@ -72,4 +72,16 @@ describe('getEntries handler auth', () => {
     const body = JSON.parse(result.body) as { error: { code: string } };
     expect(body.error.code).toBe('FORBIDDEN');
   });
+
+  it('rejects coaches with revoked links', async () => {
+    mockGetItem.mockResolvedValueOnce({
+      Item: { PK: 'USER#athlete-1', SK: 'COACH#coach-1', status: 'revoked' }
+    } as unknown as GetCommandOutput);
+
+    const result = (await handler(buildEvent('coach', 'athlete-1'), {} as never, () => undefined)) as APIGatewayProxyResult;
+
+    expect(result.statusCode).toBe(403);
+    const body = JSON.parse(result.body) as { error: { code: string } };
+    expect(body.error.code).toBe('FORBIDDEN');
+  });
 });

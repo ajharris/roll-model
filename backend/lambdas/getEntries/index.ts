@@ -2,6 +2,7 @@ import type { APIGatewayProxyHandler } from 'aws-lambda';
 
 import { getAuthContext, requireRole } from '../../shared/auth';
 import { getItem, queryItems } from '../../shared/db';
+import { isCoachLinkActive } from '../../shared/links';
 import { ApiError, errorResponse, response } from '../../shared/responses';
 import type { Entry } from '../../shared/types';
 
@@ -36,7 +37,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         }
       });
 
-      if (!link.Item) {
+      if (!isCoachLinkActive(link.Item)) {
         throw new ApiError({
           code: 'FORBIDDEN',
           message: 'Coach is not linked to this athlete.',

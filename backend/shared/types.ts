@@ -32,10 +32,15 @@ export interface Comment {
   visibility: 'visible' | 'hiddenByAthlete';
 }
 
+export type CoachLinkStatus = 'pending' | 'active' | 'revoked';
+
 export interface CoachLink {
   athleteId: string;
   coachId: string;
+  status: CoachLinkStatus;
   createdAt: string;
+  updatedAt: string;
+  createdBy: string;
 }
 
 export interface CreateEntryRequest {
