@@ -6,7 +6,7 @@ import { getItem, putItem, queryItems } from '../../shared/db';
 import { normalizeToken, tokenizeText } from '../../shared/keywords';
 import { callOpenAI } from '../../shared/openai';
 import { ApiError, errorResponse, response } from '../../shared/responses';
-import { batchGetEntries, queryKeywordMatches } from '../../shared/retrieval';
+import { batchGetEntries, queryKeywordMatches, rankKeywordMatches } from '../../shared/retrieval';
 import type {
   AIChatContext,
   AIChatRequest,
@@ -26,6 +26,7 @@ interface SanitizedContext {
 }
 
 const DEFAULT_ENTRY_LIMIT = 10;
+const KEYWORD_MATCH_LIMIT = 10;
 const DEFAULT_THREAD_MESSAGE_LIMIT = 20;
 
 const parseBody = (body: string | null): AIChatRequest => {
@@ -131,29 +132,14 @@ const getKeywordDrivenEntries = async (context: SanitizedContext): Promise<Entry
     return [];
   }
 
-  const matches = await Promise.all(tokens.map((token) => queryKeywordMatches(context.athleteId, token, 5)));
+  const scopes: Array<'shared' | 'private'> = context.includePrivate ? ['shared', 'private'] : ['shared'];
+  const matches = await Promise.all(
+    tokens.flatMap((token) =>
+      scopes.map((scope) => queryKeywordMatches(context.athleteId, token, 5, { visibilityScope: scope }))
+    )
+  );
 
-  const ranked = new Map<string, { score: number; createdAt: string }>();
-  for (const perToken of matches) {
-    for (const match of perToken) {
-      const current = ranked.get(match.entryId);
-      ranked.set(match.entryId, {
-        score: (current?.score ?? 0) + 1,
-        createdAt: current?.createdAt ?? match.createdAt
-      });
-    }
-  }
-
-  const sortedIds = Array.from(ranked.entries())
-    .sort((a, b) => {
-      if (b[1].score !== a[1].score) {
-        return b[1].score - a[1].score;
-      }
-      return b[1].createdAt.localeCompare(a[1].createdAt);
-    })
-    .map(([entryId]) => entryId)
-    .slice(0, DEFAULT_ENTRY_LIMIT);
-
+  const sortedIds = rankKeywordMatches(matches, KEYWORD_MATCH_LIMIT);
   return batchGetEntries(sortedIds);
 };
 
@@ -289,12 +275,15 @@ export const handler: APIGatewayProxyHandler = async (event) => {
     });
 
     const threadMessages = await getRecentThreadMessages(threadId);
-    const candidateEntries =
-      sanitized.keywords.length > 0
-        ? await getKeywordDrivenEntries(sanitized)
-        : await getRecentEntries(sanitized.athleteId, DEFAULT_ENTRY_LIMIT);
+    const recentEntries = await getRecentEntries(sanitized.athleteId, DEFAULT_ENTRY_LIMIT);
+    const keywordEntries = sanitized.keywords.length > 0 ? await getKeywordDrivenEntries(sanitized) : [];
 
-    const entries = applyContextFilters(candidateEntries, sanitized).slice(0, DEFAULT_ENTRY_LIMIT);
+    const filteredRecent = applyContextFilters(recentEntries, sanitized).slice(0, DEFAULT_ENTRY_LIMIT);
+    const filteredKeyword = applyContextFilters(keywordEntries, sanitized).filter(
+      (entry) => !filteredRecent.some((recent) => recent.entryId === entry.entryId)
+    );
+
+    const entries = [...filteredRecent, ...filteredKeyword];
     const promptContext = buildPromptContext(entries, sanitized.includePrivate);
 
     const historyText = threadMessages

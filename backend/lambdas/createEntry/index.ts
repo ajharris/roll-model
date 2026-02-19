@@ -71,9 +71,21 @@ export const handler: APIGatewayProxyHandler = async (event) => {
       }
     });
 
-    const tokens = extractEntryTokens(entry, { includePrivate: true, maxTokens: 30 });
-    if (tokens.length > 0) {
-      const keywordItems = buildKeywordIndexItems(auth.userId, entry.entryId, entry.createdAt, tokens);
+    const sharedTokens = extractEntryTokens(entry, { includePrivate: false, maxTokens: 30 });
+    const allTokens = extractEntryTokens(entry, { includePrivate: true, maxTokens: 30 });
+    const sharedTokenSet = new Set(sharedTokens);
+    const privateOnlyTokens = allTokens.filter((token) => !sharedTokenSet.has(token));
+
+    const keywordItems = [
+      ...buildKeywordIndexItems(auth.userId, entry.entryId, entry.createdAt, sharedTokens, {
+        visibilityScope: 'shared'
+      }),
+      ...buildKeywordIndexItems(auth.userId, entry.entryId, entry.createdAt, privateOnlyTokens, {
+        visibilityScope: 'private'
+      })
+    ];
+
+    if (keywordItems.length > 0) {
       await batchWriteItems(keywordItems);
     }
 

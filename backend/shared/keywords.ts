@@ -64,12 +64,16 @@ export const buildKeywordIndexItems = (
   athleteId: string,
   entryId: string,
   createdAt: string,
-  tokens: string[]
+  tokens: string[],
+  options?: { visibilityScope?: 'shared' | 'private' }
 ): Array<Record<string, string>> => {
+  const visibilityScope = options?.visibilityScope ?? 'shared';
+  const pkPrefix = visibilityScope === 'private' ? 'USER_PRIVATE' : 'USER';
   return tokens.map((token) => ({
-    PK: `USER#${athleteId}`,
+    PK: `${pkPrefix}#${athleteId}`,
     SK: `KW#${token}#TS#${createdAt}#ENTRY#${entryId}`,
     entityType: 'KEYWORD_INDEX',
+    visibilityScope,
     entryId,
     createdAt
   }));
