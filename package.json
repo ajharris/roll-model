@@ -1,0 +1,44 @@
+{
+  "name": "roll-model",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Serverless backend for roll-model training intelligence platform.",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "clean": "rm -rf dist coverage cdk.out",
+    "lint": "eslint . --ext .ts",
+    "format": "prettier --write .",
+    "test": "jest --runInBand",
+    "cdk:synth": "npm run build && cdk synth -a \"node dist/infrastructure/cdk/bin/app.js\"",
+    "cdk:deploy": "npm run build && cdk deploy -a \"node dist/infrastructure/cdk/bin/app.js\""
+  },
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.863.0",
+    "@aws-sdk/lib-dynamodb": "^3.863.0",
+    "aws-cdk-lib": "^2.209.1",
+    "constructs": "^10.4.2",
+    "uuid": "^11.1.0",
+    "@aws-sdk/client-ssm": "^3.863.0"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "^8.10.147",
+    "@types/jest": "^30.0.0",
+    "@types/node": "^22.15.30",
+    "@types/uuid": "^10.0.0",
+    "@typescript-eslint/eslint-plugin": "^8.35.1",
+    "@typescript-eslint/parser": "^8.35.1",
+    "aws-cdk": "^2.1029.1",
+    "esbuild": "^0.25.6",
+    "eslint": "^8.57.1",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-import": "^2.32.0",
+    "jest": "^30.0.5",
+    "prettier": "^3.6.2",
+    "ts-jest": "^29.4.1",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.8.3"
+  }
+}
