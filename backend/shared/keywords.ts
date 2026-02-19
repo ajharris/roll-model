@@ -51,10 +51,13 @@ export const extractEntryTokens = (
   options: { includePrivate: boolean; maxTokens?: number }
 ): string[] => {
   const fromTags = entry.sessionMetrics.tags.map((tag) => normalizeToken(tag));
+  const fromTechniques = (entry.rawTechniqueMentions ?? [])
+    .map((mention) => normalizeToken(mention))
+    .filter((mention) => mention.length >= 3);
   const fromShared = tokenizeText(entry.sections.shared);
   const fromPrivate = options.includePrivate ? tokenizeText(entry.sections.private) : [];
 
-  return [...new Set([...fromTags, ...fromShared, ...fromPrivate])]
+  return [...new Set([...fromTags, ...fromTechniques, ...fromShared, ...fromPrivate])]
     .filter((token) => token.length >= 3)
     .filter((token) => !STOPWORDS.has(token))
     .slice(0, options.maxTokens ?? 30);

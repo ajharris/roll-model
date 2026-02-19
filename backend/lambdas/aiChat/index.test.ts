@@ -66,7 +66,8 @@ describe('aiChat context/privacy', () => {
           rounds: 5,
           giOrNoGi: 'gi',
           tags: []
-        }
+        },
+        rawTechniqueMentions: []
       }
     ];
 
