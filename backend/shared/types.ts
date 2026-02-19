@@ -59,7 +59,7 @@ export interface TechniqueCandidate {
 }
 
 export interface PostCommentRequest {
-  entryId: string;
+  entryId?: string;
   body: string;
 }
 
