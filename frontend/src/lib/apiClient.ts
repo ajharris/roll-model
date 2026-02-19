@@ -78,6 +78,11 @@ export const apiClient = {
       method: 'POST',
       body: JSON.stringify(payload),
     }),
+  revokeCoach: (payload: { coachId: string }) =>
+    request('/links/coach', {
+      method: 'DELETE',
+      body: JSON.stringify(payload),
+    }),
   chat: (payload: { threadId?: string; message: string; context?: string }) =>
     request<{ assistant_text: string; suggested_prompts?: string[] }>('/ai/chat', {
       method: 'POST',

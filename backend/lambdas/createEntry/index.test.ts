@@ -67,7 +67,7 @@ describe('createEntry handler auth', () => {
       'user-123',
       expect.any(String),
       expect.any(String),
-      ['guard', 'knee-slice'],
+      ['guard'],
       { visibilityScope: 'shared' }
     );
     expect(mockBuildKeywordIndexItems).toHaveBeenCalledWith(

@@ -4,11 +4,11 @@ import { getAuthContext, requireRole } from '../../shared/auth';
 import { getItem, putItem } from '../../shared/db';
 import { ApiError, errorResponse, response } from '../../shared/responses';
 
-interface LinkCoachAthleteRequest {
+interface RevokeCoachLinkRequest {
   coachId: string;
 }
 
-const parseBody = (rawBody: string | null): LinkCoachAthleteRequest => {
+const parseBody = (rawBody: string | null): RevokeCoachLinkRequest => {
   if (!rawBody) {
     throw new ApiError({
       code: 'INVALID_REQUEST',
@@ -17,7 +17,7 @@ const parseBody = (rawBody: string | null): LinkCoachAthleteRequest => {
     });
   }
 
-  const parsed = JSON.parse(rawBody) as Partial<LinkCoachAthleteRequest>;
+  const parsed = JSON.parse(rawBody) as Partial<RevokeCoachLinkRequest>;
   if (typeof parsed.coachId !== 'string' || parsed.coachId.length === 0) {
     throw new ApiError({
       code: 'INVALID_REQUEST',
@@ -26,7 +26,7 @@ const parseBody = (rawBody: string | null): LinkCoachAthleteRequest => {
     });
   }
 
-  return parsed as LinkCoachAthleteRequest;
+  return parsed as RevokeCoachLinkRequest;
 };
 
 export const handler: APIGatewayProxyHandler = async (event) => {
@@ -35,14 +35,22 @@ export const handler: APIGatewayProxyHandler = async (event) => {
     requireRole(auth, ['athlete']);
 
     const payload = parseBody(event.body);
-
-    const now = new Date().toISOString();
-    const existingLink = await getItem({
+    const link = await getItem({
       Key: {
         PK: `USER#${auth.userId}`,
         SK: `COACH#${payload.coachId}`
       }
     });
+
+    if (!link.Item) {
+      throw new ApiError({
+        code: 'NOT_FOUND',
+        message: 'Coach link not found.',
+        statusCode: 404
+      });
+    }
+
+    const now = new Date().toISOString();
 
     await putItem({
       Item: {
@@ -51,19 +59,18 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         entityType: 'COACH_LINK',
         athleteId: auth.userId,
         coachId: payload.coachId,
-        status: 'active',
-        createdAt:
-          typeof existingLink.Item?.createdAt === 'string' ? existingLink.Item.createdAt : now,
+        status: 'revoked',
+        createdAt: typeof link.Item.createdAt === 'string' ? link.Item.createdAt : now,
         updatedAt: now,
-        createdBy:
-          typeof existingLink.Item?.createdBy === 'string' ? existingLink.Item.createdBy : auth.userId
+        createdBy: typeof link.Item.createdBy === 'string' ? link.Item.createdBy : auth.userId
       }
     });
 
-    return response(201, {
-      linked: true,
+    return response(200, {
+      revoked: true,
       athleteId: auth.userId,
-      coachId: payload.coachId
+      coachId: payload.coachId,
+      status: 'revoked'
     });
   } catch (error) {
     return errorResponse(error);

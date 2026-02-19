@@ -3,6 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 
 import { getAuthContext, requireRole } from '../../shared/auth';
 import { getItem, putItem } from '../../shared/db';
+import { isCoachLinkActive } from '../../shared/links';
 import { ApiError, errorResponse, response } from '../../shared/responses';
 import type { Comment, PostCommentRequest } from '../../shared/types';
 
@@ -55,7 +56,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
       }
     });
 
-    if (!link.Item) {
+    if (!isCoachLinkActive(link.Item)) {
       throw new ApiError({
         code: 'FORBIDDEN',
         message: 'Coach is not linked to this athlete.',

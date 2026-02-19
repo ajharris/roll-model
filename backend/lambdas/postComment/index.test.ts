@@ -1,6 +1,4 @@
 import type { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
-import type { GetCommandOutput } from '@aws-sdk/lib-dynamodb';
-
 import { handler } from './index';
 import { getItem, putItem } from '../../shared/db';
 
@@ -58,6 +56,18 @@ describe('postComment handler auth', () => {
     mockGetItem
       .mockResolvedValueOnce({ Item: { athleteId: 'athlete-9' } } as never)
       .mockResolvedValueOnce({} as never);
+
+    const result = (await handler(buildEvent('coach'), {} as never, () => undefined)) as APIGatewayProxyResult;
+
+    expect(result.statusCode).toBe(403);
+    const body = JSON.parse(result.body) as { error: { code: string } };
+    expect(body.error.code).toBe('FORBIDDEN');
+  });
+
+  it('rejects revoked coach links', async () => {
+    mockGetItem
+      .mockResolvedValueOnce({ Item: { athleteId: 'athlete-9' } } as never)
+      .mockResolvedValueOnce({ Item: { PK: 'USER#athlete-9', SK: 'COACH#coach-42', status: 'revoked' } } as never);
 
     const result = (await handler(buildEvent('coach'), {} as never, () => undefined)) as APIGatewayProxyResult;
 
