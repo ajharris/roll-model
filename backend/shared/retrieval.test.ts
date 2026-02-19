@@ -1,5 +1,4 @@
 import { getItem, queryItems } from './db';
-
 import { batchGetEntries, queryKeywordMatches, rankKeywordMatches } from './retrieval';
 
 jest.mock('./db', () => ({

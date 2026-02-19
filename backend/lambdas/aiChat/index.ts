@@ -4,10 +4,10 @@ import { v4 as uuidv4 } from 'uuid';
 import { getAuthContext, requireRole } from '../../shared/auth';
 import { getItem, putItem, queryItems } from '../../shared/db';
 import { normalizeToken, tokenizeText } from '../../shared/keywords';
+import { isCoachLinkActive } from '../../shared/links';
 import { callOpenAI } from '../../shared/openai';
 import { ApiError, errorResponse, response } from '../../shared/responses';
 import { batchGetEntries, queryKeywordMatches, rankKeywordMatches } from '../../shared/retrieval';
-import { isCoachLinkActive } from '../../shared/links';
 import type {
   AIChatContext,
   AIChatRequest,
@@ -113,6 +113,9 @@ const getRecentEntries = async (athleteId: string, limit: number): Promise<Entry
     .filter((item) => item.entityType === 'ENTRY')
     .map((item) => {
       const { PK: _pk, SK: _sk, entityType: _entityType, ...entry } = item;
+      void _pk;
+      void _sk;
+      void _entityType;
       return entry;
     });
 };
@@ -230,6 +233,9 @@ const getRecentThreadMessages = async (threadId: string): Promise<AIMessage[]> =
     .filter((item) => item.entityType === 'AI_MESSAGE')
     .map((item) => {
       const { PK: _pk, SK: _sk, entityType: _entityType, ...msg } = item;
+      void _pk;
+      void _sk;
+      void _entityType;
       return msg;
     })
     .reverse();

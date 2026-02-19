@@ -1,7 +1,8 @@
 import type { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 
-import { handler } from './index';
 import { getItem, putItem } from '../../shared/db';
+
+import { handler } from './index';
 
 jest.mock('../../shared/db');
 jest.mock('uuid', () => ({ v4: () => 'comment-123' }));

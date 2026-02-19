@@ -1,8 +1,9 @@
-import type { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 import type { GetCommandOutput, QueryCommandOutput } from '@aws-sdk/lib-dynamodb';
+import type { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
+
+import { getItem, queryItems } from '../../shared/db';
 
 import { handler } from './index';
-import { getItem, queryItems } from '../../shared/db';
 
 jest.mock('../../shared/db');
 

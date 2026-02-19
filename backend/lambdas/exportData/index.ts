@@ -8,6 +8,17 @@ import type { AIMessage, AIThread, CoachLink, Comment, Entry } from '../../share
 const SCHEMA_VERSION = '2026-02-19';
 const MODE_VALUES = new Set(['full', 'tidy']);
 
+const stripKeys = <T extends { PK: string; SK: string; entityType: string }>(item: T): Omit<
+  T,
+  'PK' | 'SK' | 'entityType'
+> => {
+  const { PK, SK, entityType, ...rest } = item;
+  void PK;
+  void SK;
+  void entityType;
+  return rest;
+};
+
 export const handler: APIGatewayProxyHandler = async (event) => {
   try {
     const auth = getAuthContext(event);
@@ -33,12 +44,11 @@ export const handler: APIGatewayProxyHandler = async (event) => {
     const entries = (entriesResult.Items ?? [])
       .filter((item) => item.entityType === 'ENTRY')
       .map((item) => {
-        const { PK: _pk, SK: _sk, entityType: _entityType, ...entry } = item as Entry & {
+        return stripKeys(item as Entry & {
           PK: string;
           SK: string;
           entityType: string;
-        };
-        return entry;
+        });
       });
 
     const commentsByEntryId = new Map<string, Comment[]>();
@@ -54,12 +64,11 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         });
 
         const comments = (commentsResult.Items ?? []).map((item) => {
-          const { PK: _pk, SK: _sk, entityType: _entityType, ...comment } = item as Comment & {
+          return stripKeys(item as Comment & {
             PK: string;
             SK: string;
             entityType: string;
-          };
-          return comment;
+          });
         });
 
         commentsByEntryId.set(entry.entryId, comments);
@@ -86,23 +95,21 @@ export const handler: APIGatewayProxyHandler = async (event) => {
     const links = (linksResult.Items ?? [])
       .filter((item) => item.entityType === 'COACH_LINK')
       .map((item) => {
-        const { PK: _pk, SK: _sk, entityType: _entityType, ...link } = item as CoachLink & {
+        return stripKeys(item as CoachLink & {
           PK: string;
           SK: string;
           entityType: string;
-        };
-        return link;
+        });
       });
 
     const aiThreads = (threadsResult.Items ?? [])
       .filter((item) => item.entityType === 'AI_THREAD')
       .map((item) => {
-        const { PK: _pk, SK: _sk, entityType: _entityType, ...thread } = item as AIThread & {
+        return stripKeys(item as AIThread & {
           PK: string;
           SK: string;
           entityType: string;
-        };
-        return thread;
+        });
       });
 
     const aiMessagesByThreadId = new Map<string, AIMessage[]>();
@@ -119,12 +126,11 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         const messages = (messagesResult.Items ?? [])
           .filter((item) => item.entityType === 'AI_MESSAGE')
           .map((item) => {
-            const { PK: _pk, SK: _sk, entityType: _entityType, ...message } = item as AIMessage & {
+            return stripKeys(item as AIMessage & {
               PK: string;
               SK: string;
               entityType: string;
-            };
-            return message;
+            });
           });
 
         aiMessagesByThreadId.set(thread.threadId, messages);

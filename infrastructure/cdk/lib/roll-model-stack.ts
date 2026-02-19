@@ -8,7 +8,7 @@ import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as nodejs from 'aws-cdk-lib/aws-lambda-nodejs';
-import { Construct } from 'constructs';
+import type { Construct } from 'constructs';
 
 export class RollModelStack extends cdk.Stack {
   public constructor(scope: Construct, id: string, props?: cdk.StackProps) {

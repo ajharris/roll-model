@@ -1,9 +1,10 @@
 import type { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 
-import { handler } from './index';
 import { batchWriteItems, putItem } from '../../shared/db';
 import { buildKeywordIndexItems, extractEntryTokens } from '../../shared/keywords';
 import { upsertTechniqueCandidates } from '../../shared/techniques';
+
+import { handler } from './index';
 
 jest.mock('../../shared/db');
 jest.mock('../../shared/keywords');

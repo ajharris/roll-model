@@ -137,6 +137,190 @@ npm run build
 
 ------------------------------------------------------------------------
 
+## CI/CD (GitHub Actions + Amplify)
+
+This repo uses:
+
+-   **GitHub Actions** to build, test, and deploy the backend (CDK).
+-   **AWS Amplify** to build and deploy the frontend.
+
+### GitHub Actions
+
+Workflows:
+
+-   `/.github/workflows/ci.yml` runs lint/test/build on PRs and `main`.
+-   `/.github/workflows/deploy-backend.yml` deploys CDK on pushes to `main`.
+
+Required GitHub repo variables:
+
+-   `AWS_REGION=us-east-1`
+-   `AWS_ROLE_ARN=arn:aws:iam::<account-id>:role/<github-actions-role-name>`
+
+### Amplify
+
+Amplify uses `amplify.yml` at repo root and the env vars in the console.
+Set the frontend `NEXT_PUBLIC_*` variables in Amplify (not GitHub secrets).
+
+### GitHub OIDC Role (Recommended)
+
+Create an IAM role for GitHub OIDC and trust only `main` on this repo:
+
+``` json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": { "Federated": "arn:aws:iam::864981757594:oidc-provider/token.actions.githubusercontent.com" },
+      "Action": "sts:AssumeRoleWithWebIdentity",
+      "Condition": {
+        "StringEquals": { "token.actions.githubusercontent.com:aud": "sts.amazonaws.com" },
+        "StringLike": { "token.actions.githubusercontent.com:sub": "repo:OWNER/REPO:ref:refs/heads/main" }
+      }
+    }
+  ]
+}
+```
+
+### IAM Permissions (Two Options)
+
+Option A: **Baseline (broad, easiest)**
+
+``` json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    { "Effect": "Allow", "Action": "cloudformation:*", "Resource": "*" },
+    { "Effect": "Allow", "Action": "lambda:*", "Resource": "*" },
+    { "Effect": "Allow", "Action": "apigateway:*", "Resource": "*" },
+    { "Effect": "Allow", "Action": "dynamodb:*", "Resource": "*" },
+    { "Effect": "Allow", "Action": "cognito-idp:*", "Resource": "*" },
+    { "Effect": "Allow", "Action": "iam:PassRole", "Resource": "*" },
+    { "Effect": "Allow", "Action": "sts:GetCallerIdentity", "Resource": "*" },
+    { "Effect": "Allow", "Action": "ssm:GetParameter", "Resource": "*" }
+  ]
+}
+```
+
+Option B: **Tighter (scoped to this stack + CDK bootstrap)**
+
+Replace `<ACCOUNT_ID>` and `<REGION>` and keep stack name `RollModelStack`.
+If you use a different CDK bootstrap qualifier, update the role/bucket names.
+
+``` json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "cloudformation:CreateChangeSet",
+        "cloudformation:DeleteChangeSet",
+        "cloudformation:DescribeChangeSet",
+        "cloudformation:DescribeStacks",
+        "cloudformation:DescribeStackEvents",
+        "cloudformation:DescribeStackResources",
+        "cloudformation:ExecuteChangeSet",
+        "cloudformation:GetTemplate",
+        "cloudformation:ListStackResources",
+        "cloudformation:UpdateStack",
+        "cloudformation:CreateStack",
+        "cloudformation:DeleteStack"
+      ],
+      "Resource": [
+        "arn:aws:cloudformation:<REGION>:<ACCOUNT_ID>:stack/RollModelStack/*"
+      ]
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "lambda:CreateFunction",
+        "lambda:UpdateFunctionCode",
+        "lambda:UpdateFunctionConfiguration",
+        "lambda:DeleteFunction",
+        "lambda:GetFunction",
+        "lambda:ListTags",
+        "lambda:TagResource",
+        "lambda:UntagResource"
+      ],
+      "Resource": "arn:aws:lambda:<REGION>:<ACCOUNT_ID>:function:RollModelStack-*"
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "apigateway:GET",
+        "apigateway:POST",
+        "apigateway:PUT",
+        "apigateway:PATCH",
+        "apigateway:DELETE"
+      ],
+      "Resource": "arn:aws:apigateway:<REGION>::/restapis*"
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "dynamodb:CreateTable",
+        "dynamodb:UpdateTable",
+        "dynamodb:DeleteTable",
+        "dynamodb:DescribeTable",
+        "dynamodb:TagResource",
+        "dynamodb:UntagResource"
+      ],
+      "Resource": "arn:aws:dynamodb:<REGION>:<ACCOUNT_ID>:table/RollModel"
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "cognito-idp:CreateUserPool",
+        "cognito-idp:UpdateUserPool",
+        "cognito-idp:DeleteUserPool",
+        "cognito-idp:CreateUserPoolClient",
+        "cognito-idp:UpdateUserPoolClient",
+        "cognito-idp:DeleteUserPoolClient",
+        "cognito-idp:DescribeUserPool",
+        "cognito-idp:DescribeUserPoolClient"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Effect": "Allow",
+      "Action": "ssm:GetParameter",
+      "Resource": "arn:aws:ssm:<REGION>:<ACCOUNT_ID>:parameter/roll-model/openai_api_key"
+    },
+    {
+      "Effect": "Allow",
+      "Action": "iam:PassRole",
+      "Resource": "arn:aws:iam::<ACCOUNT_ID>:role/cdk-hnb659fds-*"
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "sts:GetCallerIdentity",
+        "s3:GetObject",
+        "s3:PutObject",
+        "s3:ListBucket"
+      ],
+      "Resource": [
+        "arn:aws:s3:::cdk-hnb659fds-assets-<ACCOUNT_ID>-<REGION>",
+        "arn:aws:s3:::cdk-hnb659fds-assets-<ACCOUNT_ID>-<REGION>/*"
+      ]
+    },
+    {
+      "Effect": "Allow",
+      "Action": "sts:AssumeRole",
+      "Resource": [
+        "arn:aws:iam::<ACCOUNT_ID>:role/cdk-hnb659fds-deploy-role-<ACCOUNT_ID>-<REGION>",
+        "arn:aws:iam::<ACCOUNT_ID>:role/cdk-hnb659fds-file-publishing-role-<ACCOUNT_ID>-<REGION>"
+      ]
+    }
+  ]
+}
+```
+
+If CDK deploy fails with access denied, expand actions/resources incrementally.
+
+------------------------------------------------------------------------
+
 ## Required Environment Variables (Frontend)
 
 See `frontend/.env.example`
