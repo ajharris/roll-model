@@ -1,7 +1,9 @@
-# Roll Model
+# BJJ Lab Notebook (Roll Model)
 
-Roll Model is a scientific Brazilian Jiu Jitsu journaling and
+BJJ Lab Notebook is a scientific Brazilian Jiu Jitsu journaling and
 performance intelligence system.
+
+Hosted at: https://main.d15hzi11jeckui.amplifyapp.com/
 
 It combines: - Structured training logs - Private athlete-owned notes -
 Coach-shared collaboration - AI-assisted analysis - Exportable JSON
