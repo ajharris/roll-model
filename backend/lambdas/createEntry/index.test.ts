@@ -3,14 +3,20 @@ import type { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 import { handler } from './index';
 import { batchWriteItems, putItem } from '../../shared/db';
 import { buildKeywordIndexItems, extractEntryTokens } from '../../shared/keywords';
+import { upsertTechniqueCandidates } from '../../shared/techniques';
 
 jest.mock('../../shared/db');
 jest.mock('../../shared/keywords');
+jest.mock('../../shared/techniques', () => ({
+  ...jest.requireActual('../../shared/techniques'),
+  upsertTechniqueCandidates: jest.fn()
+}));
 
 const mockPutItem = jest.mocked(putItem);
 const mockBatchWriteItems = jest.mocked(batchWriteItems);
 const mockExtractEntryTokens = jest.mocked(extractEntryTokens);
 const mockBuildKeywordIndexItems = jest.mocked(buildKeywordIndexItems);
+const mockUpsertTechniqueCandidates = jest.mocked(upsertTechniqueCandidates);
 
 const buildEvent = (role: 'athlete' | 'coach'): APIGatewayProxyEvent =>
   ({
@@ -22,7 +28,8 @@ const buildEvent = (role: 'athlete' | 'coach'): APIGatewayProxyEvent =>
         rounds: 6,
         giOrNoGi: 'gi',
         tags: ['guard']
-      }
+      },
+      rawTechniqueMentions: ['Knee Slice']
     }),
     requestContext: {
       authorizer: {
@@ -38,22 +45,32 @@ describe('createEntry handler auth', () => {
   beforeEach(() => {
     mockPutItem.mockResolvedValue();
     mockBatchWriteItems.mockResolvedValue();
-    mockExtractEntryTokens.mockReturnValue([]);
-    mockBuildKeywordIndexItems.mockReturnValue([]);
+    mockExtractEntryTokens.mockReset();
+    mockBuildKeywordIndexItems.mockReset();
+    mockUpsertTechniqueCandidates.mockResolvedValue();
   });
 
   it('allows athlete tokens', async () => {
+    mockExtractEntryTokens.mockReturnValueOnce(['guard', 'knee-slice']).mockReturnValueOnce([
+      'guard',
+      'private-note',
+      'knee-slice'
+    ]);
+    mockBuildKeywordIndexItems.mockReturnValueOnce([{ id: 'shared' }]).mockReturnValueOnce([{ id: 'private' }]);
+
     const result = (await handler(buildEvent('athlete'), {} as never, () => undefined)) as APIGatewayProxyResult;
 
     expect(result.statusCode).toBe(201);
     const body = JSON.parse(result.body) as { entry: { athleteId: string } };
     expect(body.entry.athleteId).toBe('user-123');
     expect(mockPutItem).toHaveBeenCalledTimes(2);
+    expect(mockExtractEntryTokens).toHaveBeenCalledTimes(2);
+    expect(mockUpsertTechniqueCandidates).toHaveBeenCalledWith(['Knee Slice'], expect.any(String), expect.any(String));
     expect(mockBuildKeywordIndexItems).toHaveBeenCalledWith(
       'user-123',
       expect.any(String),
       expect.any(String),
-      ['guard'],
+      ['guard', 'knee-slice'],
       { visibilityScope: 'shared' }
     );
     expect(mockBuildKeywordIndexItems).toHaveBeenCalledWith(
