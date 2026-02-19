@@ -5,10 +5,6 @@ import { queryItems } from '../../shared/db';
 import { errorResponse, response } from '../../shared/responses';
 import type { Comment, Entry } from '../../shared/types';
 
-interface EntryWithComments extends Entry {
-  comments: Comment[];
-}
-
 export const handler: APIGatewayProxyHandler = async (event) => {
   try {
     const auth = getAuthContext(event);
