@@ -66,7 +66,8 @@ describe('aiChat context/privacy', () => {
           rounds: 5,
           giOrNoGi: 'gi',
           tags: []
-        }
+        },
+        rawTechniqueMentions: []
       }
     ];
 
@@ -195,6 +196,23 @@ describe('aiChat handler', () => {
     const userMessage = callArgs.find((msg) => msg.role === 'user')?.content ?? '';
     expect(userMessage).toContain('private text');
     expect(userMessage).toContain('shared text');
+  });
+
+  it('rejects coaches with revoked links', async () => {
+    mockGetItem.mockResolvedValueOnce({
+      Item: { PK: 'USER#athlete-9', SK: 'COACH#coach-1', status: 'revoked' }
+    } as never);
+
+    const event = buildEvent('coach', {
+      message: 'Check in',
+      context: { athleteId: 'athlete-9' }
+    });
+
+    const result = (await handler(event, {} as never, () => undefined)) as APIGatewayProxyResult;
+
+    expect(result.statusCode).toBe(403);
+    const body = JSON.parse(result.body) as { error: { code: string } };
+    expect(body.error.code).toBe('FORBIDDEN');
   });
 
   it('prevents coach from accessing private content', async () => {

@@ -71,6 +71,11 @@ export class RollModelStack extends cdk.Stack {
       'backend/lambdas/linkCoachAthlete/index.ts',
       table
     );
+    const revokeCoachLinkLambda = this.createLambda(
+      'revokeCoachLink',
+      'backend/lambdas/revokeCoachLink/index.ts',
+      table
+    );
     const exportDataLambda = this.createLambda('exportData', 'backend/lambdas/exportData/index.ts', table);
     const aiChatLambda = this.createLambda('aiChat', 'backend/lambdas/aiChat/index.ts', table);
 
@@ -107,9 +112,14 @@ export class RollModelStack extends cdk.Stack {
     const comments = entries.addResource('comments');
     comments.addMethod('POST', new apigateway.LambdaIntegration(postCommentLambda), methodOptions);
 
+    const entryById = entries.addResource('{entryId}');
+    const entryComments = entryById.addResource('comments');
+    entryComments.addMethod('POST', new apigateway.LambdaIntegration(postCommentLambda), methodOptions);
+
     const links = api.root.addResource('links');
     const athleteCoach = links.addResource('coach');
     athleteCoach.addMethod('POST', new apigateway.LambdaIntegration(linkCoachAthleteLambda), methodOptions);
+    athleteCoach.addMethod('DELETE', new apigateway.LambdaIntegration(revokeCoachLinkLambda), methodOptions);
 
     const exportResource = api.root.addResource('export');
     exportResource.addMethod('GET', new apigateway.LambdaIntegration(exportDataLambda), methodOptions);

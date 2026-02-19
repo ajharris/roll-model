@@ -18,6 +18,15 @@ export default function CoachLinkPage() {
     }
   };
 
+  const revoke = async () => {
+    try {
+      await apiClient.revokeCoach({ coachId });
+      setStatus('Coach link revoked.');
+    } catch {
+      setStatus('Could not revoke coach link.');
+    }
+  };
+
   return (
     <Protected allow={['athlete']}>
       <section>
@@ -27,6 +36,9 @@ export default function CoachLinkPage() {
           <label htmlFor="coachId">Coach ID (Cognito sub)</label>
           <input id="coachId" value={coachId} onChange={(e) => setCoachId(e.target.value)} required />
           <button type="submit">Link coach</button>
+          <button type="button" onClick={revoke}>
+            Revoke coach
+          </button>
         </form>
         <p>{status}</p>
       </section>
