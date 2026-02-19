@@ -1,62 +1,33 @@
-# roll-model backend
+# roll-model
 
-Production-grade serverless backend for the **roll-model** scientific training intelligence platform for grapplers.
+This repository contains:
 
-## Project overview
+- `backend/`: Serverless API and infrastructure.
+- `frontend/`: Next.js (App Router) frontend v1.
 
-Core principles:
-- Athlete owns their training and AI conversation data.
-- Coaches can comment and access shared context only for linked athletes.
-- Structured data-first architecture for analytics and ML.
-- JSON exports from day one.
-
-## Architecture summary
-
-- AWS CDK v2 (TypeScript)
-- API Gateway REST API + Cognito JWT authorizer
-- Lambda (Node.js 20)
-- DynamoDB single-table (`RollModel`)
-- OpenAI server-side integration for `/ai/chat`
-- Keyword-based context retrieval for `/ai/chat` with DynamoDB keyword index
-- OpenAI key sourced from SSM SecureString: `/roll-model/openai_api_key`
-
-## Environment setup
-
-1. Install Node.js 20+
-2. Install dependencies
-   ```bash
-   npm install
-   ```
-3. Build
-   ```bash
-   npm run build
-   ```
-4. Test
-   ```bash
-   npm test
-   ```
-5. Lint
-   ```bash
-   npm run lint
-   ```
-
-## Deploy with CDK
+## Frontend v1 quick start
 
 ```bash
-npm run cdk:deploy
+cd frontend
+npm install
+cp .env.example .env.local
+npm run dev
 ```
 
-Before deployment, set OpenAI key in SSM:
+Build for production:
 
 ```bash
-aws ssm put-parameter \
-  --name /roll-model/openai_api_key \
-  --type SecureString \
-  --overwrite \
-  --value "<OPENAI_API_KEY>"
+cd frontend
+npm run build
 ```
 
-## Docs
+Required frontend environment variables are documented in `frontend/.env.example`.
 
-- `docs/data-model.md`
-- `docs/api-contracts.md`
+## Backend quick start
+
+```bash
+npm install
+npm run build
+npm test
+npm run lint
+```
