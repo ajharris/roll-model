@@ -21,20 +21,16 @@ Create a training entry.
   }
 }
 ```
-- **Response**: `201` with `{ entry }`
 
 ## `GET /entries`
-Get entries for current athlete.
 - **Role**: `athlete`
-- **Response**: `200` with full entry payloads.
+- Returns full entries.
 
 ## `GET /athletes/{athleteId}/entries`
-Get entries for linked athlete.
 - **Role**: `coach`
-- **Response**: `200` with shared sections only.
+- Returns linked athlete entries with shared sections only.
 
 ## `POST /entries/comments`
-Post comment on an entry.
 - **Role**: `coach`
 - **Body**:
 ```json
@@ -43,10 +39,8 @@ Post comment on an entry.
   "body": "string"
 }
 ```
-- **Response**: `201` with `{ comment }`
 
 ## `POST /links/coach`
-Athlete links coach.
 - **Role**: `athlete`
 - **Body**:
 ```json
@@ -54,14 +48,48 @@ Athlete links coach.
   "coachId": "string"
 }
 ```
-- **Response**: `201` with link confirmation.
 
 ## `GET /export`
-Athlete data export.
 - **Role**: `athlete`
-- **Response**: `200` with:
-  - `full`: nested JSON export
-  - `tidy`: normalized arrays for analytics ingestion
+- Returns `full` and `tidy` JSON exports.
+
+## `POST /ai/chat`
+Chat endpoint for AI-assisted post-training analysis.
+
+- **Role**: `athlete` or `coach`
+- **Body**:
+```json
+{
+  "threadId": "optional",
+  "message": "string",
+  "context": {
+    "athleteId": "required for coach",
+    "entryIds": ["optional"],
+    "dateRange": {"from": "optional", "to": "optional"},
+    "includePrivate": true,
+    "keywords": ["guard retention", "turtle"]
+  }
+}
+```
+
+Rules:
+- Athlete may set `includePrivate=true`.
+- Coach is forced to shared-only context (`includePrivate` ignored/forced false) and must be linked to target athlete.
+
+- **Response**:
+```json
+{
+  "threadId": "string",
+  "assistant_text": "string",
+  "extracted_updates": {
+    "summary": "string",
+    "detectedTopics": ["string"],
+    "recommendedIntensity": 7,
+    "followUpActions": ["string"]
+  },
+  "suggested_prompts": ["string"]
+}
+```
 
 ## Error format
 ```json
@@ -72,3 +100,8 @@ Athlete data export.
   }
 }
 ```
+
+
+Keyword retrieval behavior:
+- Default context uses latest 10 entries plus latest 20 messages in the thread.
+- When `context.keywords` is supplied, keywords are tokenized and matched against per-entry keyword index items; top entries are ranked by keyword overlap then recency.

@@ -4,6 +4,7 @@ import * as cdk from 'aws-cdk-lib';
 import * as apigateway from 'aws-cdk-lib/aws-apigateway';
 import * as cognito from 'aws-cdk-lib/aws-cognito';
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
+import * as iam from 'aws-cdk-lib/aws-iam';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as nodejs from 'aws-cdk-lib/aws-lambda-nodejs';
 import { Construct } from 'constructs';
@@ -68,6 +69,16 @@ export class RollModelStack extends cdk.Stack {
       table
     );
     const exportDataLambda = this.createLambda('exportData', 'backend/lambdas/exportData/index.ts', table);
+    const aiChatLambda = this.createLambda('aiChat', 'backend/lambdas/aiChat/index.ts', table);
+
+    aiChatLambda.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: ['ssm:GetParameter'],
+        resources: [
+          `arn:aws:ssm:${cdk.Stack.of(this).region}:${cdk.Stack.of(this).account}:parameter/roll-model/openai_api_key`
+        ]
+      })
+    );
 
     const api = new apigateway.RestApi(this, 'RollModelApi', {
       restApiName: 'RollModelApi',
@@ -99,6 +110,10 @@ export class RollModelStack extends cdk.Stack {
 
     const exportResource = api.root.addResource('export');
     exportResource.addMethod('GET', new apigateway.LambdaIntegration(exportDataLambda), methodOptions);
+
+    const ai = api.root.addResource('ai');
+    const aiChat = ai.addResource('chat');
+    aiChat.addMethod('POST', new apigateway.LambdaIntegration(aiChatLambda), methodOptions);
 
     const athletes = api.root.addResource('athletes');
     const athleteById = athletes.addResource('{athleteId}');

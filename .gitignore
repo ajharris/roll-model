@@ -3,5 +3,3 @@ dist/
 cdk.out/
 coverage/
 *.log
-.env
-.scratch

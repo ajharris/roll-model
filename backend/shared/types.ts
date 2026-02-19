@@ -46,3 +46,46 @@ export interface ApiErrorShape {
   message: string;
   statusCode: number;
 }
+
+export interface AIThread {
+  threadId: string;
+  title: string;
+  createdAt: string;
+  lastActiveAt: string;
+}
+
+export type AIMessageRole = 'user' | 'assistant';
+export type AIVisibilityScope = 'private' | 'shared';
+
+export interface AIMessage {
+  messageId: string;
+  threadId: string;
+  role: AIMessageRole;
+  content: string;
+  visibilityScope: AIVisibilityScope;
+  createdAt: string;
+}
+
+export interface AIChatContext {
+  athleteId?: string;
+  entryIds?: string[];
+  dateRange?: {
+    from?: string;
+    to?: string;
+  };
+  includePrivate?: boolean;
+  keywords?: string[];
+}
+
+export interface AIChatRequest {
+  threadId?: string;
+  message: string;
+  context?: AIChatContext;
+}
+
+export interface AIExtractedUpdates {
+  summary: string;
+  detectedTopics: string[];
+  recommendedIntensity?: number;
+  followUpActions: string[];
+}

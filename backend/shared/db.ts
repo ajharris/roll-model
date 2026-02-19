@@ -3,6 +3,8 @@ import {
   type DynamoDBClientConfig
 } from '@aws-sdk/client-dynamodb';
 import {
+  BatchWriteCommand,
+  type BatchWriteCommandInput,
   DynamoDBDocumentClient,
   GetCommand,
   type GetCommandInput,
@@ -35,6 +37,23 @@ export const putItem = async (input: Omit<PutCommandInput, 'TableName'>): Promis
       ...input
     })
   );
+};
+
+export const batchWriteItems = async (items: Array<Record<string, unknown>>): Promise<void> => {
+  const chunks: Array<Array<Record<string, unknown>>> = [];
+  for (let i = 0; i < items.length; i += 25) {
+    chunks.push(items.slice(i, i + 25));
+  }
+
+  for (const chunk of chunks) {
+    const input: BatchWriteCommandInput = {
+      RequestItems: {
+        [TABLE_NAME]: chunk.map((Item) => ({ PutRequest: { Item } }))
+      }
+    };
+
+    await documentClient.send(new BatchWriteCommand(input));
+  }
 };
 
 export const queryItems = async (

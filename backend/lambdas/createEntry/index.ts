@@ -2,7 +2,8 @@ import type { APIGatewayProxyEvent, APIGatewayProxyHandler } from 'aws-lambda';
 import { v4 as uuidv4 } from 'uuid';
 
 import { getAuthContext, requireRole } from '../../shared/auth';
-import { putItem } from '../../shared/db';
+import { batchWriteItems, putItem } from '../../shared/db';
+import { buildKeywordIndexItems, extractEntryTokens } from '../../shared/keywords';
 import { ApiError, errorResponse, response } from '../../shared/responses';
 import type { CreateEntryRequest, Entry } from '../../shared/types';
 
@@ -69,6 +70,12 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         ...entry
       }
     });
+
+    const tokens = extractEntryTokens(entry, { includePrivate: true, maxTokens: 30 });
+    if (tokens.length > 0) {
+      const keywordItems = buildKeywordIndexItems(auth.userId, entry.entryId, entry.createdAt, tokens);
+      await batchWriteItems(keywordItems);
+    }
 
     await putItem({
       Item: {

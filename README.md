@@ -4,68 +4,59 @@ Production-grade serverless backend for the **roll-model** scientific training i
 
 ## Project overview
 
-This repository initializes the backend foundation with strict TypeScript, AWS CDK v2 infrastructure, and modular Lambda handlers.
-
-Core principles implemented:
-- Athlete owns their training data.
-- Coaches can comment but cannot alter or delete athlete entries.
-- Structured-first storage for analytics and ML-readiness.
-- JSON export available from day one.
+Core principles:
+- Athlete owns their training and AI conversation data.
+- Coaches can comment and access shared context only for linked athletes.
+- Structured data-first architecture for analytics and ML.
+- JSON exports from day one.
 
 ## Architecture summary
 
-- **AWS CDK v2 (TypeScript)** provisions all cloud resources.
-- **API Gateway REST API** for HTTP interface.
-- **Cognito User Pool** for JWT auth (`custom:role` claim for `athlete | coach`).
-- **Lambda (Node.js 20)** for business logic.
-- **DynamoDB single-table (`RollModel`)** for user, entry, link, and comment entities.
-
-Repository layout:
-
-```text
-backend/
-  lambdas/
-  shared/
-infrastructure/
-  cdk/
-docs/
-```
+- AWS CDK v2 (TypeScript)
+- API Gateway REST API + Cognito JWT authorizer
+- Lambda (Node.js 20)
+- DynamoDB single-table (`RollModel`)
+- OpenAI server-side integration for `/ai/chat`
+- Keyword-based context retrieval for `/ai/chat` with DynamoDB keyword index
+- OpenAI key sourced from SSM SecureString: `/roll-model/openai_api_key`
 
 ## Environment setup
 
 1. Install Node.js 20+
-2. Install dependencies:
+2. Install dependencies
    ```bash
    npm install
    ```
-3. Build project:
+3. Build
    ```bash
    npm run build
    ```
-4. Run tests:
+4. Test
    ```bash
    npm test
    ```
-5. Run lint:
+5. Lint
    ```bash
    npm run lint
    ```
 
 ## Deploy with CDK
 
-Configure AWS credentials and default region/account, then run:
-
 ```bash
 npm run cdk:deploy
 ```
 
-To preview synthesized infrastructure:
+Before deployment, set OpenAI key in SSM:
 
 ```bash
-npm run cdk:synth
+aws ssm put-parameter \
+  --name /roll-model/openai_api_key \
+  --type SecureString \
+  --overwrite \
+  --value "<OPENAI_API_KEY>"
 ```
 
-## Documentation
+## Docs
 
-- Data model: `docs/data-model.md`
-- API contracts: `docs/api-contracts.md`
+- `docs/data-model.md`
+- `docs/api-contracts.md`
