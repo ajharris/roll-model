@@ -19,7 +19,7 @@ export default function EntriesPage() {
     <Protected allow={['athlete']}>
       <section>
         <h2>Observations</h2>
-        <p className="small">BJJ for Betas: evidence over vibes.</p>
+        <p className="small">BJJ Lab Notebook: evidence over vibes.</p>
         <Link href="/entries/new">Create a new entry</Link>
         {error && <p>{error}</p>}
         {entries.map((entry) => (
