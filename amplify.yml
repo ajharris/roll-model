@@ -5,8 +5,6 @@ applications:
       phases:
         preBuild:
           commands:
-            - node --version
-            - npm --version
             - npm ci
         build:
           commands:
