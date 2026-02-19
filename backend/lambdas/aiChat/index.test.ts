@@ -1,14 +1,45 @@
-import { putItem } from '../../shared/db';
-import { resetOpenAIApiKeyCache } from '../../shared/openai';
+import type { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
+
+import { getItem, putItem, queryItems } from '../../shared/db';
+import { callOpenAI, resetOpenAIApiKeyCache } from '../../shared/openai';
 import type { Entry } from '../../shared/types';
 
-import { buildPromptContext, sanitizeContext, storeMessage } from './index';
+import { buildPromptContext, handler, sanitizeContext, storeMessage } from './index';
 
-jest.mock('../../shared/db', () => ({
-  putItem: jest.fn(),
-  getItem: jest.fn(),
-  queryItems: jest.fn()
+jest.mock('../../shared/db');
+jest.mock('../../shared/retrieval', () => ({
+  batchGetEntries: jest.fn(),
+  queryKeywordMatches: jest.fn()
 }));
+jest.mock('../../shared/openai', () => {
+  const actual = jest.requireActual('../../shared/openai');
+  return {
+    ...actual,
+    callOpenAI: jest.fn()
+  };
+});
+
+jest.mock('uuid', () => ({
+  v4: jest.fn()
+}));
+
+const mockGetItem = jest.mocked(getItem);
+const mockPutItem = jest.mocked(putItem);
+const mockQueryItems = jest.mocked(queryItems);
+const mockCallOpenAI = jest.mocked(callOpenAI);
+
+const buildEvent = (role: 'athlete' | 'coach', body: Record<string, unknown>): APIGatewayProxyEvent =>
+  ({
+    body: JSON.stringify(body),
+    requestContext: {
+      authorizer: {
+        claims: {
+          sub: role === 'athlete' ? 'athlete-1' : 'coach-1',
+          'custom:role': role
+        }
+      }
+    }
+  }) as unknown as APIGatewayProxyEvent;
 
 describe('aiChat context/privacy', () => {
   it('athlete can include private notes when requested', () => {
@@ -85,5 +116,138 @@ describe('aiChat storage', () => {
         createdAt: '2026-01-02T00:00:00.000Z'
       }
     });
+  });
+});
+
+describe('aiChat handler', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    resetOpenAIApiKeyCache();
+    mockPutItem.mockResolvedValue();
+    mockCallOpenAI.mockResolvedValue({
+      text: 'Assistant reply',
+      extracted_updates: {
+        summary: 'Summary',
+        detectedTopics: ['guard'],
+        followUpActions: ['review notes']
+      },
+      suggested_prompts: ['Ask about intensity']
+    });
+  });
+
+  it('returns stable schema for athlete and includes private context when requested', async () => {
+    const { v4 } = jest.requireMock('uuid') as { v4: jest.Mock };
+    v4.mockReturnValueOnce('thread-1').mockReturnValueOnce('msg-1').mockReturnValueOnce('msg-2');
+
+    mockQueryItems.mockImplementation(async (input) => {
+      const values = input.ExpressionAttributeValues ?? {};
+      if (values[':msgPrefix'] === 'MSG#') {
+        return {
+          Items: []
+        } as never;
+      }
+      if (values[':entryPrefix'] === 'ENTRY#') {
+        return {
+          Items: [
+            {
+              entityType: 'ENTRY',
+              PK: 'USER#athlete-1',
+              SK: 'ENTRY#2026-01-01T00:00:00.000Z#entry-1',
+              entryId: 'entry-1',
+              athleteId: 'athlete-1',
+              createdAt: '2026-01-01T00:00:00.000Z',
+              updatedAt: '2026-01-01T00:00:00.000Z',
+              sections: { private: 'private text', shared: 'shared text' },
+              sessionMetrics: {
+                durationMinutes: 60,
+                intensity: 7,
+                rounds: 5,
+                giOrNoGi: 'gi',
+                tags: []
+              }
+            }
+          ]
+        } as never;
+      }
+      return { Items: [] } as never;
+    });
+
+    const event = buildEvent('athlete', {
+      message: 'Help me plan',
+      context: { includePrivate: true }
+    });
+
+    const result = (await handler(event, {} as never, () => undefined)) as APIGatewayProxyResult;
+
+    expect(result.statusCode).toBe(200);
+    const body = JSON.parse(result.body) as {
+      threadId: string;
+      assistant_text: string;
+      extracted_updates: { summary: string; detectedTopics: string[]; followUpActions: string[] };
+      suggested_prompts: string[];
+    };
+    expect(body.threadId).toBe('thread-1');
+    expect(typeof body.assistant_text).toBe('string');
+    expect(body.extracted_updates.summary).toBe('Summary');
+    expect(Array.isArray(body.suggested_prompts)).toBe(true);
+
+    const callArgs = mockCallOpenAI.mock.calls[0]?.[0] ?? [];
+    const userMessage = callArgs.find((msg) => msg.role === 'user')?.content ?? '';
+    expect(userMessage).toContain('private text');
+    expect(userMessage).toContain('shared text');
+  });
+
+  it('prevents coach from accessing private content', async () => {
+    const { v4 } = jest.requireMock('uuid') as { v4: jest.Mock };
+    v4.mockReturnValueOnce('thread-2').mockReturnValueOnce('msg-3').mockReturnValueOnce('msg-4');
+
+    mockGetItem.mockResolvedValueOnce({ Item: { PK: 'USER#athlete-9', SK: 'COACH#coach-1' } } as never);
+
+    mockQueryItems.mockImplementation(async (input) => {
+      const values = input.ExpressionAttributeValues ?? {};
+      if (values[':msgPrefix'] === 'MSG#') {
+        return { Items: [] } as never;
+      }
+      if (values[':entryPrefix'] === 'ENTRY#') {
+        return {
+          Items: [
+            {
+              entityType: 'ENTRY',
+              PK: 'USER#athlete-9',
+              SK: 'ENTRY#2026-01-01T00:00:00.000Z#entry-9',
+              entryId: 'entry-9',
+              athleteId: 'athlete-9',
+              createdAt: '2026-01-01T00:00:00.000Z',
+              updatedAt: '2026-01-01T00:00:00.000Z',
+              sections: { private: 'secret plan', shared: 'shared plan' },
+              sessionMetrics: {
+                durationMinutes: 45,
+                intensity: 6,
+                rounds: 4,
+                giOrNoGi: 'no-gi',
+                tags: []
+              }
+            }
+          ]
+        } as never;
+      }
+      return { Items: [] } as never;
+    });
+
+    const event = buildEvent('coach', {
+      message: 'Coach check-in',
+      context: { athleteId: 'athlete-9', includePrivate: true }
+    });
+
+    const result = (await handler(event, {} as never, () => undefined)) as APIGatewayProxyResult;
+
+    expect(result.statusCode).toBe(200);
+    const body = JSON.parse(result.body) as { assistant_text: string };
+    expect(typeof body.assistant_text).toBe('string');
+
+    const callArgs = mockCallOpenAI.mock.calls[0]?.[0] ?? [];
+    const userMessage = callArgs.find((msg) => msg.role === 'user')?.content ?? '';
+    expect(userMessage).not.toContain('secret plan');
+    expect(userMessage).toContain('shared plan');
   });
 });

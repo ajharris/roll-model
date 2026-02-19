@@ -1,5 +1,4 @@
 import type { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
-import type { GetCommandOutput } from '@aws-sdk/lib-dynamodb';
 
 import { handler } from './index';
 import { getItem, putItem } from '../../shared/db';
@@ -34,10 +33,8 @@ describe('postComment handler auth', () => {
 
   it('allows coach tokens', async () => {
     mockGetItem
-      .mockResolvedValueOnce({ Item: { athleteId: 'athlete-9' } } as unknown as GetCommandOutput)
-      .mockResolvedValueOnce(
-        { Item: { PK: 'USER#athlete-9', SK: 'COACH#coach-42' } } as unknown as GetCommandOutput
-      );
+      .mockResolvedValueOnce({ Item: { athleteId: 'athlete-9' } } as never)
+      .mockResolvedValueOnce({ Item: { PK: 'USER#athlete-9', SK: 'COACH#coach-42' } } as never);
 
     const result = (await handler(buildEvent('coach'), {} as never, () => undefined)) as APIGatewayProxyResult;
 

@@ -43,14 +43,6 @@ describe('createEntry handler auth', () => {
   });
 
   it('allows athlete tokens', async () => {
-    mockExtractEntryTokens.mockReset();
-    mockBuildKeywordIndexItems.mockReset();
-    mockExtractEntryTokens
-      .mockReturnValueOnce(['guard'])
-      .mockReturnValueOnce(['guard', 'private-note']);
-    mockBuildKeywordIndexItems.mockReturnValueOnce([{ id: 'shared' } as never]);
-    mockBuildKeywordIndexItems.mockReturnValueOnce([{ id: 'private' } as never]);
-
     const result = (await handler(buildEvent('athlete'), {} as never, () => undefined)) as APIGatewayProxyResult;
 
     expect(result.statusCode).toBe(201);
