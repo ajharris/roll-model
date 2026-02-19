@@ -52,4 +52,16 @@ describe('postComment handler auth', () => {
     const body = JSON.parse(result.body) as { error: { code: string } };
     expect(body.error.code).toBe('FORBIDDEN');
   });
+
+  it('requires coach-athlete link', async () => {
+    mockGetItem
+      .mockResolvedValueOnce({ Item: { athleteId: 'athlete-9' } } as unknown as GetCommandOutput)
+      .mockResolvedValueOnce({} as unknown as GetCommandOutput);
+
+    const result = (await handler(buildEvent('coach'), {} as never, () => undefined)) as APIGatewayProxyResult;
+
+    expect(result.statusCode).toBe(403);
+    const body = JSON.parse(result.body) as { error: { code: string } };
+    expect(body.error.code).toBe('FORBIDDEN');
+  });
 });
