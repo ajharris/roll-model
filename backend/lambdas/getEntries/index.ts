@@ -63,6 +63,9 @@ export const handler: APIGatewayProxyHandler = async (event) => {
           SK: string;
           entityType: string;
         };
+        void _pk;
+        void _sk;
+        void _entityType;
         return entry;
       });
 

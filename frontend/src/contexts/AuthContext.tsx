@@ -35,15 +35,22 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 const sessionKey = 'roll-model-auth';
 
-const userPool = new CognitoUserPool({
-  UserPoolId: process.env.NEXT_PUBLIC_COGNITO_USER_POOL_ID ?? '',
-  ClientId: process.env.NEXT_PUBLIC_COGNITO_CLIENT_ID ?? '',
-});
+const createUserPool = (): CognitoUserPool | null => {
+  const userPoolId = process.env.NEXT_PUBLIC_COGNITO_USER_POOL_ID;
+  const clientId = process.env.NEXT_PUBLIC_COGNITO_CLIENT_ID;
+  if (!userPoolId || !clientId) return null;
+  try {
+    return new CognitoUserPool({ UserPoolId: userPoolId, ClientId: clientId });
+  } catch {
+    return null;
+  }
+};
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [tokens, setTokens] = useState<AuthTokens | null>(null);
   const [user, setUser] = useState<UserInfo | null>(null);
   const [role, setRole] = useState<UserRole>('unknown');
+  const userPool = useMemo(() => createUserPool(), []);
 
   useEffect(() => {
     const raw = sessionStorage.getItem(sessionKey);
@@ -74,6 +81,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const signIn = useCallback((username: string, password: string) =>
     new Promise<void>((resolve, reject) => {
+      if (!userPool) {
+        reject(new Error('Cognito user pool is not configured.'));
+        return;
+      }
       const cognitoUser = new CognitoUser({ Username: username, Pool: userPool });
       const authDetails = new AuthenticationDetails({ Username: username, Password: password });
 
@@ -88,7 +99,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         },
         onFailure: (err) => reject(err),
       });
-    }), []);
+    }), [userPool]);
 
   const signOut = useCallback(() => {
     setTokens(null);

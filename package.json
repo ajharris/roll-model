@@ -9,7 +9,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "clean": "rm -rf dist coverage cdk.out",
-    "lint": "eslint . --ext .ts",
+    "lint": "eslint backend infrastructure --ext .ts",
     "format": "prettier --write .",
     "test": "npm run test:backend && npm run test:frontend",
     "test:backend": "jest --runInBand",

@@ -86,6 +86,9 @@ export const batchGetEntries = async (entryIds: string[]): Promise<Entry[]> => {
       SK: string;
       entityType: string;
     };
+    void _pk;
+    void _sk;
+    void _entityType;
 
     entries.push(rest);
   }
