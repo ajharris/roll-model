@@ -27,7 +27,7 @@ export default function ChatPage() {
         ? {
             ...thread,
             title: thread.messages.length ? thread.title : message.slice(0, 28),
-            messages: [...thread.messages, { id: crypto.randomUUID(), role: 'user', text: message, createdAt: new Date().toISOString() }],
+            messages: [...thread.messages, { id: crypto.randomUUID(), role: 'user' as const, text: message, createdAt: new Date().toISOString() }],
           }
         : thread,
     );
@@ -41,7 +41,7 @@ export default function ChatPage() {
           thread.id === active.id
             ? {
                 ...thread,
-                messages: [...thread.messages, { id: crypto.randomUUID(), role: 'assistant', text: response.assistant_text, createdAt: new Date().toISOString() }],
+                messages: [...thread.messages, { id: crypto.randomUUID(), role: 'assistant' as const, text: response.assistant_text, createdAt: new Date().toISOString() }],
               }
             : thread,
         ),
