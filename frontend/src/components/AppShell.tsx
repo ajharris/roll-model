@@ -18,7 +18,7 @@ export const AppShell = ({ children }: { children: ReactNode }) => {
   return (
     <div className="layout">
       <header>
-        <h1>BJJ for Betas</h1>
+        <h1>BJJ Lab Notebook</h1>
         <p>Evidence over vibes. Keep observations tight and testable.</p>
         {isAuthenticated && (
           <div className="user-row">
