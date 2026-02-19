@@ -56,8 +56,8 @@ describe('postComment handler auth', () => {
 
   it('requires coach-athlete link', async () => {
     mockGetItem
-      .mockResolvedValueOnce({ Item: { athleteId: 'athlete-9' } } as unknown as GetCommandOutput)
-      .mockResolvedValueOnce({} as unknown as GetCommandOutput);
+      .mockResolvedValueOnce({ Item: { athleteId: 'athlete-9' } } as never)
+      .mockResolvedValueOnce({} as never);
 
     const result = (await handler(buildEvent('coach'), {} as never, () => undefined)) as APIGatewayProxyResult;
 

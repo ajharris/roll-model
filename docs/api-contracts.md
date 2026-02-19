@@ -226,73 +226,55 @@ Link an athlete to a coach.
 ```
 
 ## `GET /export`
-Return full and tidy exports for the authenticated athlete.
+Return a full or tidy export for the authenticated athlete.
 - **Role**: `athlete`
+
+**Query parameters**
+- `mode` (optional): `full` or `tidy`. If omitted, both are returned.
+
+**Notes**
+- `full` is raw entities grouped into arrays.
+- `tidy` is analysis-ready normalized arrays plus relationship tables.
+- Tidy ordering is deterministic based on DynamoDB sort keys: entries by `ENTRY#...`, comments by `COMMENT#...` within each entry, threads by `AI_THREAD#...`, messages by `MSG#...` within each thread.
 
 **Response JSON schema (200)**
 ```json
 {
   "type": "object",
-  "required": ["full", "tidy"],
+  "required": ["schemaVersion", "generatedAt"],
   "properties": {
+    "schemaVersion": {"type": "string"},
+    "generatedAt": {"type": "string"},
     "full": {
       "type": "object",
-      "required": ["athleteId", "exportedAt", "entries"],
+      "required": ["athleteId", "entries", "comments", "links", "aiThreads", "aiMessages"],
       "properties": {
         "athleteId": {"type": "string"},
-        "exportedAt": {"type": "string"},
         "entries": {
           "type": "array",
-          "items": {
-            "type": "object",
-            "required": ["entryId", "athleteId", "createdAt", "updatedAt", "sections", "sessionMetrics", "comments"],
-            "properties": {
-              "entryId": {"type": "string"},
-              "athleteId": {"type": "string"},
-              "createdAt": {"type": "string"},
-              "updatedAt": {"type": "string"},
-              "sections": {
-                "type": "object",
-                "required": ["private", "shared"],
-                "properties": {
-                  "private": {"type": "string"},
-                  "shared": {"type": "string"}
-                }
-              },
-              "sessionMetrics": {
-                "type": "object",
-                "required": ["durationMinutes", "intensity", "rounds", "giOrNoGi", "tags"],
-                "properties": {
-                  "durationMinutes": {"type": "number"},
-                  "intensity": {"type": "number"},
-                  "rounds": {"type": "number"},
-                  "giOrNoGi": {"type": "string"},
-                  "tags": {"type": "array", "items": {"type": "string"}}
-                }
-              },
-              "comments": {
-                "type": "array",
-                "items": {
-                  "type": "object",
-                  "required": ["commentId", "entryId", "coachId", "createdAt", "body", "visibility"],
-                  "properties": {
-                    "commentId": {"type": "string"},
-                    "entryId": {"type": "string"},
-                    "coachId": {"type": "string"},
-                    "createdAt": {"type": "string"},
-                    "body": {"type": "string"},
-                    "visibility": {"type": "string", "enum": ["visible", "hiddenByAthlete"]}
-                  }
-                }
-              }
-            }
-          }
+          "items": {"$ref": "#/definitions/Entry"}
+        },
+        "comments": {
+          "type": "array",
+          "items": {"$ref": "#/definitions/Comment"}
+        },
+        "links": {
+          "type": "array",
+          "items": {"$ref": "#/definitions/CoachLink"}
+        },
+        "aiThreads": {
+          "type": "array",
+          "items": {"$ref": "#/definitions/AIThread"}
+        },
+        "aiMessages": {
+          "type": "array",
+          "items": {"$ref": "#/definitions/AIMessage"}
         }
       }
     },
     "tidy": {
       "type": "object",
-      "required": ["athlete", "entries", "comments", "relationships"],
+      "required": ["athlete", "entries", "comments", "links", "aiThreads", "aiMessages", "relationships"],
       "properties": {
         "athlete": {
           "type": "object",
@@ -307,22 +289,23 @@ Return full and tidy exports for the authenticated athlete.
         },
         "comments": {
           "type": "array",
-          "items": {
-            "type": "object",
-            "required": ["commentId", "entryId", "coachId", "createdAt", "body", "visibility"],
-            "properties": {
-              "commentId": {"type": "string"},
-              "entryId": {"type": "string"},
-              "coachId": {"type": "string"},
-              "createdAt": {"type": "string"},
-              "body": {"type": "string"},
-              "visibility": {"type": "string", "enum": ["visible", "hiddenByAthlete"]}
-            }
-          }
+          "items": {"$ref": "#/definitions/Comment"}
+        },
+        "links": {
+          "type": "array",
+          "items": {"$ref": "#/definitions/CoachLink"}
+        },
+        "aiThreads": {
+          "type": "array",
+          "items": {"$ref": "#/definitions/AIThread"}
+        },
+        "aiMessages": {
+          "type": "array",
+          "items": {"$ref": "#/definitions/AIMessage"}
         },
         "relationships": {
           "type": "object",
-          "required": ["entryComments"],
+          "required": ["entryComments", "threadMessages"],
           "properties": {
             "entryComments": {
               "type": "array",
@@ -332,6 +315,17 @@ Return full and tidy exports for the authenticated athlete.
                 "properties": {
                   "entryId": {"type": "string"},
                   "commentIds": {"type": "array", "items": {"type": "string"}}
+                }
+              }
+            },
+            "threadMessages": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["threadId", "messageIds"],
+                "properties": {
+                  "threadId": {"type": "string"},
+                  "messageIds": {"type": "array", "items": {"type": "string"}}
                 }
               }
             }
@@ -368,6 +362,49 @@ Return full and tidy exports for the authenticated athlete.
             "tags": {"type": "array", "items": {"type": "string"}}
           }
         }
+      }
+    },
+    "Comment": {
+      "type": "object",
+      "required": ["commentId", "entryId", "coachId", "createdAt", "body", "visibility"],
+      "properties": {
+        "commentId": {"type": "string"},
+        "entryId": {"type": "string"},
+        "coachId": {"type": "string"},
+        "createdAt": {"type": "string"},
+        "body": {"type": "string"},
+        "visibility": {"type": "string", "enum": ["visible", "hiddenByAthlete"]}
+      }
+    },
+    "CoachLink": {
+      "type": "object",
+      "required": ["athleteId", "coachId", "createdAt"],
+      "properties": {
+        "athleteId": {"type": "string"},
+        "coachId": {"type": "string"},
+        "createdAt": {"type": "string"}
+      }
+    },
+    "AIThread": {
+      "type": "object",
+      "required": ["threadId", "title", "createdAt", "lastActiveAt"],
+      "properties": {
+        "threadId": {"type": "string"},
+        "title": {"type": "string"},
+        "createdAt": {"type": "string"},
+        "lastActiveAt": {"type": "string"}
+      }
+    },
+    "AIMessage": {
+      "type": "object",
+      "required": ["messageId", "threadId", "role", "content", "visibilityScope", "createdAt"],
+      "properties": {
+        "messageId": {"type": "string"},
+        "threadId": {"type": "string"},
+        "role": {"type": "string", "enum": ["user", "assistant"]},
+        "content": {"type": "string"},
+        "visibilityScope": {"type": "string", "enum": ["private", "shared"]},
+        "createdAt": {"type": "string"}
       }
     }
   }
