@@ -1,4 +1,4 @@
-import type { APIGatewayProxyEvent } from 'aws-lambda';
+import type { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 
 import { handler } from './index';
 import { batchWriteItems, putItem } from '../../shared/db';
@@ -32,7 +32,7 @@ const buildEvent = (role: 'athlete' | 'coach'): APIGatewayProxyEvent =>
         }
       }
     }
-  }) as APIGatewayProxyEvent;
+  }) as unknown as APIGatewayProxyEvent;
 
 describe('createEntry handler auth', () => {
   beforeEach(() => {
@@ -43,7 +43,7 @@ describe('createEntry handler auth', () => {
   });
 
   it('allows athlete tokens', async () => {
-    const result = await handler(buildEvent('athlete'), {} as never, () => undefined);
+    const result = (await handler(buildEvent('athlete'), {} as never, () => undefined)) as APIGatewayProxyResult;
 
     expect(result.statusCode).toBe(201);
     const body = JSON.parse(result.body) as { entry: { athleteId: string } };
@@ -52,7 +52,7 @@ describe('createEntry handler auth', () => {
   });
 
   it('rejects coach tokens', async () => {
-    const result = await handler(buildEvent('coach'), {} as never, () => undefined);
+    const result = (await handler(buildEvent('coach'), {} as never, () => undefined)) as APIGatewayProxyResult;
 
     expect(result.statusCode).toBe(403);
     const body = JSON.parse(result.body) as { error: { code: string } };

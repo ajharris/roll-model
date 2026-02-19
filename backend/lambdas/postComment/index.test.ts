@@ -1,4 +1,4 @@
-import type { APIGatewayProxyEvent } from 'aws-lambda';
+import type { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 
 import { handler } from './index';
 import { getItem, putItem } from '../../shared/db';
@@ -23,7 +23,7 @@ const buildEvent = (role: 'athlete' | 'coach'): APIGatewayProxyEvent =>
         }
       }
     }
-  }) as APIGatewayProxyEvent;
+  }) as unknown as APIGatewayProxyEvent;
 
 describe('postComment handler auth', () => {
   beforeEach(() => {
@@ -33,10 +33,10 @@ describe('postComment handler auth', () => {
 
   it('allows coach tokens', async () => {
     mockGetItem
-      .mockResolvedValueOnce({ Item: { athleteId: 'athlete-9' } })
-      .mockResolvedValueOnce({ Item: { PK: 'USER#athlete-9', SK: 'COACH#coach-42' } });
+      .mockResolvedValueOnce({ Item: { athleteId: 'athlete-9' } } as never)
+      .mockResolvedValueOnce({ Item: { PK: 'USER#athlete-9', SK: 'COACH#coach-42' } } as never);
 
-    const result = await handler(buildEvent('coach'), {} as never, () => undefined);
+    const result = (await handler(buildEvent('coach'), {} as never, () => undefined)) as APIGatewayProxyResult;
 
     expect(result.statusCode).toBe(201);
     const body = JSON.parse(result.body) as { comment: { coachId: string; commentId: string } };
@@ -46,7 +46,7 @@ describe('postComment handler auth', () => {
   });
 
   it('rejects athlete tokens', async () => {
-    const result = await handler(buildEvent('athlete'), {} as never, () => undefined);
+    const result = (await handler(buildEvent('athlete'), {} as never, () => undefined)) as APIGatewayProxyResult;
 
     expect(result.statusCode).toBe(403);
     const body = JSON.parse(result.body) as { error: { code: string } };
