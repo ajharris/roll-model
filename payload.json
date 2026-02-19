@@ -1,0 +1,13 @@
+{
+  "sections": {
+    "private": "Private: felt gassed after mount escape reps.",
+    "shared": "Mount escapes: knee-elbow + kipping. Need earlier frames."
+  },
+  "sessionMetrics": {
+    "durationMinutes": 60,
+    "intensity": 6,
+    "rounds": 5,
+    "giOrNoGi": "gi",
+    "tags": ["mount-escape", "knee-elbow", "kipping"]
+  }
+}
