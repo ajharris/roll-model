@@ -198,6 +198,23 @@ describe('aiChat handler', () => {
     expect(userMessage).toContain('shared text');
   });
 
+  it('rejects coaches with revoked links', async () => {
+    mockGetItem.mockResolvedValueOnce({
+      Item: { PK: 'USER#athlete-9', SK: 'COACH#coach-1', status: 'revoked' }
+    } as never);
+
+    const event = buildEvent('coach', {
+      message: 'Check in',
+      context: { athleteId: 'athlete-9' }
+    });
+
+    const result = (await handler(event, {} as never, () => undefined)) as APIGatewayProxyResult;
+
+    expect(result.statusCode).toBe(403);
+    const body = JSON.parse(result.body) as { error: { code: string } };
+    expect(body.error.code).toBe('FORBIDDEN');
+  });
+
   it('prevents coach from accessing private content', async () => {
     const { v4 } = jest.requireMock('uuid') as { v4: jest.Mock };
     v4.mockReturnValueOnce('thread-2').mockReturnValueOnce('msg-3').mockReturnValueOnce('msg-4');
