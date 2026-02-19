@@ -1,3 +1,4 @@
+import * as fs from 'fs';
 import * as path from 'path';
 
 import * as cdk from 'aws-cdk-lib';
@@ -140,10 +141,12 @@ export class RollModelStack extends cdk.Stack {
   }
 
   private createLambda(name: string, entryPath: string, table: dynamodb.Table): nodejs.NodejsFunction {
+    const entry = path.join(__dirname, '..', '..', '..', entryPath);
+    const resolvedEntry = fs.existsSync(entry) ? entry : entry.replace(/\.ts$/, '.js');
     const fn = new nodejs.NodejsFunction(this, `${name}Lambda`, {
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: 'handler',
-      entry: path.join(__dirname, '..', '..', '..', entryPath),
+      entry: resolvedEntry,
       environment: {
         TABLE_NAME: table.tableName
       },
