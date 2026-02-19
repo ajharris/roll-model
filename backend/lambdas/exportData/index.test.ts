@@ -20,6 +20,19 @@ const buildEvent = (): APIGatewayProxyEvent =>
     }
   }) as unknown as APIGatewayProxyEvent;
 
+const buildEventWithMode = (mode: string): APIGatewayProxyEvent =>
+  ({
+    queryStringParameters: { mode },
+    requestContext: {
+      authorizer: {
+        claims: {
+          sub: 'athlete-1',
+          'custom:role': 'athlete'
+        }
+      }
+    }
+  }) as unknown as APIGatewayProxyEvent;
+
 describe('exportData handler', () => {
   beforeEach(() => {
     mockQueryItems.mockReset();
@@ -62,19 +75,58 @@ describe('exportData handler', () => {
             visibility: 'visible'
           }
         ]
+      } as unknown as QueryCommandOutput)
+      .mockResolvedValueOnce({
+        Items: []
+      } as unknown as QueryCommandOutput)
+      .mockResolvedValueOnce({
+        Items: []
       } as unknown as QueryCommandOutput);
 
     const result = (await handler(buildEvent(), {} as never, () => undefined)) as APIGatewayProxyResult;
 
     expect(result.statusCode).toBe(200);
     const body = JSON.parse(result.body) as {
-      full: { athleteId: string; entries: Array<{ entryId: string; comments: Array<{ commentId: string }> }> };
+      schemaVersion: string;
+      generatedAt: string;
+      full: {
+        athleteId: string;
+        entries: Array<{ entryId: string }>;
+        comments: Array<{ commentId: string }>;
+      };
       tidy: { entries: Array<{ entryId: string }>; comments: Array<{ commentId: string }> };
     };
+    expect(body.schemaVersion).toBe('2026-02-19');
+    expect(body.generatedAt).toBeDefined();
     expect(body.full.athleteId).toBe('athlete-1');
     expect(body.full.entries[0].entryId).toBe('entry-1');
-    expect(body.full.entries[0].comments[0].commentId).toBe('comment-1');
+    expect(body.full.comments[0].commentId).toBe('comment-1');
     expect(body.tidy.entries).toHaveLength(1);
     expect(body.tidy.comments).toHaveLength(1);
+  });
+
+  it('returns tidy only when mode=tidy', async () => {
+    mockQueryItems
+      .mockResolvedValueOnce({
+        Items: []
+      } as unknown as QueryCommandOutput)
+      .mockResolvedValueOnce({
+        Items: []
+      } as unknown as QueryCommandOutput)
+      .mockResolvedValueOnce({
+        Items: []
+      } as unknown as QueryCommandOutput)
+      .mockResolvedValueOnce({
+        Items: []
+      } as unknown as QueryCommandOutput);
+
+    const result = (await handler(buildEventWithMode('tidy'), {} as never, () => undefined)) as APIGatewayProxyResult;
+
+    expect(result.statusCode).toBe(200);
+    const body = JSON.parse(result.body) as { schemaVersion: string; generatedAt: string; tidy?: unknown; full?: unknown };
+    expect(body.schemaVersion).toBe('2026-02-19');
+    expect(body.generatedAt).toBeDefined();
+    expect(body.tidy).toBeDefined();
+    expect(body.full).toBeUndefined();
   });
 });

@@ -31,6 +31,12 @@ export interface Comment {
   visibility: 'visible' | 'hiddenByAthlete';
 }
 
+export interface CoachLink {
+  athleteId: string;
+  coachId: string;
+  createdAt: string;
+}
+
 export interface CreateEntryRequest {
   sections: EntrySections;
   sessionMetrics: SessionMetrics;

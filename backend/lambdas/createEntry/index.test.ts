@@ -38,11 +38,16 @@ describe('createEntry handler auth', () => {
   beforeEach(() => {
     mockPutItem.mockResolvedValue();
     mockBatchWriteItems.mockResolvedValue();
-    mockExtractEntryTokens.mockReturnValue([]);
+    mockExtractEntryTokens.mockReset();
     mockBuildKeywordIndexItems.mockReturnValue([]);
   });
 
   it('allows athlete tokens', async () => {
+    mockExtractEntryTokens.mockReturnValueOnce(['guard']).mockReturnValueOnce(['guard', 'private-note']);
+    mockBuildKeywordIndexItems
+      .mockReturnValueOnce([{ id: 'shared' }])
+      .mockReturnValueOnce([{ id: 'private' }]);
+
     const result = (await handler(buildEvent('athlete'), {} as never, () => undefined)) as APIGatewayProxyResult;
 
     expect(result.statusCode).toBe(201);
