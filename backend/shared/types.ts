@@ -20,6 +20,7 @@ export interface Entry {
   updatedAt: string;
   sections: EntrySections;
   sessionMetrics: SessionMetrics;
+  rawTechniqueMentions: string[];
 }
 
 export interface Comment {
@@ -40,6 +41,16 @@ export interface CoachLink {
 export interface CreateEntryRequest {
   sections: EntrySections;
   sessionMetrics: SessionMetrics;
+  rawTechniqueMentions?: string[];
+}
+
+export interface TechniqueCandidate {
+  phrase: string;
+  normalizedPhrase: string;
+  count: number;
+  lastSeenAt: string;
+  exampleEntryIds: string[];
+  status: string;
 }
 
 export interface PostCommentRequest {

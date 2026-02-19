@@ -18,7 +18,8 @@ describe('keyword tokenization', () => {
         rounds: 6,
         giOrNoGi: 'gi',
         tags: ['Guard Retention', 'Pressure-Passing']
-      }
+      },
+      rawTechniqueMentions: ['Knee Slice', 'Arm Bar']
     };
 
     const tokens = extractEntryTokens(entry, { includePrivate: true, maxTokens: 30 });
@@ -27,6 +28,8 @@ describe('keyword tokenization', () => {
       expect.arrayContaining([
         'guard-retention',
         'pressure-passing',
+        'knee-slice',
+        'arm-bar',
         'worked',
         'passing',
         'pressure',

@@ -5,6 +5,7 @@ import { getAuthContext, requireRole } from '../../shared/auth';
 import { batchWriteItems, putItem } from '../../shared/db';
 import { buildKeywordIndexItems, extractEntryTokens } from '../../shared/keywords';
 import { ApiError, errorResponse, response } from '../../shared/responses';
+import { sanitizeTechniqueMentions, upsertTechniqueCandidates } from '../../shared/techniques';
 import type { CreateEntryRequest, Entry } from '../../shared/types';
 
 const parseBody = (event: APIGatewayProxyEvent): CreateEntryRequest => {
@@ -27,7 +28,10 @@ const parseBody = (event: APIGatewayProxyEvent): CreateEntryRequest => {
     typeof parsed.sessionMetrics.intensity !== 'number' ||
     typeof parsed.sessionMetrics.rounds !== 'number' ||
     typeof parsed.sessionMetrics.giOrNoGi !== 'string' ||
-    !Array.isArray(parsed.sessionMetrics.tags)
+    !Array.isArray(parsed.sessionMetrics.tags) ||
+    (parsed.rawTechniqueMentions !== undefined &&
+      (!Array.isArray(parsed.rawTechniqueMentions) ||
+        parsed.rawTechniqueMentions.some((mention) => typeof mention !== 'string')))
   ) {
     throw new ApiError({
       code: 'INVALID_REQUEST',
@@ -50,7 +54,8 @@ export const buildEntry = (
   createdAt: nowIso,
   updatedAt: nowIso,
   sections: input.sections,
-  sessionMetrics: input.sessionMetrics
+  sessionMetrics: input.sessionMetrics,
+  rawTechniqueMentions: sanitizeTechniqueMentions(input.rawTechniqueMentions)
 });
 
 export const handler: APIGatewayProxyHandler = async (event) => {
@@ -88,6 +93,8 @@ export const handler: APIGatewayProxyHandler = async (event) => {
     if (keywordItems.length > 0) {
       await batchWriteItems(keywordItems);
     }
+
+    await upsertTechniqueCandidates(entry.rawTechniqueMentions, entry.entryId, nowIso);
 
     await putItem({
       Item: {

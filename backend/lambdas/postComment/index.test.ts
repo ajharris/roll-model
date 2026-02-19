@@ -1,4 +1,5 @@
 import type { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
+import type { GetCommandOutput } from '@aws-sdk/lib-dynamodb';
 
 import { handler } from './index';
 import { getItem, putItem } from '../../shared/db';
