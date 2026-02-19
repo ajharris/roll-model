@@ -18,7 +18,8 @@ describe('aiChat context/privacy', () => {
       includePrivate: true,
       entryIds: undefined,
       from: undefined,
-      to: undefined
+      to: undefined,
+      keywords: []
     });
 
     const entries: Entry[] = [

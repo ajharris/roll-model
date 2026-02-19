@@ -1,6 +1,6 @@
 import { getItem, queryItems } from './db';
 
-import { batchGetEntries, queryKeywordMatches } from './retrieval';
+import { batchGetEntries, queryKeywordMatches, rankKeywordMatches } from './retrieval';
 
 jest.mock('./db', () => ({
   getItem: jest.fn(),
@@ -57,5 +57,23 @@ describe('retrieval helpers', () => {
     const entries = await batchGetEntries(['entry-1']);
     expect(entries).toHaveLength(1);
     expect(entries[0].entryId).toBe('entry-1');
+  });
+
+  it('rankKeywordMatches ranks by match count then recency', () => {
+    const ranked = rankKeywordMatches(
+      [
+        [
+          { entryId: 'entry-old', createdAt: '2026-01-01T00:00:00.000Z' },
+          { entryId: 'entry-new', createdAt: '2026-01-03T00:00:00.000Z' }
+        ],
+        [
+          { entryId: 'entry-new', createdAt: '2026-01-03T00:00:00.000Z' },
+          { entryId: 'entry-mid', createdAt: '2026-01-02T00:00:00.000Z' }
+        ]
+      ],
+      3
+    );
+
+    expect(ranked).toEqual(['entry-new', 'entry-mid', 'entry-old']);
   });
 });

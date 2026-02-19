@@ -1,4 +1,4 @@
-import type { APIGatewayProxyEvent } from 'aws-lambda';
+import type { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 
 import { handler } from './index';
 import { batchWriteItems, putItem } from '../../shared/db';
@@ -32,7 +32,7 @@ const buildEvent = (role: 'athlete' | 'coach'): APIGatewayProxyEvent =>
         }
       }
     }
-  }) as APIGatewayProxyEvent;
+  }) as unknown as APIGatewayProxyEvent;
 
 describe('createEntry handler auth', () => {
   beforeEach(() => {
@@ -43,16 +43,39 @@ describe('createEntry handler auth', () => {
   });
 
   it('allows athlete tokens', async () => {
-    const result = await handler(buildEvent('athlete'), {} as never, () => undefined);
+    mockExtractEntryTokens.mockReset();
+    mockBuildKeywordIndexItems.mockReset();
+    mockExtractEntryTokens
+      .mockReturnValueOnce(['guard'])
+      .mockReturnValueOnce(['guard', 'private-note']);
+    mockBuildKeywordIndexItems.mockReturnValueOnce([{ id: 'shared' } as never]);
+    mockBuildKeywordIndexItems.mockReturnValueOnce([{ id: 'private' } as never]);
+
+    const result = (await handler(buildEvent('athlete'), {} as never, () => undefined)) as APIGatewayProxyResult;
 
     expect(result.statusCode).toBe(201);
     const body = JSON.parse(result.body) as { entry: { athleteId: string } };
     expect(body.entry.athleteId).toBe('user-123');
     expect(mockPutItem).toHaveBeenCalledTimes(2);
+    expect(mockBuildKeywordIndexItems).toHaveBeenCalledWith(
+      'user-123',
+      expect.any(String),
+      expect.any(String),
+      ['guard'],
+      { visibilityScope: 'shared' }
+    );
+    expect(mockBuildKeywordIndexItems).toHaveBeenCalledWith(
+      'user-123',
+      expect.any(String),
+      expect.any(String),
+      ['private-note'],
+      { visibilityScope: 'private' }
+    );
+    expect(mockBatchWriteItems).toHaveBeenCalledWith([{ id: 'shared' }, { id: 'private' }]);
   });
 
   it('rejects coach tokens', async () => {
-    const result = await handler(buildEvent('coach'), {} as never, () => undefined);
+    const result = (await handler(buildEvent('coach'), {} as never, () => undefined)) as APIGatewayProxyResult;
 
     expect(result.statusCode).toBe(403);
     const body = JSON.parse(result.body) as { error: { code: string } };
