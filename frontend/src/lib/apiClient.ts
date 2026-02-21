@@ -77,16 +77,24 @@ const request = async <T>(path: string, init?: RequestInit): Promise<T> => {
 };
 
 export const apiClient = {
-  getEntries: () => request<Entry[]>('/entries'),
-  createEntry: (payload: EntryCreatePayload) =>
-    request<Entry>('/entries', { method: 'POST', body: JSON.stringify(payload) }),
+  getEntries: async () => {
+    const result = await request<{ entries: Entry[] }>('/entries');
+    return result.entries;
+  },
+  createEntry: async (payload: EntryCreatePayload) => {
+    const result = await request<{ entry: Entry }>('/entries', { method: 'POST', body: JSON.stringify(payload) });
+    return result.entry;
+  },
   postComment: (payload: CommentPayload) =>
     request('/entries/comments', {
       method: 'POST',
       body: JSON.stringify(payload),
     }),
   exportData: () => request<unknown>('/export'),
-  getAthleteEntries: (athleteId: string) => request<Entry[]>(`/athletes/${athleteId}/entries`),
+  getAthleteEntries: async (athleteId: string) => {
+    const result = await request<{ entries: Entry[] }>(`/athletes/${athleteId}/entries`);
+    return result.entries;
+  },
   linkCoach: (payload: { coachId: string }) =>
     request('/links/coach', {
       method: 'POST',
