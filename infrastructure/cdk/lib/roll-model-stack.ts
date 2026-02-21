@@ -187,7 +187,7 @@ export class RollModelStack extends cdk.Stack {
     });
 
     new cdk.CfnOutput(this, 'ApiUrl', {
-      value: api.url
+      value: `https://${api.restApiId}.execute-api.${cdk.Stack.of(this).region}.${cdk.Stack.of(this).urlSuffix}/${api.deploymentStage.stageName}`
     });
 
     new cdk.CfnOutput(this, 'UserPoolId', {
