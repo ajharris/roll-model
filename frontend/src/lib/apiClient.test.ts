@@ -31,8 +31,8 @@ describe('apiClient', () => {
     expect(requestInit.headers).toBeInstanceOf(Headers);
     const headers = requestInit.headers as Headers;
     expect(headers.get('Content-Type')).toBe('application/json');
-    expect(headers.get('Authorization')).toBe('jwt-token');
-    expect(headers.get('X-Authorization-Bearer')).toBe('Bearer jwt-token');
+    expect(headers.get('Authorization')).toBe('Bearer jwt-token');
+    expect(headers.get('Authorization-Bearer')).toBeNull();
   });
 
   it('throws ApiError with API response message on failure', async () => {
