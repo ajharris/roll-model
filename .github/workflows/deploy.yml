@@ -17,9 +17,6 @@ jobs:
   deploy:
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: infrastructure/cdk
 
     steps:
       - uses: actions/checkout@v4
