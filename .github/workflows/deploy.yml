@@ -29,4 +29,5 @@ jobs:
           aws-region: us-east-1
 
       - run: npm run build
-      - run: npx cdk deploy --require-approval never
+      - run: npx cdk bootstrap aws://864981757594/us-east-1
+      - run: npx cdk deploy --require-approval never --ci
