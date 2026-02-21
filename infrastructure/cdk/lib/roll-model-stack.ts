@@ -90,22 +90,9 @@ export class RollModelStack extends cdk.Stack {
 
     const api = new apigateway.RestApi(this, 'RollModelApi', {
       restApiName: 'RollModelApi',
-      defaultCorsPreflightOptions: {
-        allowOrigins: ['https://main.d15hzi11jeckui.amplifyapp.com'],
-        allowMethods: ['GET', 'POST', 'DELETE', 'OPTIONS'],
-        allowHeaders: ['Content-Type', 'Authorization'],
-      },
       deployOptions: {
         stageName: 'prod'
       }
-    });
-    api.addGatewayResponse('Default4xx', {
-      type: apigateway.ResponseType.DEFAULT_4XX,
-      responseHeaders: {
-        'Access-Control-Allow-Origin': "'https://main.d15hzi11jeckui.amplifyapp.com'",
-        'Access-Control-Allow-Headers': "'Content-Type,Authorization'",
-        'Access-Control-Allow-Methods': "'GET,POST,DELETE,OPTIONS'",
-      },
     });
 
     api.addGatewayResponse('GatewayResponseDefault4xx', {
