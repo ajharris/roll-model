@@ -76,14 +76,39 @@ const request = async <T>(path: string, init?: RequestInit): Promise<T> => {
   return response.json() as Promise<T>;
 };
 
+const asEntryArray = (payload: unknown): Entry[] => {
+  if (Array.isArray(payload)) {
+    return payload as Entry[];
+  }
+
+  if (
+    payload &&
+    typeof payload === 'object' &&
+    'entries' in payload &&
+    Array.isArray((payload as { entries: unknown }).entries)
+  ) {
+    return (payload as { entries: Entry[] }).entries;
+  }
+
+  return [];
+};
+
+const asEntryObject = (payload: unknown): Entry => {
+  if (payload && typeof payload === 'object' && 'entry' in payload) {
+    return (payload as { entry: Entry }).entry;
+  }
+
+  return payload as Entry;
+};
+
 export const apiClient = {
   getEntries: async () => {
-    const result = await request<{ entries: Entry[] }>('/entries');
-    return result.entries;
+    const result = await request<unknown>('/entries');
+    return asEntryArray(result);
   },
   createEntry: async (payload: EntryCreatePayload) => {
-    const result = await request<{ entry: Entry }>('/entries', { method: 'POST', body: JSON.stringify(payload) });
-    return result.entry;
+    const result = await request<unknown>('/entries', { method: 'POST', body: JSON.stringify(payload) });
+    return asEntryObject(result);
   },
   postComment: (payload: CommentPayload) =>
     request('/entries/comments', {
@@ -92,8 +117,8 @@ export const apiClient = {
     }),
   exportData: () => request<unknown>('/export'),
   getAthleteEntries: async (athleteId: string) => {
-    const result = await request<{ entries: Entry[] }>(`/athletes/${athleteId}/entries`);
-    return result.entries;
+    const result = await request<unknown>(`/athletes/${athleteId}/entries`);
+    return asEntryArray(result);
   },
   linkCoach: (payload: { coachId: string }) =>
     request('/links/coach', {

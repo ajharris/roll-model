@@ -155,4 +155,45 @@ describe('apiClient', () => {
     expect(Array.isArray(entries)).toBe(true);
     expect(entries[0]?.entryId).toBe('entry-3');
   });
+
+  it('accepts legacy raw array payload for getEntries', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => [
+        {
+          entryId: 'entry-legacy',
+          athleteId: 'athlete-1',
+          createdAt: '2026-01-01T00:00:00.000Z',
+          sections: { shared: 'shared' },
+          sessionMetrics: {
+            durationMinutes: 30,
+            intensity: 5,
+            rounds: 3,
+            giOrNoGi: 'gi',
+            tags: [],
+          },
+          rawTechniqueMentions: [],
+        },
+      ],
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { apiClient } = await import('./apiClient');
+    const entries = await apiClient.getEntries();
+    expect(entries[0]?.entryId).toBe('entry-legacy');
+  });
+
+  it('returns empty array for malformed entries payload', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ entries: { bad: true } }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { apiClient } = await import('./apiClient');
+    const entries = await apiClient.getEntries();
+    expect(entries).toEqual([]);
+  });
 });
