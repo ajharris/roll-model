@@ -30,9 +30,9 @@ export const configureApiClient = (tokenGetter: TokenGetter) => {
 const buildAuthHeaders = () => {
   const token = getToken();
   if (!token) return {};
+
   return {
-    Authorization: token,
-    'X-Authorization-Bearer': `Bearer ${token}`,
+    Authorization: `Bearer ${token}`,
   };
 };
 
