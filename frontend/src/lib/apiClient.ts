@@ -27,6 +27,9 @@ export const configureApiClient = (tokenGetter: TokenGetter) => {
   getToken = tokenGetter;
 };
 
+const joinUrl = (base: string, path: string) =>
+  `${base.replace(/\/+$/, '')}/${path.replace(/^\/+/, '')}`;
+
 const buildAuthHeaders = () => {
   const token = getToken();
   if (!token) return {};
@@ -51,7 +54,8 @@ const request = async <T>(path: string, init?: RequestInit): Promise<T> => {
     });
   }
 
-  const response = await fetch(`${baseUrl}${path}`, {
+  const url = joinUrl(baseUrl ?? '', path);
+  const response = await fetch(url, {
     ...init,
     headers,
     cache: 'no-store',
