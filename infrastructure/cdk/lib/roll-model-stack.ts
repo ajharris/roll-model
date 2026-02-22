@@ -117,6 +117,24 @@ export class RollModelStack extends cdk.Stack {
       }
     });
 
+    api.addGatewayResponse('GatewayResponseDefault4xx', {
+      type: apigateway.ResponseType.DEFAULT_4XX,
+      responseHeaders: {
+        'Access-Control-Allow-Origin': "'*'",
+        'Access-Control-Allow-Headers': "'Content-Type,Authorization,X-Authorization-Bearer'",
+        'Access-Control-Allow-Methods': "'GET,POST,DELETE,OPTIONS'"
+      }
+    });
+
+    api.addGatewayResponse('GatewayResponseDefault5xx', {
+      type: apigateway.ResponseType.DEFAULT_5XX,
+      responseHeaders: {
+        'Access-Control-Allow-Origin': "'*'",
+        'Access-Control-Allow-Headers': "'Content-Type,Authorization,X-Authorization-Bearer'",
+        'Access-Control-Allow-Methods': "'GET,POST,DELETE,OPTIONS'"
+      }
+    });
+
     const authorizer = new apigateway.CognitoUserPoolsAuthorizer(this, 'RollModelAuthorizer', {
       cognitoUserPools: [userPool],
       authorizerName: 'RollModelCognitoAuthorizer'
@@ -133,25 +151,55 @@ export class RollModelStack extends cdk.Stack {
     const entries = api.root.addResource('entries');
     entries.addMethod('POST', new apigateway.LambdaIntegration(createEntryLambda), methodOptions);
     entries.addMethod('GET', new apigateway.LambdaIntegration(getEntriesLambda), methodOptions);
+    entries.addCorsPreflight({
+      allowOrigins: apigateway.Cors.ALL_ORIGINS,
+      allowMethods: ['GET', 'POST', 'OPTIONS'],
+      allowHeaders: ['Content-Type', 'Authorization', 'X-Authorization-Bearer']
+    });
 
     const comments = entries.addResource('comments');
     comments.addMethod('POST', new apigateway.LambdaIntegration(postCommentLambda), methodOptions);
+    comments.addCorsPreflight({
+      allowOrigins: apigateway.Cors.ALL_ORIGINS,
+      allowMethods: ['POST', 'OPTIONS'],
+      allowHeaders: ['Content-Type', 'Authorization', 'X-Authorization-Bearer']
+    });
 
     const entryById = entries.addResource('{entryId}');
     const entryComments = entryById.addResource('comments');
     entryComments.addMethod('POST', new apigateway.LambdaIntegration(postCommentLambda), methodOptions);
+    entryComments.addCorsPreflight({
+      allowOrigins: apigateway.Cors.ALL_ORIGINS,
+      allowMethods: ['POST', 'OPTIONS'],
+      allowHeaders: ['Content-Type', 'Authorization', 'X-Authorization-Bearer']
+    });
 
     const links = api.root.addResource('links');
     const athleteCoach = links.addResource('coach');
     athleteCoach.addMethod('POST', new apigateway.LambdaIntegration(linkCoachAthleteLambda), methodOptions);
     athleteCoach.addMethod('DELETE', new apigateway.LambdaIntegration(revokeCoachLinkLambda), methodOptions);
+    athleteCoach.addCorsPreflight({
+      allowOrigins: apigateway.Cors.ALL_ORIGINS,
+      allowMethods: ['POST', 'DELETE', 'OPTIONS'],
+      allowHeaders: ['Content-Type', 'Authorization', 'X-Authorization-Bearer']
+    });
 
     const exportResource = api.root.addResource('export');
     exportResource.addMethod('GET', new apigateway.LambdaIntegration(exportDataLambda), methodOptions);
+    exportResource.addCorsPreflight({
+      allowOrigins: apigateway.Cors.ALL_ORIGINS,
+      allowMethods: ['GET', 'OPTIONS'],
+      allowHeaders: ['Content-Type', 'Authorization', 'X-Authorization-Bearer']
+    });
 
     const ai = api.root.addResource('ai');
     const aiChat = ai.addResource('chat');
     aiChat.addMethod('POST', new apigateway.LambdaIntegration(aiChatLambda), methodOptions);
+    aiChat.addCorsPreflight({
+      allowOrigins: apigateway.Cors.ALL_ORIGINS,
+      allowMethods: ['POST', 'OPTIONS'],
+      allowHeaders: ['Content-Type', 'Authorization', 'X-Authorization-Bearer']
+    });
 
     const signupRequests = api.root.addResource('signup-requests');
     signupRequests.addMethod('POST', new apigateway.LambdaIntegration(requestSignupLambda), publicMethodOptions);
@@ -163,9 +211,14 @@ export class RollModelStack extends cdk.Stack {
     const athleteById = athletes.addResource('{athleteId}');
     const athleteEntries = athleteById.addResource('entries');
     athleteEntries.addMethod('GET', new apigateway.LambdaIntegration(getEntriesLambda), methodOptions);
+    athleteEntries.addCorsPreflight({
+      allowOrigins: apigateway.Cors.ALL_ORIGINS,
+      allowMethods: ['GET', 'OPTIONS'],
+      allowHeaders: ['Content-Type', 'Authorization', 'X-Authorization-Bearer']
+    });
 
     new cdk.CfnOutput(this, 'ApiUrl', {
-      value: api.url
+      value: `https://${api.restApiId}.execute-api.${cdk.Stack.of(this).region}.${cdk.Stack.of(this).urlSuffix}/${api.deploymentStage.stageName}`
     });
 
     new cdk.CfnOutput(this, 'UserPoolId', {

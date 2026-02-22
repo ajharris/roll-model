@@ -29,12 +29,15 @@ export const configureApiClient = (tokenGetter: TokenGetter) => {
   getToken = tokenGetter;
 };
 
+const joinUrl = (base: string, path: string) =>
+  `${base.replace(/\/+$/, '')}/${path.replace(/^\/+/, '')}`;
+
 const buildAuthHeaders = () => {
   const token = getToken();
   if (!token) return {};
+
   return {
-    Authorization: token,
-    'X-Authorization-Bearer': `Bearer ${token}`,
+    Authorization: `Bearer ${token}`,
   };
 };
 
@@ -53,7 +56,8 @@ const request = async <T>(path: string, init?: RequestInit): Promise<T> => {
     });
   }
 
-  const response = await fetch(`${baseUrl}${path}`, {
+  const url = joinUrl(baseUrl ?? '', path);
+  const response = await fetch(url, {
     ...init,
     headers,
     cache: 'no-store',
@@ -74,17 +78,50 @@ const request = async <T>(path: string, init?: RequestInit): Promise<T> => {
   return response.json() as Promise<T>;
 };
 
+const asEntryArray = (payload: unknown): Entry[] => {
+  if (Array.isArray(payload)) {
+    return payload as Entry[];
+  }
+
+  if (
+    payload &&
+    typeof payload === 'object' &&
+    'entries' in payload &&
+    Array.isArray((payload as { entries: unknown }).entries)
+  ) {
+    return (payload as { entries: Entry[] }).entries;
+  }
+
+  return [];
+};
+
+const asEntryObject = (payload: unknown): Entry => {
+  if (payload && typeof payload === 'object' && 'entry' in payload) {
+    return (payload as { entry: Entry }).entry;
+  }
+
+  return payload as Entry;
+};
+
 export const apiClient = {
-  getEntries: () => request<Entry[]>('/entries'),
-  createEntry: (payload: EntryCreatePayload) =>
-    request<Entry>('/entries', { method: 'POST', body: JSON.stringify(payload) }),
+  getEntries: async () => {
+    const result = await request<unknown>('/entries');
+    return asEntryArray(result);
+  },
+  createEntry: async (payload: EntryCreatePayload) => {
+    const result = await request<unknown>('/entries', { method: 'POST', body: JSON.stringify(payload) });
+    return asEntryObject(result);
+  },
   postComment: (payload: CommentPayload) =>
     request('/entries/comments', {
       method: 'POST',
       body: JSON.stringify(payload),
     }),
   exportData: () => request<unknown>('/export'),
-  getAthleteEntries: (athleteId: string) => request<Entry[]>(`/athletes/${athleteId}/entries`),
+  getAthleteEntries: async (athleteId: string) => {
+    const result = await request<unknown>(`/athletes/${athleteId}/entries`);
+    return asEntryArray(result);
+  },
   linkCoach: (payload: { coachId: string }) =>
     request('/links/coach', {
       method: 'POST',

@@ -2,6 +2,12 @@ import type { APIGatewayProxyResult } from 'aws-lambda';
 
 import type { ApiErrorShape } from './types';
 
+const CORS_HEADERS: Record<string, string> = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'Content-Type,Authorization,X-Authorization-Bearer',
+  'Access-Control-Allow-Methods': 'GET,POST,DELETE,OPTIONS'
+};
+
 export class ApiError extends Error {
   public readonly code: string;
   public readonly statusCode: number;
@@ -16,7 +22,8 @@ export class ApiError extends Error {
 export const response = <T>(statusCode: number, payload: T): APIGatewayProxyResult => ({
   statusCode,
   headers: {
-    'Content-Type': 'application/json'
+    'Content-Type': 'application/json',
+    ...CORS_HEADERS
   },
   body: JSON.stringify(payload)
 });
