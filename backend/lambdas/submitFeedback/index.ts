@@ -96,13 +96,42 @@ const buildLabels = (type: FeedbackType): string[] => {
 
 export const handler: APIGatewayProxyHandler = async (event) => {
   try {
+    console.log(
+      JSON.stringify({
+        msg: 'feedback.request.received',
+        requestId: event.requestContext.requestId,
+        method: event.httpMethod,
+        path: event.path
+      })
+    );
+
     const auth = getAuthContext(event);
     const payload = parseBody(event);
+
+    console.log(
+      JSON.stringify({
+        msg: 'feedback.request.parsed',
+        requestId: event.requestContext.requestId,
+        userId: auth.userId,
+        role: auth.role,
+        type: payload.type,
+        titleLength: payload.title.length,
+        detailsLength: payload.details.length
+      })
+    );
 
     const token = process.env.GITHUB_TOKEN;
     const repo = process.env.GITHUB_REPO;
 
     if (!token || !repo) {
+      console.error(
+        JSON.stringify({
+          msg: 'feedback.config.missing',
+          requestId: event.requestContext.requestId,
+          hasGithubToken: Boolean(token),
+          hasGithubRepo: Boolean(repo)
+        })
+      );
       throw new ApiError({
         code: 'CONFIGURATION_ERROR',
         message: 'GitHub integration is not configured.',
@@ -138,6 +167,17 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         // ignore
       }
 
+      console.error(
+        JSON.stringify({
+          msg: 'feedback.github.create_issue.failed',
+          requestId: event.requestContext.requestId,
+          status: issueResponse.status,
+          statusText: issueResponse.statusText,
+          repo,
+          errorMessage: message
+        })
+      );
+
       throw new ApiError({
         code: 'GITHUB_ERROR',
         message,
@@ -147,11 +187,30 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
     const issue = (await issueResponse.json()) as { number: number; html_url: string };
 
+    console.log(
+      JSON.stringify({
+        msg: 'feedback.github.create_issue.succeeded',
+        requestId: event.requestContext.requestId,
+        repo,
+        issueNumber: issue.number
+      })
+    );
+
     return response(201, {
       issueNumber: issue.number,
       issueUrl: issue.html_url
     });
   } catch (error) {
+    console.error(
+      JSON.stringify({
+        msg: 'feedback.request.failed',
+        requestId: event.requestContext.requestId,
+        error:
+          error instanceof Error
+            ? { name: error.name, message: error.message }
+            : { message: 'Unknown error', detail: String(error) }
+      })
+    );
     return errorResponse(error);
   }
 };
