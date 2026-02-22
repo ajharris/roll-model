@@ -4,6 +4,8 @@ body { margin: 0; background: #f6f7f8; color: #1b1d1f; }
 header, nav, main section, .panel { background: #fff; border: 1px solid #d3d7dd; border-radius: 8px; padding: 12px; margin-bottom: 12px; }
 nav a { margin-right: 8px; text-decoration: none; color: #2a4160; }
 nav a.active { font-weight: 700; }
+a.button-link { text-decoration: none; color: #1b1d1f; border: 1px solid #b3bac6; border-radius: 6px; padding: 8px 12px; background: #fff; display: inline-flex; align-items: center; }
+a.button-link:hover { background: #f0f2f5; }
 label { display:block; margin:8px 0 4px; font-size: 14px; }
 input, textarea, select, button { padding: 8px; border-radius: 6px; border: 1px solid #b3bac6; }
 textarea { width: 100%; min-height: 90px; }

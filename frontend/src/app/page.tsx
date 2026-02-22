@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import type { FormEvent} from 'react';
 import { useState } from 'react';
@@ -42,6 +43,10 @@ export default function HomePage() {
           {error && <span>{error}</span>}
         </div>
       </form>
+      <div className="row">
+        <span className="small">New here?</span>
+        <Link className="button-link" href="/signup-request">Request access</Link>
+      </div>
     </section>
   );
 }

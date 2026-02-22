@@ -2,6 +2,8 @@ import type {
   CommentPayload,
   Entry,
   EntryCreatePayload,
+  FeedbackPayload,
+  SignupRequestPayload,
 } from '@/types/api';
 
 export class ApiError extends Error {
@@ -132,6 +134,16 @@ export const apiClient = {
     }),
   chat: (payload: { threadId?: string; message: string; context?: string }) =>
     request<{ assistant_text: string; suggested_prompts?: string[] }>('/ai/chat', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  requestSignup: (payload: SignupRequestPayload) =>
+    request('/signup-requests', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  submitFeedback: (payload: FeedbackPayload) =>
+    request<{ issueNumber: number; issueUrl: string }>('/feedback', {
       method: 'POST',
       body: JSON.stringify(payload),
     }),
