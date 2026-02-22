@@ -1,16 +1,18 @@
 import type { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 
-import { handler } from './index';
-
-var sendMock: jest.Mock;
-
 jest.mock('@aws-sdk/client-ses', () => {
-  sendMock = jest.fn();
+  const sendMock = jest.fn();
   return {
     SESClient: jest.fn(() => ({ send: sendMock })),
-    SendEmailCommand: jest.fn((input) => input)
+    SendEmailCommand: jest.fn((input) => input),
+    __sendMock: sendMock
   };
 });
+
+import { handler } from './index';
+
+const getSendMock = () =>
+  (jest.requireMock('@aws-sdk/client-ses') as { __sendMock: jest.Mock }).__sendMock;
 
 const buildEvent = (body?: Record<string, unknown>): APIGatewayProxyEvent =>
   ({
@@ -19,7 +21,7 @@ const buildEvent = (body?: Record<string, unknown>): APIGatewayProxyEvent =>
 
 describe('requestSignup handler', () => {
   beforeEach(() => {
-    sendMock.mockReset();
+    getSendMock().mockReset();
     process.env.SIGNUP_APPROVAL_EMAIL = 'approvals@example.com';
     process.env.SIGNUP_SOURCE_EMAIL = 'no-reply@example.com';
   });
@@ -32,6 +34,7 @@ describe('requestSignup handler', () => {
     )) as APIGatewayProxyResult;
 
     expect(result.statusCode).toBe(202);
+    const sendMock = getSendMock();
     expect(sendMock).toHaveBeenCalledTimes(1);
     const commandInput = sendMock.mock.calls[0]?.[0] as {
       Destination: { ToAddresses: string[] };

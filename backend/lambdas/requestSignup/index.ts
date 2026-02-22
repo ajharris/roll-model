@@ -1,5 +1,5 @@
-import type { APIGatewayProxyEvent, APIGatewayProxyHandler } from 'aws-lambda';
 import { SESClient, SendEmailCommand } from '@aws-sdk/client-ses';
+import type { APIGatewayProxyEvent, APIGatewayProxyHandler } from 'aws-lambda';
 
 import { ApiError, errorResponse, response } from '../../shared/responses';
 

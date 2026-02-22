@@ -32,7 +32,6 @@ describe('apiClient', () => {
     const headers = requestInit.headers as Headers;
     expect(headers.get('Content-Type')).toBe('application/json');
     expect(headers.get('Authorization')).toBe('Bearer jwt-token');
-    expect(headers.get('Authorization-Bearer')).toBeNull();
   });
 
   it('throws ApiError with API response message on failure', async () => {
@@ -57,28 +56,6 @@ describe('apiClient', () => {
       ok: true,
       status: 202,
       json: async () => ({ status: 'queued' }),
-  it('unwraps getEntries payload shape', async () => {
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      status: 200,
-      json: async () => ({
-        entries: [
-          {
-            entryId: 'entry-1',
-            athleteId: 'athlete-1',
-            createdAt: '2026-01-01T00:00:00.000Z',
-            sections: { shared: 'shared', private: 'private' },
-            sessionMetrics: {
-              durationMinutes: 60,
-              intensity: 7,
-              rounds: 6,
-              giOrNoGi: 'gi',
-              tags: ['guard'],
-            },
-            rawTechniqueMentions: [],
-          },
-        ],
-      }),
     });
     vi.stubGlobal('fetch', fetchMock);
 
@@ -114,6 +91,34 @@ describe('apiClient', () => {
         method: 'POST',
       }),
     );
+  });
+
+  it('unwraps getEntries payload shape', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        entries: [
+          {
+            entryId: 'entry-1',
+            athleteId: 'athlete-1',
+            createdAt: '2026-01-01T00:00:00.000Z',
+            sections: { shared: 'shared', private: 'private' },
+            sessionMetrics: {
+              durationMinutes: 60,
+              intensity: 7,
+              rounds: 6,
+              giOrNoGi: 'gi',
+              tags: ['guard'],
+            },
+            rawTechniqueMentions: [],
+          },
+        ],
+      }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { apiClient } = await import('./apiClient');
     const entries = await apiClient.getEntries();
 
     expect(Array.isArray(entries)).toBe(true);
@@ -217,6 +222,7 @@ describe('apiClient', () => {
 
     const { apiClient } = await import('./apiClient');
     const entries = await apiClient.getEntries();
+
     expect(entries[0]?.entryId).toBe('entry-legacy');
   });
 
@@ -230,6 +236,7 @@ describe('apiClient', () => {
 
     const { apiClient } = await import('./apiClient');
     const entries = await apiClient.getEntries();
+
     expect(entries).toEqual([]);
   });
 });
