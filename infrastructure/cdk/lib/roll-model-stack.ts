@@ -108,8 +108,18 @@ export class RollModelStack extends cdk.Stack {
     requestSignupLambda.addEnvironment('SIGNUP_APPROVAL_EMAIL', process.env.SIGNUP_APPROVAL_EMAIL ?? '');
     requestSignupLambda.addEnvironment('SIGNUP_SOURCE_EMAIL', process.env.SIGNUP_SOURCE_EMAIL ?? '');
 
-    submitFeedbackLambda.addEnvironment('GITHUB_TOKEN', process.env.GITHUB_TOKEN ?? '');
+    const githubTokenSsmParam = process.env.GITHUB_TOKEN_SSM_PARAM ?? '/roll-model/github_token';
+    const githubTokenSsmParamPath = githubTokenSsmParam.startsWith('/') ? githubTokenSsmParam : `/${githubTokenSsmParam}`;
     submitFeedbackLambda.addEnvironment('GITHUB_REPO', process.env.GITHUB_REPO ?? '');
+    submitFeedbackLambda.addEnvironment('GITHUB_TOKEN_SSM_PARAM', githubTokenSsmParamPath);
+    submitFeedbackLambda.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: ['ssm:GetParameter'],
+        resources: [
+          `arn:aws:ssm:${cdk.Stack.of(this).region}:${cdk.Stack.of(this).account}:parameter${githubTokenSsmParamPath}`
+        ]
+      })
+    );
 
     const apiAccessLogGroup = new logs.LogGroup(this, 'RollModelApiAccessLogs', {
       retention: logs.RetentionDays.ONE_WEEK,

@@ -1,4 +1,5 @@
 import type { APIGatewayProxyEvent, APIGatewayProxyHandler } from 'aws-lambda';
+import { GetParameterCommand, SSMClient } from '@aws-sdk/client-ssm';
 
 import { getAuthContext } from '../../shared/auth';
 import { ApiError, errorResponse, response } from '../../shared/responses';
@@ -94,6 +95,47 @@ const buildLabels = (type: FeedbackType): string[] => {
   return ['user-reported'];
 };
 
+const ssm = new SSMClient({});
+let cachedGithubToken: string | null = null;
+
+const getGithubToken = async (): Promise<string> => {
+  if (process.env.GITHUB_TOKEN) {
+    return process.env.GITHUB_TOKEN;
+  }
+
+  if (cachedGithubToken) {
+    return cachedGithubToken;
+  }
+
+  const parameterName = process.env.GITHUB_TOKEN_SSM_PARAM;
+  if (!parameterName) {
+    throw new ApiError({
+      code: 'CONFIGURATION_ERROR',
+      message: 'GitHub integration is not configured.',
+      statusCode: 500
+    });
+  }
+
+  const result = await ssm.send(
+    new GetParameterCommand({
+      Name: parameterName,
+      WithDecryption: true
+    })
+  );
+
+  const value = result.Parameter?.Value?.trim();
+  if (!value) {
+    throw new ApiError({
+      code: 'CONFIGURATION_ERROR',
+      message: 'GitHub integration is not configured.',
+      statusCode: 500
+    });
+  }
+
+  cachedGithubToken = value;
+  return value;
+};
+
 export const handler: APIGatewayProxyHandler = async (event) => {
   try {
     console.log(
@@ -120,15 +162,15 @@ export const handler: APIGatewayProxyHandler = async (event) => {
       })
     );
 
-    const token = process.env.GITHUB_TOKEN;
+    const token = await getGithubToken();
     const repo = process.env.GITHUB_REPO;
 
-    if (!token || !repo) {
+    if (!repo) {
       console.error(
         JSON.stringify({
           msg: 'feedback.config.missing',
           requestId: event.requestContext.requestId,
-          hasGithubToken: Boolean(token),
+          hasGithubToken: true,
           hasGithubRepo: Boolean(repo)
         })
       );

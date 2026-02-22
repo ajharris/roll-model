@@ -332,8 +332,11 @@ Replace `<ACCOUNT_ID>` and `<REGION>`. This example assumes stack name `RollMode
   - `SIGNUP_APPROVAL_EMAIL`
   - `SIGNUP_SOURCE_EMAIL`
 - Feedback Lambda expects:
-  - `GITHUB_TOKEN`
+  - `GITHUB_TOKEN_SSM_PARAM` (default: `/roll-model/github_token`)
   - `GITHUB_REPO` (format: `owner/repo`)
+- Store the GitHub token in SSM Parameter Store (SecureString), for example:
+  - `/roll-model/github_token`
+- Local/test fallback: `GITHUB_TOKEN` env var is still supported when present.
 
 ## AI Integration
 
