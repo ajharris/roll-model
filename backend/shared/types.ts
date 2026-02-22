@@ -49,6 +49,8 @@ export interface CreateEntryRequest {
   rawTechniqueMentions?: string[];
 }
 
+export type UpdateEntryRequest = CreateEntryRequest;
+
 export interface TechniqueCandidate {
   phrase: string;
   normalizedPhrase: string;

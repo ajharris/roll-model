@@ -1,5 +1,6 @@
-import type { APIGatewayProxyEvent, APIGatewayProxyHandler } from 'aws-lambda';
 import { GetParameterCommand, SSMClient } from '@aws-sdk/client-ssm';
+import type { APIGatewayProxyEvent, APIGatewayProxyHandler } from 'aws-lambda';
+
 
 import { getAuthContext } from '../../shared/auth';
 import { ApiError, errorResponse, response } from '../../shared/responses';

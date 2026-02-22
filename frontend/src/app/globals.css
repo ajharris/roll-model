@@ -10,6 +10,14 @@ label { display:block; margin:8px 0 4px; font-size: 14px; }
 input, textarea, select, button { padding: 8px; border-radius: 6px; border: 1px solid #b3bac6; }
 textarea { width: 100%; min-height: 90px; }
 button { cursor: pointer; }
+button.button-danger {
+  background: #fff1f2;
+  border-color: #f0a3ad;
+  color: #8f172a;
+}
+button.button-danger:hover {
+  background: #ffe4e8;
+}
 .grid { display:grid; gap:10px; grid-template-columns: repeat(auto-fit,minmax(220px,1fr)); }
 .list-item { border-bottom: 1px solid #e2e6ec; padding: 8px 0; }
 .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }

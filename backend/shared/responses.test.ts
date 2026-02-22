@@ -9,7 +9,7 @@ describe('responses helpers', () => {
       'Content-Type': 'application/json',
       'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Headers': 'Content-Type,Authorization,X-Authorization-Bearer',
-      'Access-Control-Allow-Methods': 'GET,POST,DELETE,OPTIONS'
+      'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS'
     });
     expect(result.body).toBe(JSON.stringify({ ok: true }));
   });

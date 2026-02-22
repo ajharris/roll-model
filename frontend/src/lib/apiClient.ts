@@ -108,10 +108,25 @@ export const apiClient = {
     const result = await request<unknown>('/entries');
     return asEntryArray(result);
   },
+  getEntry: async (entryId: string) => {
+    const result = await request<unknown>(`/entries/${entryId}`);
+    return asEntryObject(result);
+  },
   createEntry: async (payload: EntryCreatePayload) => {
     const result = await request<unknown>('/entries', { method: 'POST', body: JSON.stringify(payload) });
     return asEntryObject(result);
   },
+  updateEntry: async (entryId: string, payload: EntryCreatePayload) => {
+    const result = await request<unknown>(`/entries/${entryId}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    });
+    return asEntryObject(result);
+  },
+  deleteEntry: (entryId: string) =>
+    request(`/entries/${entryId}`, {
+      method: 'DELETE',
+    }),
   postComment: (payload: CommentPayload) =>
     request('/entries/comments', {
       method: 'POST',

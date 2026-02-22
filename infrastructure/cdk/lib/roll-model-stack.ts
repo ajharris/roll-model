@@ -66,6 +66,9 @@ export class RollModelStack extends cdk.Stack {
 
     const createEntryLambda = this.createLambda('createEntry', 'backend/lambdas/createEntry/index.ts', table);
     const getEntriesLambda = this.createLambda('getEntries', 'backend/lambdas/getEntries/index.ts', table);
+    const getEntryLambda = this.createLambda('getEntry', 'backend/lambdas/getEntry/index.ts', table);
+    const updateEntryLambda = this.createLambda('updateEntry', 'backend/lambdas/updateEntry/index.ts', table);
+    const deleteEntryLambda = this.createLambda('deleteEntry', 'backend/lambdas/deleteEntry/index.ts', table);
     const postCommentLambda = this.createLambda('postComment', 'backend/lambdas/postComment/index.ts', table);
     const linkCoachAthleteLambda = this.createLambda(
       'linkCoachAthlete',
@@ -154,7 +157,7 @@ export class RollModelStack extends cdk.Stack {
       responseHeaders: {
         'Access-Control-Allow-Origin': "'*'",
         'Access-Control-Allow-Headers': "'Content-Type,Authorization,X-Authorization-Bearer'",
-        'Access-Control-Allow-Methods': "'GET,POST,DELETE,OPTIONS'"
+        'Access-Control-Allow-Methods': "'GET,POST,PUT,DELETE,OPTIONS'"
       }
     });
 
@@ -163,7 +166,7 @@ export class RollModelStack extends cdk.Stack {
       responseHeaders: {
         'Access-Control-Allow-Origin': "'*'",
         'Access-Control-Allow-Headers': "'Content-Type,Authorization,X-Authorization-Bearer'",
-        'Access-Control-Allow-Methods': "'GET,POST,DELETE,OPTIONS'"
+        'Access-Control-Allow-Methods': "'GET,POST,PUT,DELETE,OPTIONS'"
       }
     });
 
@@ -198,6 +201,15 @@ export class RollModelStack extends cdk.Stack {
     });
 
     const entryById = entries.addResource('{entryId}');
+    entryById.addMethod('GET', new apigateway.LambdaIntegration(getEntryLambda), methodOptions);
+    entryById.addMethod('PUT', new apigateway.LambdaIntegration(updateEntryLambda), methodOptions);
+    entryById.addMethod('DELETE', new apigateway.LambdaIntegration(deleteEntryLambda), methodOptions);
+    entryById.addCorsPreflight({
+      allowOrigins: apigateway.Cors.ALL_ORIGINS,
+      allowMethods: ['GET', 'PUT', 'DELETE', 'OPTIONS'],
+      allowHeaders: ['Content-Type', 'Authorization', 'X-Authorization-Bearer']
+    });
+
     const entryComments = entryById.addResource('comments');
     entryComments.addMethod('POST', new apigateway.LambdaIntegration(postCommentLambda), methodOptions);
     entryComments.addCorsPreflight({
