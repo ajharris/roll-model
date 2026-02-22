@@ -8,6 +8,7 @@ import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as nodejs from 'aws-cdk-lib/aws-lambda-nodejs';
+import * as logs from 'aws-cdk-lib/aws-logs';
 import type { Construct } from 'constructs';
 
 export class RollModelStack extends cdk.Stack {
@@ -110,10 +111,31 @@ export class RollModelStack extends cdk.Stack {
     submitFeedbackLambda.addEnvironment('GITHUB_TOKEN', process.env.GITHUB_TOKEN ?? '');
     submitFeedbackLambda.addEnvironment('GITHUB_REPO', process.env.GITHUB_REPO ?? '');
 
+    const apiAccessLogGroup = new logs.LogGroup(this, 'RollModelApiAccessLogs', {
+      retention: logs.RetentionDays.ONE_WEEK,
+      removalPolicy: cdk.RemovalPolicy.DESTROY
+    });
+
     const api = new apigateway.RestApi(this, 'RollModelApi', {
       restApiName: 'RollModelApi',
+      cloudWatchRole: true,
       deployOptions: {
-        stageName: 'prod'
+        stageName: 'prod',
+        loggingLevel: apigateway.MethodLoggingLevel.INFO,
+        metricsEnabled: true,
+        dataTraceEnabled: false,
+        accessLogDestination: new apigateway.LogGroupLogDestination(apiAccessLogGroup),
+        accessLogFormat: apigateway.AccessLogFormat.jsonWithStandardFields({
+          caller: true,
+          httpMethod: true,
+          ip: true,
+          protocol: true,
+          requestTime: true,
+          resourcePath: true,
+          responseLength: true,
+          status: true,
+          user: true
+        })
       }
     });
 
@@ -203,9 +225,19 @@ export class RollModelStack extends cdk.Stack {
 
     const signupRequests = api.root.addResource('signup-requests');
     signupRequests.addMethod('POST', new apigateway.LambdaIntegration(requestSignupLambda), publicMethodOptions);
+    signupRequests.addCorsPreflight({
+      allowOrigins: apigateway.Cors.ALL_ORIGINS,
+      allowMethods: ['POST', 'OPTIONS'],
+      allowHeaders: ['Content-Type', 'Authorization', 'X-Authorization-Bearer']
+    });
 
     const feedback = api.root.addResource('feedback');
     feedback.addMethod('POST', new apigateway.LambdaIntegration(submitFeedbackLambda), methodOptions);
+    feedback.addCorsPreflight({
+      allowOrigins: apigateway.Cors.ALL_ORIGINS,
+      allowMethods: ['POST', 'OPTIONS'],
+      allowHeaders: ['Content-Type', 'Authorization', 'X-Authorization-Bearer']
+    });
 
     const athletes = api.root.addResource('athletes');
     const athleteById = athletes.addResource('{athleteId}');
@@ -231,6 +263,10 @@ export class RollModelStack extends cdk.Stack {
 
     new cdk.CfnOutput(this, 'TableName', {
       value: table.tableName
+    });
+
+    new cdk.CfnOutput(this, 'ApiAccessLogGroupName', {
+      value: apiAccessLogGroup.logGroupName
     });
   }
 
