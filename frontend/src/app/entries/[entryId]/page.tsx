@@ -24,6 +24,7 @@ export default function EntryDetailPage() {
   const [tags, setTags] = useState<string[]>([]);
   const [techniques, setTechniques] = useState<string[]>([]);
   const [status, setStatus] = useState('');
+  const canEdit = Boolean(entry) && !isLoading;
 
   useEffect(() => {
     let cancelled = false;
@@ -63,6 +64,10 @@ export default function EntryDetailPage() {
 
   const save = async (event: FormEvent) => {
     event.preventDefault();
+    if (!entry) {
+      setStatus('Entry not available.');
+      return;
+    }
     setStatus('Saving...');
 
     try {
@@ -79,6 +84,11 @@ export default function EntryDetailPage() {
   };
 
   const remove = async () => {
+    if (!entry) {
+      setStatus('Entry not available.');
+      return;
+    }
+
     const confirmed = window.confirm('Delete this entry? This cannot be undone.');
     if (!confirmed) {
       setStatus('Delete cancelled.');
@@ -103,68 +113,82 @@ export default function EntryDetailPage() {
         </p>
         {isLoading && <p>Loading entry...</p>}
         {!isLoading && !entry && <p>{status || 'Entry not found.'}</p>}
-        {entry && (
-          <>
-            <p className="small">Created: {new Date(entry.createdAt).toLocaleString()}</p>
-            <form onSubmit={save}>
-              <label htmlFor="shared-notes">Shared notes</label>
-              <textarea id="shared-notes" value={shared} onChange={(e) => setShared(e.target.value)} required />
-              <label htmlFor="private-notes">Private notes</label>
-              <textarea
-                id="private-notes"
-                value={privateText}
-                onChange={(e) => setPrivateText(e.target.value)}
-                required
+        {entry && <p className="small">Created: {new Date(entry.createdAt).toLocaleString()}</p>}
+        <form onSubmit={save}>
+          <label htmlFor="shared-notes">Shared notes</label>
+          <textarea
+            id="shared-notes"
+            value={shared}
+            onChange={(e) => setShared(e.target.value)}
+            required
+            disabled={!canEdit}
+          />
+          <label htmlFor="private-notes">Private notes</label>
+          <textarea
+            id="private-notes"
+            value={privateText}
+            onChange={(e) => setPrivateText(e.target.value)}
+            required
+            disabled={!canEdit}
+          />
+          <div className="grid">
+            <div>
+              <label htmlFor="duration-minutes">Duration (minutes)</label>
+              <input
+                id="duration-minutes"
+                type="number"
+                value={durationMinutes}
+                onChange={(e) => setDurationMinutes(Number(e.target.value))}
+                disabled={!canEdit}
               />
-              <div className="grid">
-                <div>
-                  <label htmlFor="duration-minutes">Duration (minutes)</label>
-                  <input
-                    id="duration-minutes"
-                    type="number"
-                    value={durationMinutes}
-                    onChange={(e) => setDurationMinutes(Number(e.target.value))}
-                  />
-                </div>
-                <div>
-                  <label htmlFor="intensity">Intensity (1-10)</label>
-                  <input
-                    id="intensity"
-                    type="number"
-                    min={1}
-                    max={10}
-                    value={intensity}
-                    onChange={(e) => setIntensity(Number(e.target.value))}
-                  />
-                </div>
-                <div>
-                  <label htmlFor="rounds">Rounds</label>
-                  <input id="rounds" type="number" value={rounds} onChange={(e) => setRounds(Number(e.target.value))} />
-                </div>
-                <div>
-                  <label htmlFor="gi-or-no-gi">Gi or no-gi</label>
-                  <select
-                    id="gi-or-no-gi"
-                    value={giOrNoGi}
-                    onChange={(e) => setGiOrNoGi(e.target.value as 'gi' | 'no-gi')}
-                  >
-                    <option value="gi">gi</option>
-                    <option value="no-gi">no-gi</option>
-                  </select>
-                </div>
-              </div>
-              <ChipInput label="Tags" values={tags} onChange={setTags} />
-              <ChipInput label="Technique mentions" values={techniques} onChange={setTechniques} />
-              <div className="grid">
-                <button type="submit">Update entry</button>
-                <button type="button" onClick={remove} className="button-danger">
-                  Delete entry
-                </button>
-              </div>
-              <p>{status}</p>
-            </form>
-          </>
-        )}
+            </div>
+            <div>
+              <label htmlFor="intensity">Intensity (1-10)</label>
+              <input
+                id="intensity"
+                type="number"
+                min={1}
+                max={10}
+                value={intensity}
+                onChange={(e) => setIntensity(Number(e.target.value))}
+                disabled={!canEdit}
+              />
+            </div>
+            <div>
+              <label htmlFor="rounds">Rounds</label>
+              <input
+                id="rounds"
+                type="number"
+                value={rounds}
+                onChange={(e) => setRounds(Number(e.target.value))}
+                disabled={!canEdit}
+              />
+            </div>
+            <div>
+              <label htmlFor="gi-or-no-gi">Gi or no-gi</label>
+              <select
+                id="gi-or-no-gi"
+                value={giOrNoGi}
+                onChange={(e) => setGiOrNoGi(e.target.value as 'gi' | 'no-gi')}
+                disabled={!canEdit}
+              >
+                <option value="gi">gi</option>
+                <option value="no-gi">no-gi</option>
+              </select>
+            </div>
+          </div>
+          <ChipInput label="Tags" values={tags} onChange={setTags} />
+          <ChipInput label="Technique mentions" values={techniques} onChange={setTechniques} />
+          <div className="grid">
+            <button type="submit" disabled={!canEdit}>
+              Update entry
+            </button>
+            <button type="button" onClick={remove} className="button-danger" disabled={!canEdit}>
+              Delete entry
+            </button>
+          </div>
+          <p>{status}</p>
+        </form>
         <div className="panel">
           <h3>Comments</h3>
           <p>Comments are not yet retrievable in v1. Coaches can still post comments through the coach workflow.</p>
