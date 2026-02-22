@@ -5,6 +5,8 @@ import {
 import {
   BatchWriteCommand,
   type BatchWriteCommandInput,
+  DeleteCommand,
+  type DeleteCommandInput,
   DynamoDBDocumentClient,
   GetCommand,
   type GetCommandInput,
@@ -70,6 +72,15 @@ export const queryItems = async (
 export const getItem = async (input: Omit<GetCommandInput, 'TableName'>): Promise<GetCommandOutput> => {
   return documentClient.send(
     new GetCommand({
+      TableName: TABLE_NAME,
+      ...input
+    })
+  );
+};
+
+export const deleteItem = async (input: Omit<DeleteCommandInput, 'TableName'>): Promise<void> => {
+  await documentClient.send(
+    new DeleteCommand({
       TableName: TABLE_NAME,
       ...input
     })

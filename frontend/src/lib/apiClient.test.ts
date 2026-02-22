@@ -165,6 +165,105 @@ describe('apiClient', () => {
     expect(entry.entryId).toBe('entry-2');
   });
 
+  it('unwraps getEntry payload shape', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        entry: {
+          entryId: 'entry-9',
+          athleteId: 'athlete-1',
+          createdAt: '2026-01-09T00:00:00.000Z',
+          sections: { shared: 'shared', private: 'private' },
+          sessionMetrics: {
+            durationMinutes: 50,
+            intensity: 8,
+            rounds: 7,
+            giOrNoGi: 'gi',
+            tags: ['back'],
+          },
+          rawTechniqueMentions: ['arm drag'],
+        },
+      }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { apiClient } = await import('./apiClient');
+    const entry = await apiClient.getEntry('entry-9');
+
+    expect(entry.entryId).toBe('entry-9');
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://api.example.test/entries/entry-9',
+      expect.objectContaining({
+        cache: 'no-store',
+      }),
+    );
+  });
+
+  it('unwraps updateEntry payload shape', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        entry: {
+          entryId: 'entry-10',
+          athleteId: 'athlete-1',
+          createdAt: '2026-01-10T00:00:00.000Z',
+          sections: { shared: 'updated', private: 'updated private' },
+          sessionMetrics: {
+            durationMinutes: 40,
+            intensity: 5,
+            rounds: 4,
+            giOrNoGi: 'no-gi',
+            tags: ['passing'],
+          },
+          rawTechniqueMentions: [],
+        },
+      }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { apiClient } = await import('./apiClient');
+    const entry = await apiClient.updateEntry('entry-10', {
+      sections: { shared: 'updated', private: 'updated private' },
+      sessionMetrics: {
+        durationMinutes: 40,
+        intensity: 5,
+        rounds: 4,
+        giOrNoGi: 'no-gi',
+        tags: ['passing'],
+      },
+      rawTechniqueMentions: [],
+    });
+
+    expect(entry.entryId).toBe('entry-10');
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://api.example.test/entries/entry-10',
+      expect.objectContaining({
+        method: 'PUT',
+      }),
+    );
+  });
+
+  it('calls deleteEntry with DELETE and accepts 204', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 204,
+      json: async () => ({}),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { apiClient } = await import('./apiClient');
+    await apiClient.deleteEntry('entry-11');
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://api.example.test/entries/entry-11',
+      expect.objectContaining({
+        method: 'DELETE',
+      }),
+    );
+  });
+
   it('unwraps getAthleteEntries payload shape', async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,

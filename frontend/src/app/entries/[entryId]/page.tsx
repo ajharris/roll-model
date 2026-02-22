@@ -1,34 +1,168 @@
 'use client';
 
-import { useParams } from 'next/navigation';
+import Link from 'next/link';
+import { useParams, useRouter } from 'next/navigation';
+import type { FormEvent } from 'react';
 import { useEffect, useState } from 'react';
 
+import { ChipInput } from '@/components/ChipInput';
 import { Protected } from '@/components/Protected';
 import { apiClient } from '@/lib/apiClient';
 import type { Entry } from '@/types/api';
 
 export default function EntryDetailPage() {
   const { entryId } = useParams<{ entryId: string }>();
+  const router = useRouter();
   const [entry, setEntry] = useState<Entry | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [shared, setShared] = useState('');
+  const [privateText, setPrivateText] = useState('');
+  const [durationMinutes, setDurationMinutes] = useState(60);
+  const [intensity, setIntensity] = useState(6);
+  const [rounds, setRounds] = useState(5);
+  const [giOrNoGi, setGiOrNoGi] = useState<'gi' | 'no-gi'>('gi');
+  const [tags, setTags] = useState<string[]>([]);
+  const [techniques, setTechniques] = useState<string[]>([]);
+  const [status, setStatus] = useState('');
 
   useEffect(() => {
-    void apiClient.getEntries().then((entries) => setEntry(entries.find((e) => e.entryId === entryId) ?? null));
+    let cancelled = false;
+    setIsLoading(true);
+    setStatus('');
+
+    void apiClient
+      .getEntry(entryId)
+      .then((loadedEntry) => {
+        if (cancelled) return;
+        setEntry(loadedEntry);
+        setShared(loadedEntry.sections.shared);
+        setPrivateText(loadedEntry.sections.private ?? '');
+        setDurationMinutes(loadedEntry.sessionMetrics.durationMinutes);
+        setIntensity(loadedEntry.sessionMetrics.intensity);
+        setRounds(loadedEntry.sessionMetrics.rounds);
+        setGiOrNoGi(loadedEntry.sessionMetrics.giOrNoGi);
+        setTags(loadedEntry.sessionMetrics.tags);
+        setTechniques(loadedEntry.rawTechniqueMentions);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setEntry(null);
+          setStatus('Could not load entry.');
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setIsLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, [entryId]);
+
+  const save = async (event: FormEvent) => {
+    event.preventDefault();
+    setStatus('Saving...');
+
+    try {
+      const updated = await apiClient.updateEntry(entryId, {
+        sections: { shared, private: privateText },
+        sessionMetrics: { durationMinutes, intensity, rounds, giOrNoGi, tags },
+        rawTechniqueMentions: techniques,
+      });
+      setEntry(updated);
+      setStatus('Saved.');
+    } catch {
+      setStatus('Save failed.');
+    }
+  };
+
+  const remove = async () => {
+    const confirmed = window.confirm('Delete this entry? This cannot be undone.');
+    if (!confirmed) {
+      setStatus('Delete cancelled.');
+      return;
+    }
+
+    setStatus('Deleting...');
+    try {
+      await apiClient.deleteEntry(entryId);
+      router.push('/entries');
+    } catch {
+      setStatus('Delete failed.');
+    }
+  };
 
   return (
     <Protected allow={['athlete']}>
       <section>
         <h2>Entry detail</h2>
-        {!entry && <p>Entry not found.</p>}
+        <p className="small">
+          <Link href="/entries">Back to entries</Link>
+        </p>
+        {isLoading && <p>Loading entry...</p>}
+        {!isLoading && !entry && <p>{status || 'Entry not found.'}</p>}
         {entry && (
           <>
-            <p><strong>Shared</strong>: {entry.sections.shared}</p>
-            <p><strong>Private</strong>: {entry.sections.private}</p>
-            <p>Duration: {entry.sessionMetrics.durationMinutes} minutes</p>
-            <p>Intensity: {entry.sessionMetrics.intensity}</p>
-            <p>Rounds: {entry.sessionMetrics.rounds}</p>
-            <p>Mode: {entry.sessionMetrics.giOrNoGi}</p>
-            <p>Tags: {entry.sessionMetrics.tags.join(', ')}</p>
+            <p className="small">Created: {new Date(entry.createdAt).toLocaleString()}</p>
+            <form onSubmit={save}>
+              <label htmlFor="shared-notes">Shared notes</label>
+              <textarea id="shared-notes" value={shared} onChange={(e) => setShared(e.target.value)} required />
+              <label htmlFor="private-notes">Private notes</label>
+              <textarea
+                id="private-notes"
+                value={privateText}
+                onChange={(e) => setPrivateText(e.target.value)}
+                required
+              />
+              <div className="grid">
+                <div>
+                  <label htmlFor="duration-minutes">Duration (minutes)</label>
+                  <input
+                    id="duration-minutes"
+                    type="number"
+                    value={durationMinutes}
+                    onChange={(e) => setDurationMinutes(Number(e.target.value))}
+                  />
+                </div>
+                <div>
+                  <label htmlFor="intensity">Intensity (1-10)</label>
+                  <input
+                    id="intensity"
+                    type="number"
+                    min={1}
+                    max={10}
+                    value={intensity}
+                    onChange={(e) => setIntensity(Number(e.target.value))}
+                  />
+                </div>
+                <div>
+                  <label htmlFor="rounds">Rounds</label>
+                  <input id="rounds" type="number" value={rounds} onChange={(e) => setRounds(Number(e.target.value))} />
+                </div>
+                <div>
+                  <label htmlFor="gi-or-no-gi">Gi or no-gi</label>
+                  <select
+                    id="gi-or-no-gi"
+                    value={giOrNoGi}
+                    onChange={(e) => setGiOrNoGi(e.target.value as 'gi' | 'no-gi')}
+                  >
+                    <option value="gi">gi</option>
+                    <option value="no-gi">no-gi</option>
+                  </select>
+                </div>
+              </div>
+              <ChipInput label="Tags" values={tags} onChange={setTags} />
+              <ChipInput label="Technique mentions" values={techniques} onChange={setTechniques} />
+              <div className="grid">
+                <button type="submit">Update entry</button>
+                <button type="button" onClick={remove} className="button-danger">
+                  Delete entry
+                </button>
+              </div>
+              <p>{status}</p>
+            </form>
           </>
         )}
         <div className="panel">

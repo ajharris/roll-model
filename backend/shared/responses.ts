@@ -5,7 +5,7 @@ import type { ApiErrorShape } from './types';
 const CORS_HEADERS: Record<string, string> = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'Content-Type,Authorization,X-Authorization-Bearer',
-  'Access-Control-Allow-Methods': 'GET,POST,DELETE,OPTIONS'
+  'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS'
 };
 
 export class ApiError extends Error {
