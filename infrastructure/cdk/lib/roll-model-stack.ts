@@ -78,6 +78,16 @@ export class RollModelStack extends cdk.Stack {
     );
     const exportDataLambda = this.createLambda('exportData', 'backend/lambdas/exportData/index.ts', table);
     const aiChatLambda = this.createLambda('aiChat', 'backend/lambdas/aiChat/index.ts', table);
+    const requestSignupLambda = this.createLambda(
+      'requestSignup',
+      'backend/lambdas/requestSignup/index.ts',
+      table
+    );
+    const submitFeedbackLambda = this.createLambda(
+      'submitFeedback',
+      'backend/lambdas/submitFeedback/index.ts',
+      table
+    );
 
     aiChatLambda.addToRolePolicy(
       new iam.PolicyStatement({
@@ -87,6 +97,18 @@ export class RollModelStack extends cdk.Stack {
         ]
       })
     );
+
+    requestSignupLambda.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: ['ses:SendEmail', 'ses:SendRawEmail'],
+        resources: ['*']
+      })
+    );
+    requestSignupLambda.addEnvironment('SIGNUP_APPROVAL_EMAIL', process.env.SIGNUP_APPROVAL_EMAIL ?? '');
+    requestSignupLambda.addEnvironment('SIGNUP_SOURCE_EMAIL', process.env.SIGNUP_SOURCE_EMAIL ?? '');
+
+    submitFeedbackLambda.addEnvironment('GITHUB_TOKEN', process.env.GITHUB_TOKEN ?? '');
+    submitFeedbackLambda.addEnvironment('GITHUB_REPO', process.env.GITHUB_REPO ?? '');
 
     const api = new apigateway.RestApi(this, 'RollModelApi', {
       restApiName: 'RollModelApi',
@@ -103,6 +125,9 @@ export class RollModelStack extends cdk.Stack {
     const methodOptions: apigateway.MethodOptions = {
       authorizationType: apigateway.AuthorizationType.COGNITO,
       authorizer
+    };
+    const publicMethodOptions: apigateway.MethodOptions = {
+      authorizationType: apigateway.AuthorizationType.NONE
     };
 
     const entries = api.root.addResource('entries');
@@ -127,6 +152,12 @@ export class RollModelStack extends cdk.Stack {
     const ai = api.root.addResource('ai');
     const aiChat = ai.addResource('chat');
     aiChat.addMethod('POST', new apigateway.LambdaIntegration(aiChatLambda), methodOptions);
+
+    const signupRequests = api.root.addResource('signup-requests');
+    signupRequests.addMethod('POST', new apigateway.LambdaIntegration(requestSignupLambda), publicMethodOptions);
+
+    const feedback = api.root.addResource('feedback');
+    feedback.addMethod('POST', new apigateway.LambdaIntegration(submitFeedbackLambda), methodOptions);
 
     const athletes = api.root.addResource('athletes');
     const athleteById = athletes.addResource('{athleteId}');

@@ -45,3 +45,21 @@ export interface ChatThread {
   title: string;
   messages: ChatMessage[];
 }
+
+export type FeedbackType = 'bug' | 'feature' | 'other';
+
+export interface FeedbackPayload {
+  type: FeedbackType;
+  title: string;
+  details: string;
+  steps?: string;
+  expected?: string;
+  actual?: string;
+}
+
+export interface SignupRequestPayload {
+  email: string;
+  name?: string;
+  notes?: string;
+  intendedRole?: string;
+}

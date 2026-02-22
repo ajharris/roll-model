@@ -51,4 +51,46 @@ describe('apiClient', () => {
       status: 502,
     });
   });
+
+  it('posts signup requests to the public endpoint', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 202,
+      json: async () => ({ status: 'queued' }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { apiClient } = await import('./apiClient');
+
+    await apiClient.requestSignup({ email: 'new.user@example.com', name: 'New User' });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://api.example.test/signup-requests',
+      expect.objectContaining({
+        method: 'POST',
+      }),
+    );
+  });
+
+  it('posts feedback to the authenticated endpoint', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 201,
+      json: async () => ({ issueNumber: 5, issueUrl: 'https://github.com/example/issues/5' }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { apiClient, configureApiClient } = await import('./apiClient');
+    configureApiClient(() => 'jwt-token');
+
+    const response = await apiClient.submitFeedback({ type: 'bug', title: 'Bug', details: 'Details' });
+
+    expect(response.issueNumber).toBe(5);
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://api.example.test/feedback',
+      expect.objectContaining({
+        method: 'POST',
+      }),
+    );
+  });
 });

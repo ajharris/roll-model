@@ -23,14 +23,19 @@ export const AppShell = ({ children }: { children: ReactNode }) => {
         {isAuthenticated && (
           <div className="user-row">
             <span>{user?.email ?? user?.sub}</span>
-            <button
-              onClick={() => {
-                signOut();
-                router.push('/');
-              }}
-            >
-              Sign out
-            </button>
+            <div className="row">
+              <Link href="/feedback" className="button-link">
+                Feedback
+              </Link>
+              <button
+                onClick={() => {
+                  signOut();
+                  router.push('/');
+                }}
+              >
+                Sign out
+              </button>
+            </div>
           </div>
         )}
       </header>
