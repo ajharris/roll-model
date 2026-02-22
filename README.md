@@ -1,4 +1,4 @@
-# BJJ Lab Notebook (Roll Model)
+# Roll Model (BJJ Lab Notebook)
 
 BJJ Lab Notebook is a scientific Brazilian Jiu Jitsu journaling and
 performance intelligence system.
@@ -23,172 +23,178 @@ The goal is simple: evidence over vibes.
 
 ------------------------------------------------------------------------
 
-## Architecture Overview
 
-### Backend (Serverless AWS)
+## Current Project State
 
--   AWS CDK infrastructure
--   API Gateway (REST)
--   AWS Lambda (TypeScript)
--   Amazon Cognito (User Pools with role-based access)
--   DynamoDB (single-table design)
--   SSM Parameter Store (OpenAI key storage)
+As of this codebase snapshot, the platform includes:
+
+- Athlete training entries with private/shared sections.
+- Coach-athlete link management (link + revoke).
+- Coach comments on entries.
+- AI chat with privacy-aware retrieval, thread/message storage, and structured outputs.
+- Athlete export endpoint with `full` and `tidy` modes.
+- Public signup request intake (SES email notification flow).
+- Authenticated feedback submission that opens GitHub issues.
+- Next.js frontend flows for entries, chat, analytics view, export, coaching, signup requests, and feedback.
+
+## Architecture
+
+### Backend (AWS Serverless, CDK)
+
+- API Gateway (REST API, `prod` stage).
+- Lambda (TypeScript, Node.js 20).
+- Cognito User Pool + User Pool Client.
+- DynamoDB single-table design (`RollModel`, PITR enabled).
+- SSM Parameter Store for OpenAI key: `/roll-model/openai_api_key`.
+- SES integration for signup request notifications.
 
 ### Frontend
 
--   Next.js (App Router)
--   TypeScript
--   Cognito authentication
--   Typed API client
--   Scientific UX tone
--   Minimal analytics dashboards
-
-------------------------------------------------------------------------
+- Next.js App Router (v14).
+- React + TypeScript.
+- Cognito-based auth flow.
+- Typed API client in `frontend/src/lib/apiClient.ts`.
 
 ## Authentication Model
 
-Roles are enforced via Cognito custom attribute:
+Roles are enforced using Cognito custom attribute `custom:role`.
 
--   `custom:role = athlete`
--   `custom:role = coach`
+- `athlete`: create/view entries, link/revoke coaches, export data, use AI chat.
+- `coach`: view linked athlete shared entries only, comment on entries, use AI chat with shared-only context.
 
-### Athlete Permissions
+## API Surface (Implemented)
 
--   Create entries
--   View private + shared notes
--   Link coaches
--   Export data
--   Use AI features
+- `POST /entries`
+- `GET /entries`
+- `GET /athletes/{athleteId}/entries`
+- `POST /entries/comments`
+- `POST /links/coach`
+- `DELETE /links/coach`
+- `GET /export`
+- `POST /ai/chat`
+- `POST /signup-requests` (public)
+- `POST /feedback` (authenticated)
 
-### Coach Permissions
+Reference docs:
 
--   View shared notes only
--   Post comments
--   Cannot edit or delete entries
--   Cannot access private sections
+- `docs/architecture.md`
+- `docs/api-contracts.md`
+- `docs/privacy.md`
+- `docs/data-model.md`
 
-------------------------------------------------------------------------
+## Repository Layout
 
-## Data Model (Simplified)
+- `backend/` Lambda handlers + shared domain modules + Jest tests.
+- `infrastructure/cdk/` AWS CDK stack (`RollModelStack`).
+- `frontend/` Next.js frontend + Vitest tests.
+- `docs/` architecture, contracts, privacy, and data model docs.
 
-### Entry
+## Local Development
 
--   entryId
--   athleteId
--   createdAt
--   updatedAt
--   sections:
-    -   private
-    -   shared
--   sessionMetrics:
-    -   durationMinutes
-    -   intensity
-    -   rounds
-    -   giOrNoGi
-    -   tags\[\]
--   rawTechniqueMentions\[\]
+### Prerequisites
 
-### Comment
+- Node.js 20+
+- npm
+- AWS credentials/profile (for CDK deploy/synth against your account)
 
--   PK = ENTRY#{entryId}
--   SK = COMMENT#{timestamp}
--   body
--   coachId
+### Install and verify (repo root)
 
-### Keyword Index
-
--   Enables keyword-based context retrieval for AI
--   PK = USER#{athleteId}
--   SK = KW#{token}#TS#{timestamp}#ENTRY#{entryId}
-
-------------------------------------------------------------------------
-
-## Backend Setup
-
-Install dependencies:
-
-``` bash
-npm install
+```bash
+npm ci
+npm run lint
+npm run test
 npm run build
-npm test
 ```
 
-Deploy infrastructure:
+### Run frontend
 
-``` bash
-cd infrastructure/cdk
-cdk deploy
-```
-
-------------------------------------------------------------------------
-
-## Frontend Setup
-
-``` bash
+```bash
 cd frontend
-npm install
-cp .env.example .env.local
+npm ci
 npm run dev
 ```
 
-Production build:
+Set frontend environment variables (example names):
 
-``` bash
-npm run build
+- `NEXT_PUBLIC_API_BASE_URL`
+- `NEXT_PUBLIC_COGNITO_USER_POOL_ID`
+- `NEXT_PUBLIC_COGNITO_CLIENT_ID`
+- `NEXT_PUBLIC_COGNITO_DOMAIN` (optional)
+- `NEXT_PUBLIC_COGNITO_REDIRECT_URI` (optional)
+
+## Infrastructure and Deploy
+
+### CDK
+
+From repo root:
+
+```bash
+npm run cdk:synth
+npm run cdk:deploy
 ```
 
-------------------------------------------------------------------------
+Stack outputs include:
 
-## CI/CD (GitHub Actions + Amplify)
+- `ApiUrl`
+- `UserPoolId`
+- `UserPoolClientId`
+- `TableName`
 
-This repo uses:
+### CI/CD
 
--   **GitHub Actions** to build, test, and deploy the backend (CDK).
--   **AWS Amplify** to build and deploy the frontend.
+- `/.github/workflows/ci.yml`
+  - Runs CDK synth.
+  - Runs backend lint/test/build.
+  - Runs frontend lint/test/build.
+- `/.github/workflows/deploy.yml`
+  - Triggers after successful CI on `main`.
+  - Assumes AWS role and deploys CDK.
 
-### GitHub Actions
+Frontend deploy is managed by AWS Amplify using `amplify.yml`.
 
-Workflows:
+### GitHub Actions AWS Auth (OIDC)
 
--   `/.github/workflows/ci.yml` runs lint/test/build on PRs and `main`.
--   `/.github/workflows/deploy-backend.yml` deploys CDK on pushes to `main`.
+Backend deploy workflow uses GitHub OIDC + `aws-actions/configure-aws-credentials`.
 
-Required GitHub repo variables:
+- Role currently assumed in deploy workflow:
+  - `arn:aws:iam::864981757594:role/roll-model-github-actions`
+- Region currently used:
+  - `us-east-1`
 
--   `AWS_REGION=us-east-1`
--   `AWS_ROLE_ARN=arn:aws:iam::<account-id>:role/<github-actions-role-name>`
+Recommended trust policy scope: restrict to this repo + `main` branch.
 
-### Amplify
-
-Amplify uses `amplify.yml` at repo root and the env vars in the console.
-Set the frontend `NEXT_PUBLIC_*` variables in Amplify (not GitHub secrets).
-
-### GitHub OIDC Role (Recommended)
-
-Create an IAM role for GitHub OIDC and trust only `main` on this repo:
-
-``` json
+```json
 {
   "Version": "2012-10-17",
   "Statement": [
     {
       "Effect": "Allow",
-      "Principal": { "Federated": "arn:aws:iam::864981757594:oidc-provider/token.actions.githubusercontent.com" },
+      "Principal": {
+        "Federated": "arn:aws:iam::<ACCOUNT_ID>:oidc-provider/token.actions.githubusercontent.com"
+      },
       "Action": "sts:AssumeRoleWithWebIdentity",
       "Condition": {
-        "StringEquals": { "token.actions.githubusercontent.com:aud": "sts.amazonaws.com" },
-        "StringLike": { "token.actions.githubusercontent.com:sub": "repo:OWNER/REPO:ref:refs/heads/main" }
+        "StringEquals": {
+          "token.actions.githubusercontent.com:aud": "sts.amazonaws.com"
+        },
+        "StringLike": {
+          "token.actions.githubusercontent.com:sub": "repo:OWNER/REPO:ref:refs/heads/main"
+        }
       }
     }
   ]
 }
 ```
 
-### IAM Permissions (Two Options)
+If deploy permissions are too narrow, expand incrementally across CloudFormation, Lambda, API Gateway, DynamoDB, Cognito, SSM, and CDK bootstrap asset roles/resources.
 
-Option A: **Baseline (broad, easiest)**
+### IAM Policy Examples For Deploy Role
 
-``` json
+Option A is broader and easier to get working quickly. Option B is tighter and scoped to this stack and CDK bootstrap resources.
+
+#### Option A: Baseline (broad)
+
+```json
 {
   "Version": "2012-10-17",
   "Statement": [
@@ -199,17 +205,17 @@ Option A: **Baseline (broad, easiest)**
     { "Effect": "Allow", "Action": "cognito-idp:*", "Resource": "*" },
     { "Effect": "Allow", "Action": "iam:PassRole", "Resource": "*" },
     { "Effect": "Allow", "Action": "sts:GetCallerIdentity", "Resource": "*" },
-    { "Effect": "Allow", "Action": "ssm:GetParameter", "Resource": "*" }
+    { "Effect": "Allow", "Action": "ssm:GetParameter", "Resource": "*" },
+    { "Effect": "Allow", "Action": "s3:*", "Resource": "*" }
   ]
 }
 ```
 
-Option B: **Tighter (scoped to this stack + CDK bootstrap)**
+#### Option B: Tighter (stack + bootstrap scoped)
 
-Replace `<ACCOUNT_ID>` and `<REGION>` and keep stack name `RollModelStack`.
-If you use a different CDK bootstrap qualifier, update the role/bucket names.
+Replace `<ACCOUNT_ID>` and `<REGION>`. This example assumes stack name `RollModelStack` and default CDK bootstrap qualifier (`hnb659fds`).
 
-``` json
+```json
 {
   "Version": "2012-10-17",
   "Statement": [
@@ -319,88 +325,69 @@ If you use a different CDK bootstrap qualifier, update the role/bucket names.
 }
 ```
 
-If CDK deploy fails with access denied, expand actions/resources incrementally.
+## Configuration Notes
 
-------------------------------------------------------------------------
-
-## Required Environment Variables (Frontend)
-
-See `frontend/.env.example`
-
-Typical values:
-
--   NEXT_PUBLIC_API_BASE_URL
--   NEXT_PUBLIC_COGNITO_USER_POOL_ID
--   NEXT_PUBLIC_COGNITO_CLIENT_ID
--   NEXT_PUBLIC_COGNITO_DOMAIN (if using Hosted UI)
--   NEXT_PUBLIC_COGNITO_REDIRECT_URI
-
-------------------------------------------------------------------------
+- OpenAI API key must exist in SSM at `/roll-model/openai_api_key`.
+- Signup request Lambda expects:
+  - `SIGNUP_APPROVAL_EMAIL`
+  - `SIGNUP_SOURCE_EMAIL`
+- Feedback Lambda expects:
+  - `GITHUB_TOKEN`
+  - `GITHUB_REPO` (format: `owner/repo`)
 
 ## AI Integration
 
--   All OpenAI calls occur server-side.
--   API key stored in AWS SSM Parameter Store:
-    `/roll-model/openai_api_key`
--   AI responses return:
-    -   assistant_text (natural language coaching)
-    -   extracted_updates (structured JSON)
-    -   suggested_prompts
+- OpenAI calls are server-side only (`backend/lambdas/aiChat/index.ts`).
+- Key location in SSM Parameter Store:
+  - `/roll-model/openai_api_key`
+- AI response shape includes:
+  - `assistant_text`
+  - `extracted_updates`
+  - `suggested_prompts`
+- Context retrieval combines:
+  - recent entries (default 10),
+  - recent thread messages (default 20),
+  - optional keyword-based retrieval with privacy scope enforcement.
 
-AI chat supports: - Recency-based context (last N entries) -
-Keyword-based retrieval - Privacy-aware filtering
+## Data Export
 
-------------------------------------------------------------------------
+Athletes can export data via `GET /export`.
 
-## JSON Export
+- Query option:
+  - `mode=full`
+  - `mode=tidy`
+  - no `mode` returns both.
+- Response includes:
+  - `schemaVersion`
+  - `generatedAt`
+  - full and/or tidy datasets for entries, comments, links, AI threads, and AI messages.
+- Designed for downstream analysis in Python, Pandas, notebooks, and ML experimentation.
 
-Athletes can export their data via:
+## Security and Privacy
 
-    GET /export
+- Role enforcement uses Cognito claim `custom:role` (`athlete` or `coach`).
+- Coaches can only access linked athletes.
+- Coaches receive `shared` entry content only.
+- AI context respects privacy scope and never exposes athlete private notes to coaches.
+- OpenAI calls run server-side only.
 
-Export includes: - Entries - Comments - Links - AI outputs (if
-present) - schemaVersion - generatedAt
+## Future Work (Planned)
 
-Export supports downstream use in: - Python - Pandas - Jupyter - ML
-pipelines
+### Near-term
 
-------------------------------------------------------------------------
+- Complete and publish API contract updates for all routes (including `DELETE /links/coach`, feedback, and signup endpoints).
+- Add frontend support for richer AI context controls (date range, entry selection, keyword filters).
+- Improve analytics beyond baseline charts (time windows, trend summaries, coach-visible shared metrics).
+- Expand automated test coverage for cross-role and privacy edge cases.
 
-## Scientific Direction
+### Mid-term
 
-Roll Model is designed to enable:
+- Introduce controlled technique vocabulary and alias mapping pipeline.
+- Add weekly/monthly training reports generated from export/tidy models.
+- Add optional athlete-consented anonymized cohort analytics.
+- Improve operational observability (structured logging, alarms, failure dashboards).
 
--   Load tracking over time
--   Injury signal detection
--   Technique exposure analysis
--   Correlation modeling
--   Community-level anonymized trend analysis (opt-in)
+### Longer-term
 
-Future extensions include: - Controlled technique vocabulary - Technique
-alias mapping - Injury prediction signals - Weekly lab-style training
-reports
-
-------------------------------------------------------------------------
-
-## Security Notes
-
--   No OpenAI calls from frontend.
--   Tokens are not stored in localStorage.
--   Private sections never exposed to coaches.
--   All access is role-verified server-side.
-
-------------------------------------------------------------------------
-
-## Development Roadmap (High Level)
-
-1.  Backend stabilization
-2.  AI chat integration
-3.  Frontend v1 complete workflow
-4.  Analytics dashboard expansion
-5.  Technique vocabulary mining
-6.  ML experimentation layer
-
-------------------------------------------------------------------------
-
-Roll Model Scientific grappling. Structured reflection. Intelligent
-progression.
+- ML-assisted pattern detection for workload/recovery signals.
+- Experimentation framework for prompt/retrieval strategies with measurable quality metrics.
