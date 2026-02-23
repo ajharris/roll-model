@@ -101,10 +101,13 @@ Reference docs:
 
 ```bash
 npm ci
+npm run setup:codex
 npm run lint
 npm run test
 npm run build
 ```
+
+`npm run setup:codex` configures `origin` automatically when a remote URL is available in environment variables such as `CODEX_GIT_REMOTE_URL`, `CODEX_REMOTE_URL`, `GIT_REMOTE_URL`, `REPOSITORY_URL`, or `GITHUB_REPOSITORY`.
 
 ### Run frontend
 

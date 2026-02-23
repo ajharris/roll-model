@@ -15,7 +15,8 @@
     "test:backend": "jest --runInBand",
     "test:frontend": "npm --prefix frontend run test",
     "cdk:synth": "npm run build && cdk synth -a \"node dist/infrastructure/cdk/bin/app.js\"",
-    "cdk:deploy": "npm run build && cdk deploy -a \"node dist/infrastructure/cdk/bin/app.js\""
+    "cdk:deploy": "npm run build && cdk deploy -a \"node dist/infrastructure/cdk/bin/app.js\"",
+    "setup:codex": "bash scripts/codex/setup-environment.sh"
   },
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.863.0",
