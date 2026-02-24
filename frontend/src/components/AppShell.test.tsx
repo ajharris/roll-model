@@ -91,7 +91,7 @@ describe('AppShell', () => {
   it('redirects to Cognito hosted logout when configured', async () => {
     const user = userEvent.setup();
     const signOutMock = vi.fn();
-    const assignMock = vi.spyOn(window.location, 'assign').mockImplementation(() => undefined);
+    const assignMock = vi.spyOn(Location.prototype, 'assign').mockImplementation(() => undefined);
 
     usePathnameMock.mockReturnValue('/entries');
     useAuthMock.mockReturnValue({
