@@ -37,7 +37,7 @@ interface AuthContextValue {
   user: UserInfo | null;
   role: UserRole;
   tokens: AuthTokens | null;
-  signIn: (username: string, password: string) => Promise<void>;
+  signIn: (username: string, password: string) => Promise<UserRole>;
   signOut: () => void;
   hydrateHostedUiTokens: (tokens: AuthTokens) => UserRole | null;
 }
@@ -277,7 +277,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [clearRefreshTimeout, refreshCurrentSession, tokens]);
 
   const signIn = useCallback((username: string, password: string) =>
-    new Promise<void>((resolve, reject) => {
+    new Promise<UserRole>((resolve, reject) => {
       if (!userPool) {
         reject(new Error('Cognito user pool is not configured.'));
         return;
@@ -287,12 +287,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       cognitoUser.authenticateUser(authDetails, {
         onSuccess: (result) => {
-          hydrateFromToken({
+          const nextRole = hydrateFromToken({
             idToken: result.getIdToken().getJwtToken(),
             accessToken: result.getAccessToken().getJwtToken(),
             refreshToken: result.getRefreshToken().getToken(),
           });
-          resolve();
+          if (!nextRole) {
+            reject(new Error('Failed to hydrate authenticated session.'));
+            return;
+          }
+          resolve(nextRole);
         },
         onFailure: (err) => reject(err),
       });
