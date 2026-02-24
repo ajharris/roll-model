@@ -1,5 +1,5 @@
-import { frontendConfig } from '@/lib/config';
 import { logAuthFailure, logNetworkFailure } from '@/lib/clientErrorLogging';
+import { frontendConfig } from '@/lib/config';
 import type {
   CommentPayload,
   Entry,

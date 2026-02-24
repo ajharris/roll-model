@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
 import { useAuth } from '@/contexts/AuthContext';
+import { logAuthFailure } from '@/lib/clientErrorLogging';
 import {
   HOSTED_UI_CALLBACK_PATH,
   exchangeHostedUiCodeForTokens,
@@ -12,7 +13,6 @@ import {
   hostedUiStateKey,
   parseHostedUiCallback,
 } from '@/lib/cognitoHostedUi';
-import { logAuthFailure } from '@/lib/clientErrorLogging';
 import { getDefaultRouteForRole } from '@/lib/roleRouting';
 
 export default function HostedUiCallbackPage() {
