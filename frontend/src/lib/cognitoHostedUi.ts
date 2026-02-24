@@ -96,7 +96,7 @@ const selectRedirectUri = (candidates: string[], origin?: string): string | null
 
 export const getHostedUiRuntimeConfig = (
   origin?: string,
-  env: HostedUiEnv = process.env,
+  env: HostedUiEnv = process.env as HostedUiEnv,
 ): HostedUiRuntimeConfig => {
   const validationErrors: string[] = [];
   const hasHostedUiConfig = Boolean(
