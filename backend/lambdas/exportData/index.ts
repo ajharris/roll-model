@@ -1,4 +1,5 @@
 import type { APIGatewayProxyHandler } from 'aws-lambda';
+import { withRequestLogging } from '../../shared/logger';
 
 import { getAuthContext, requireRole } from '../../shared/auth';
 import { queryItems } from '../../shared/db';
@@ -19,7 +20,7 @@ const stripKeys = <T extends { PK: string; SK: string; entityType: string }>(ite
   return rest;
 };
 
-export const handler: APIGatewayProxyHandler = async (event) => {
+const baseHandler: APIGatewayProxyHandler = async (event) => {
   try {
     const auth = getAuthContext(event);
     requireRole(auth, ['athlete']);
@@ -185,3 +186,5 @@ export const handler: APIGatewayProxyHandler = async (event) => {
     return errorResponse(error);
   }
 };
+
+export const handler: APIGatewayProxyHandler = withRequestLogging('exportData', baseHandler);

@@ -1,4 +1,5 @@
 import type { APIGatewayProxyEvent, APIGatewayProxyHandler } from 'aws-lambda';
+import { withRequestLogging } from '../../shared/logger';
 
 import { getAuthContext, requireRole } from '../../shared/auth';
 import { batchWriteItems, deleteItem, getItem, putItem } from '../../shared/db';
@@ -87,7 +88,7 @@ const buildKeywordItemKey = (
   SK: `KW#${token}#TS#${createdAt}#ENTRY#${entryId}`
 });
 
-export const handler: APIGatewayProxyHandler = async (event) => {
+const baseHandler: APIGatewayProxyHandler = async (event) => {
   try {
     const auth = getAuthContext(event);
     requireRole(auth, ['athlete']);
@@ -206,3 +207,5 @@ export const handler: APIGatewayProxyHandler = async (event) => {
     return errorResponse(error);
   }
 };
+
+export const handler: APIGatewayProxyHandler = withRequestLogging('updateEntry', baseHandler);

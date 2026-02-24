@@ -1,4 +1,5 @@
 import type { APIGatewayProxyHandler } from 'aws-lambda';
+import { withRequestLogging } from '../../shared/logger';
 import { v4 as uuidv4 } from 'uuid';
 
 import { getAuthContext, hasRole, requireRole } from '../../shared/auth';
@@ -278,7 +279,7 @@ export const storeMessage = async (message: AIMessage): Promise<void> => {
   });
 };
 
-export const handler: APIGatewayProxyHandler = async (event) => {
+const baseHandler: APIGatewayProxyHandler = async (event) => {
   try {
     const auth = getAuthContext(event);
     requireRole(auth, ['athlete', 'coach']);
@@ -352,3 +353,5 @@ export const handler: APIGatewayProxyHandler = async (event) => {
     return errorResponse(error);
   }
 };
+
+export const handler: APIGatewayProxyHandler = withRequestLogging('aiChat', baseHandler);

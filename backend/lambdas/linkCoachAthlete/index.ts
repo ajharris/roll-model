@@ -1,4 +1,5 @@
 import type { APIGatewayProxyHandler } from 'aws-lambda';
+import { withRequestLogging } from '../../shared/logger';
 
 import { getAuthContext, requireRole } from '../../shared/auth';
 import { getItem, putItem } from '../../shared/db';
@@ -29,7 +30,7 @@ const parseBody = (rawBody: string | null): LinkCoachAthleteRequest => {
   return parsed as LinkCoachAthleteRequest;
 };
 
-export const handler: APIGatewayProxyHandler = async (event) => {
+const baseHandler: APIGatewayProxyHandler = async (event) => {
   try {
     const auth = getAuthContext(event);
     requireRole(auth, ['athlete']);
@@ -69,3 +70,5 @@ export const handler: APIGatewayProxyHandler = async (event) => {
     return errorResponse(error);
   }
 };
+
+export const handler: APIGatewayProxyHandler = withRequestLogging('linkCoachAthlete', baseHandler);
