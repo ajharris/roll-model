@@ -2,17 +2,25 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import type { FormEvent} from 'react';
-import { useState } from 'react';
+import type { FormEvent } from 'react';
+import { useEffect, useState } from 'react';
 
 import { useAuth } from '@/contexts/AuthContext';
+import type { HostedUiRuntimeConfig } from '@/lib/cognitoHostedUi';
+import { beginHostedUiSignIn, getHostedUiRuntimeConfig } from '@/lib/cognitoHostedUi';
 
 export default function HomePage() {
   const { isAuthenticated, role, signIn } = useAuth();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [hostedUiError, setHostedUiError] = useState('');
+  const [hostedUiConfig, setHostedUiConfig] = useState<HostedUiRuntimeConfig | null>(null);
   const router = useRouter();
+
+  useEffect(() => {
+    setHostedUiConfig(getHostedUiRuntimeConfig(window.location.origin));
+  }, []);
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -22,6 +30,17 @@ export default function HomePage() {
       router.push(role === 'coach' ? '/coach' : '/entries');
     } catch {
       setError('Sign in failed. Verify credentials and user pool settings.');
+    }
+  };
+
+  const signInWithHostedUi = async () => {
+    setHostedUiError('');
+    try {
+      await beginHostedUiSignIn(window.location.origin);
+    } catch {
+      setHostedUiError(
+        hostedUiConfig?.validationErrors[0] ?? 'Hosted UI sign-in is not configured correctly.',
+      );
     }
   };
 
@@ -43,6 +62,19 @@ export default function HomePage() {
           {error && <span>{error}</span>}
         </div>
       </form>
+      {hostedUiConfig?.enabled && (
+        <div className="row">
+          <button type="button" onClick={() => void signInWithHostedUi()}>
+            Sign in with Cognito Hosted UI
+          </button>
+          {hostedUiError && <span>{hostedUiError}</span>}
+        </div>
+      )}
+      {!hostedUiConfig?.enabled &&
+      hostedUiConfig?.hasHostedUiConfig &&
+      hostedUiConfig.validationErrors.length ? (
+        <p className="small">{hostedUiConfig.validationErrors[0]}</p>
+      ) : null}
       <div className="row">
         <span className="small">New here?</span>
         <Link className="button-link" href="/signup-request">Request access</Link>

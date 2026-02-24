@@ -12,7 +12,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import { configureApiClient } from '@/lib/apiClient';
 import type { UserRole } from '@/types/api';
 
-interface AuthTokens {
+export interface AuthTokens {
   idToken: string;
   accessToken?: string;
   refreshToken?: string;
@@ -30,6 +30,7 @@ interface AuthContextValue {
   tokens: AuthTokens | null;
   signIn: (username: string, password: string) => Promise<void>;
   signOut: () => void;
+  hydrateHostedUiTokens: (tokens: AuthTokens) => UserRole | null;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -52,32 +53,35 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [role, setRole] = useState<UserRole>('unknown');
   const userPool = useMemo(() => createUserPool(), []);
 
+  const hydrateFromToken = useCallback((nextTokens: AuthTokens): UserRole | null => {
+    try {
+      const decoded = jwtDecode<Record<string, string>>(nextTokens.idToken);
+      const nextRole = (decoded['custom:role'] as UserRole) ?? 'unknown';
+      setTokens(nextTokens);
+      setUser({ sub: decoded.sub, email: decoded.email });
+      setRole(nextRole);
+      sessionStorage.setItem(sessionKey, JSON.stringify(nextTokens));
+      return nextRole;
+    } catch {
+      setTokens(null);
+      setUser(null);
+      setRole('unknown');
+      sessionStorage.removeItem(sessionKey);
+      return null;
+    }
+  }, []);
+
   useEffect(() => {
     const raw = sessionStorage.getItem(sessionKey);
     if (raw) {
       const parsed = JSON.parse(raw) as AuthTokens;
       hydrateFromToken(parsed);
     }
-  }, []);
+  }, [hydrateFromToken]);
 
   useEffect(() => {
     configureApiClient(() => tokens?.idToken ?? null);
   }, [tokens]);
-
-  const hydrateFromToken = (nextTokens: AuthTokens) => {
-    try {
-      const decoded = jwtDecode<Record<string, string>>(nextTokens.idToken);
-      setTokens(nextTokens);
-      setUser({ sub: decoded.sub, email: decoded.email });
-      setRole((decoded['custom:role'] as UserRole) ?? 'unknown');
-      sessionStorage.setItem(sessionKey, JSON.stringify(nextTokens));
-    } catch {
-      setTokens(null);
-      setUser(null);
-      setRole('unknown');
-      sessionStorage.removeItem(sessionKey);
-    }
-  };
 
   const signIn = useCallback((username: string, password: string) =>
     new Promise<void>((resolve, reject) => {
@@ -99,7 +103,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         },
         onFailure: (err) => reject(err),
       });
-    }), [userPool]);
+    }), [hydrateFromToken, userPool]);
 
   const signOut = useCallback(() => {
     setTokens(null);
@@ -107,6 +111,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setRole('unknown');
     sessionStorage.removeItem(sessionKey);
   }, []);
+
+  const hydrateHostedUiTokens = useCallback(
+    (nextTokens: AuthTokens) => hydrateFromToken(nextTokens),
+    [hydrateFromToken],
+  );
 
   const value = useMemo(
     () => ({
@@ -116,8 +125,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       tokens,
       signIn,
       signOut,
+      hydrateHostedUiTokens,
     }),
-    [role, signIn, signOut, tokens, user],
+    [hydrateHostedUiTokens, role, signIn, signOut, tokens, user],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

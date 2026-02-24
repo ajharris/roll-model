@@ -8,6 +8,8 @@ import { AppShell } from './AppShell';
 const pushMock = vi.fn();
 const usePathnameMock = vi.fn();
 const useAuthMock = vi.fn();
+const buildHostedUiLogoutUrlMock = vi.fn();
+const getHostedUiRuntimeConfigMock = vi.fn();
 
 vi.mock('next/link', () => ({
   default: ({ href, className, children }: { href: string; className?: string; children: ReactNode }) => (
@@ -26,11 +28,20 @@ vi.mock('@/contexts/AuthContext', () => ({
   useAuth: () => useAuthMock(),
 }));
 
+vi.mock('@/lib/cognitoHostedUi', () => ({
+  buildHostedUiLogoutUrl: (...args: unknown[]) => buildHostedUiLogoutUrlMock(...args),
+  getHostedUiRuntimeConfig: (...args: unknown[]) => getHostedUiRuntimeConfigMock(...args),
+}));
+
 describe('AppShell', () => {
   beforeEach(() => {
     pushMock.mockReset();
     usePathnameMock.mockReset();
     useAuthMock.mockReset();
+    buildHostedUiLogoutUrlMock.mockReset();
+    getHostedUiRuntimeConfigMock.mockReset();
+    buildHostedUiLogoutUrlMock.mockReturnValue(null);
+    getHostedUiRuntimeConfigMock.mockReturnValue({});
   });
 
   it('renders athlete nav links and marks active path', () => {
@@ -75,5 +86,35 @@ describe('AppShell', () => {
 
     expect(signOutMock).toHaveBeenCalledTimes(1);
     expect(pushMock).toHaveBeenCalledWith('/');
+  });
+
+  it('redirects to Cognito hosted logout when configured', async () => {
+    const user = userEvent.setup();
+    const signOutMock = vi.fn();
+    const assignMock = vi.spyOn(window.location, 'assign').mockImplementation(() => undefined);
+
+    usePathnameMock.mockReturnValue('/entries');
+    useAuthMock.mockReturnValue({
+      isAuthenticated: true,
+      role: 'athlete',
+      signOut: signOutMock,
+      user: { email: 'athlete@example.com' },
+    });
+    buildHostedUiLogoutUrlMock.mockReturnValue('https://example.auth/logout');
+
+    render(
+      <AppShell>
+        <div>child</div>
+      </AppShell>,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Sign out' }));
+
+    expect(signOutMock).toHaveBeenCalledTimes(1);
+    expect(getHostedUiRuntimeConfigMock).toHaveBeenCalledWith(window.location.origin);
+    expect(assignMock).toHaveBeenCalledWith('https://example.auth/logout');
+    expect(pushMock).not.toHaveBeenCalled();
+
+    assignMock.mockRestore();
   });
 });
