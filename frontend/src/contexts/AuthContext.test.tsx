@@ -80,8 +80,13 @@ const Probe = () => {
     <div>
       <div data-testid="is-authenticated">{auth.isAuthenticated ? 'yes' : 'no'}</div>
       <div data-testid="role">{auth.role}</div>
+      <div data-testid="active-role">{auth.activeRole}</div>
+      <div data-testid="roles">{auth.roles.join(',')}</div>
       <div data-testid="id-token">{auth.tokens?.idToken ?? ''}</div>
       <div data-testid="user-email">{auth.user?.email ?? ''}</div>
+      <button type="button" onClick={() => auth.setActiveRole('coach')}>
+        switch-to-coach
+      </button>
     </div>
   );
 };
@@ -267,5 +272,42 @@ describe('AuthContext refresh flow', () => {
     expect(screen.getByTestId('id-token')).toHaveTextContent(refreshedIdToken);
 
     expect(latestApiTokenGetter?.()).toBe(refreshedIdToken);
+  });
+
+  it('hydrates multiple roles from cognito groups and allows switching active role', async () => {
+    const now = new Date('2026-02-24T12:00:00.000Z');
+    vi.spyOn(Date, 'now').mockReturnValue(now.getTime());
+
+    const idToken = makeJwt({
+      sub: 'user-9',
+      email: 'multi@example.com',
+      exp: Math.floor(now.getTime() / 1000) + 3600,
+      'cognito:groups': ['athlete', 'coach', 'admin'],
+      'cognito:username': 'multi-user',
+    });
+
+    sessionStorage.setItem(
+      sessionKey,
+      JSON.stringify({
+        idToken,
+        accessToken: 'access-1',
+        refreshToken: 'refresh-1',
+      }),
+    );
+
+    const user = (await import('@testing-library/user-event')).default.setup();
+    renderWithProvider();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('is-authenticated')).toHaveTextContent('yes');
+    });
+
+    expect(screen.getByTestId('roles')).toHaveTextContent('athlete,coach,admin');
+    expect(screen.getByTestId('active-role')).toHaveTextContent('athlete');
+
+    await user.click(screen.getByRole('button', { name: 'switch-to-coach' }));
+
+    expect(screen.getByTestId('active-role')).toHaveTextContent('coach');
+    expect(sessionStorage.getItem('roll-model-active-role')).toBe('coach');
   });
 });

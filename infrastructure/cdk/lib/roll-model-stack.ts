@@ -64,6 +64,27 @@ export class RollModelStack extends cdk.Stack {
       }
     });
 
+    const athleteGroup = new cognito.CfnUserPoolGroup(this, 'RollModelAthleteGroup', {
+      groupName: 'athlete',
+      userPoolId: userPool.userPoolId,
+      precedence: 30,
+      description: 'Default athlete users'
+    });
+
+    const coachGroup = new cognito.CfnUserPoolGroup(this, 'RollModelCoachGroup', {
+      groupName: 'coach',
+      userPoolId: userPool.userPoolId,
+      precedence: 20,
+      description: 'Coaches with shared-athlete access'
+    });
+
+    const adminGroup = new cognito.CfnUserPoolGroup(this, 'RollModelAdminGroup', {
+      groupName: 'admin',
+      userPoolId: userPool.userPoolId,
+      precedence: 10,
+      description: 'Administrative users with frontend diagnostics access'
+    });
+
     const createEntryLambda = this.createLambda('createEntry', 'backend/lambdas/createEntry/index.ts', table);
     const getEntriesLambda = this.createLambda('getEntries', 'backend/lambdas/getEntries/index.ts', table);
     const getEntryLambda = this.createLambda('getEntry', 'backend/lambdas/getEntry/index.ts', table);
@@ -281,6 +302,18 @@ export class RollModelStack extends cdk.Stack {
 
     new cdk.CfnOutput(this, 'UserPoolClientId', {
       value: userPoolClient.userPoolClientId
+    });
+
+    new cdk.CfnOutput(this, 'CognitoAthleteGroupName', {
+      value: athleteGroup.groupName ?? 'athlete'
+    });
+
+    new cdk.CfnOutput(this, 'CognitoCoachGroupName', {
+      value: coachGroup.groupName ?? 'coach'
+    });
+
+    new cdk.CfnOutput(this, 'CognitoAdminGroupName', {
+      value: adminGroup.groupName ?? 'admin'
     });
 
     new cdk.CfnOutput(this, 'TableName', {

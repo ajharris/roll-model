@@ -6,10 +6,11 @@ import type { UserRole } from './types';
 export interface AuthContext {
   userId: string;
   role: UserRole;
+  roles: UserRole[];
 }
 
 const parseRole = (rawRole: string): UserRole => {
-  if (rawRole === 'athlete' || rawRole === 'coach') {
+  if (rawRole === 'athlete' || rawRole === 'coach' || rawRole === 'admin') {
     return rawRole;
   }
 
@@ -20,12 +21,69 @@ const parseRole = (rawRole: string): UserRole => {
   });
 };
 
-export const getAuthContext = (event: APIGatewayProxyEvent): AuthContext => {
-  const claims = event.requestContext.authorizer?.claims;
-  const userId = claims?.sub;
-  const roleClaim = claims?.['custom:role'];
+const parseCognitoGroups = (rawGroups: string | undefined): string[] => {
+  if (!rawGroups) return [];
 
-  if (!userId || !roleClaim) {
+  const trimmed = rawGroups.trim();
+  if (!trimmed) return [];
+
+  if (trimmed.startsWith('[')) {
+    try {
+      const parsed = JSON.parse(trimmed) as unknown;
+      if (Array.isArray(parsed)) {
+        return parsed
+          .filter((group): group is string => typeof group === 'string')
+          .map((group) => group.trim().toLowerCase())
+          .filter(Boolean);
+      }
+    } catch {
+      // Fall back to comma-separated parsing.
+    }
+  }
+
+  return trimmed
+    .split(',')
+    .map((group) => group.trim().toLowerCase())
+    .filter(Boolean);
+};
+
+const dedupeRoles = (roles: UserRole[]): UserRole[] => [...new Set(roles)];
+
+const getRolesFromClaims = (claims: Record<string, string | undefined>): UserRole[] => {
+  const roles: UserRole[] = [];
+  const roleClaim = claims['custom:role'];
+  if (roleClaim) {
+    roles.push(parseRole(roleClaim));
+  }
+
+  const groups = parseCognitoGroups(claims['cognito:groups']);
+  if (groups.includes('admin')) roles.push('admin');
+  if (groups.includes('coach')) roles.push('coach');
+  if (groups.includes('athlete')) roles.push('athlete');
+
+  const uniqueRoles = dedupeRoles(roles);
+  if (uniqueRoles.length) {
+    return uniqueRoles;
+  }
+
+  throw new ApiError({
+    code: 'UNAUTHORIZED',
+    message: 'Missing authentication claims.',
+    statusCode: 401
+  });
+};
+
+const getPrimaryRole = (roles: UserRole[]): UserRole => {
+  if (roles.includes('admin')) return 'admin';
+  if (roles.includes('coach')) return 'coach';
+  return 'athlete';
+};
+
+export const getAuthContext = (event: APIGatewayProxyEvent): AuthContext => {
+  const claims = event.requestContext.authorizer?.claims as Record<string, string | undefined> | undefined;
+  const userId = claims?.sub;
+
+  if (!userId || !claims) {
     throw new ApiError({
       code: 'UNAUTHORIZED',
       message: 'Missing authentication claims.',
@@ -33,14 +91,18 @@ export const getAuthContext = (event: APIGatewayProxyEvent): AuthContext => {
     });
   }
 
+  const roles = getRolesFromClaims(claims);
+
   return {
     userId,
-    role: parseRole(roleClaim)
+    roles,
+    role: getPrimaryRole(roles)
   };
 };
 
 export const requireRole = (auth: AuthContext, allowedRoles: UserRole[]): void => {
-  if (!allowedRoles.includes(auth.role)) {
+  const effectiveRoles = auth.roles?.length ? auth.roles : [auth.role];
+  if (!allowedRoles.some((role) => effectiveRoles.includes(role))) {
     throw new ApiError({
       code: 'FORBIDDEN',
       message: 'User does not have permission for this action.',
@@ -48,3 +110,6 @@ export const requireRole = (auth: AuthContext, allowedRoles: UserRole[]): void =
     });
   }
 };
+
+export const hasRole = (auth: AuthContext, role: UserRole): boolean =>
+  (auth.roles?.length ? auth.roles : [auth.role]).includes(role);

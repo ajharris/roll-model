@@ -10,14 +10,19 @@ jest.mock('../../shared/db');
 const mockGetItem = jest.mocked(getItem);
 const mockQueryItems = jest.mocked(queryItems);
 
-const buildEvent = (role: 'athlete' | 'coach', athleteId?: string): APIGatewayProxyEvent =>
+const buildEvent = (
+  role: 'athlete' | 'coach',
+  athleteId?: string,
+  claimsOverride?: Record<string, string>,
+): APIGatewayProxyEvent =>
   ({
     pathParameters: athleteId ? { athleteId } : undefined,
     requestContext: {
       authorizer: {
         claims: {
           sub: role === 'athlete' ? 'athlete-1' : 'coach-1',
-          'custom:role': role
+          'custom:role': role,
+          ...claimsOverride,
         }
       }
     }
@@ -62,6 +67,41 @@ describe('getEntries handler auth', () => {
     expect(body.entries).toHaveLength(1);
     expect(body.entries[0].sections).toEqual({ shared: 'shared notes' });
     expect(body.entries[0].sections).not.toHaveProperty('private');
+  });
+
+  it('uses athlete mode for users with both athlete and coach roles when athleteId is not requested', async () => {
+    mockQueryItems.mockResolvedValueOnce({
+      Items: [
+        {
+          PK: 'USER#athlete-1',
+          SK: 'ENTRY#2024-01-01',
+          entityType: 'ENTRY',
+          entryId: 'entry-1',
+          athleteId: 'athlete-1',
+          createdAt: '2024-01-01T00:00:00.000Z',
+          updatedAt: '2024-01-01T00:00:00.000Z',
+          sections: { shared: 'shared notes', private: 'private notes' },
+          sessionMetrics: {
+            durationMinutes: 60,
+            intensity: 7,
+            rounds: 6,
+            giOrNoGi: 'gi',
+            tags: ['guard']
+          }
+        }
+      ]
+    } as unknown as QueryCommandOutput);
+
+    const result = (await handler(
+      buildEvent('coach', undefined, { sub: 'athlete-1', 'cognito:groups': 'athlete,coach' }),
+      {} as never,
+      () => undefined,
+    )) as APIGatewayProxyResult;
+
+    expect(result.statusCode).toBe(200);
+    expect(mockGetItem).not.toHaveBeenCalled();
+    const body = JSON.parse(result.body) as { entries: Array<{ sections: { shared: string; private?: string } }> };
+    expect(body.entries[0].sections.private).toBe('private notes');
   });
 
   it('rejects coaches without a link', async () => {

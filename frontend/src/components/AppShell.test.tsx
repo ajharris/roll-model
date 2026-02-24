@@ -49,6 +49,8 @@ describe('AppShell', () => {
     useAuthMock.mockReturnValue({
       isAuthenticated: true,
       role: 'athlete',
+      roles: ['athlete'],
+      setActiveRole: vi.fn(),
       signOut: vi.fn(),
       user: { email: 'athlete@example.com' },
     });
@@ -72,6 +74,8 @@ describe('AppShell', () => {
     useAuthMock.mockReturnValue({
       isAuthenticated: true,
       role: 'athlete',
+      roles: ['athlete'],
+      setActiveRole: vi.fn(),
       signOut: signOutMock,
       user: { email: 'athlete@example.com' },
     });
@@ -96,6 +100,8 @@ describe('AppShell', () => {
     useAuthMock.mockReturnValue({
       isAuthenticated: true,
       role: 'athlete',
+      roles: ['athlete'],
+      setActiveRole: vi.fn(),
       signOut: signOutMock,
       user: { email: 'athlete@example.com' },
     });
@@ -112,5 +118,31 @@ describe('AppShell', () => {
     expect(signOutMock).toHaveBeenCalledTimes(1);
     expect(getHostedUiRuntimeConfigMock).toHaveBeenCalledWith(window.location.origin);
     expect(buildHostedUiLogoutUrlMock).toHaveBeenCalledWith({});
+  });
+
+  it('lets multi-role users switch active role and routes to that mode', async () => {
+    const user = userEvent.setup();
+    const setActiveRoleMock = vi.fn();
+
+    usePathnameMock.mockReturnValue('/entries');
+    useAuthMock.mockReturnValue({
+      isAuthenticated: true,
+      role: 'athlete',
+      roles: ['athlete', 'coach', 'admin'],
+      setActiveRole: setActiveRoleMock,
+      signOut: vi.fn(),
+      user: { email: 'athlete@example.com' },
+    });
+
+    render(
+      <AppShell>
+        <div>child</div>
+      </AppShell>,
+    );
+
+    await user.selectOptions(screen.getByLabelText('Act as'), 'coach');
+
+    expect(setActiveRoleMock).toHaveBeenCalledWith('coach');
+    expect(pushMock).toHaveBeenCalledWith('/coach');
   });
 });

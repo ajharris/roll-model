@@ -12,6 +12,7 @@ import {
   hostedUiStateKey,
   parseHostedUiCallback,
 } from '@/lib/cognitoHostedUi';
+import { getDefaultRouteForRole } from '@/lib/roleRouting';
 
 export default function HostedUiCallbackPage() {
   const router = useRouter();
@@ -64,7 +65,7 @@ export default function HostedUiCallbackPage() {
         window.history.replaceState(null, '', HOSTED_UI_CALLBACK_PATH);
 
         if (!cancelled) {
-          router.replace(nextRole === 'coach' ? '/coach' : '/entries');
+          router.replace(getDefaultRouteForRole(nextRole));
         }
       } catch (cause) {
         sessionStorage.removeItem(hostedUiPkceVerifierKey);
