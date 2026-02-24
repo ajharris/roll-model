@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import type { ReactNode } from 'react';
 
 import { useAuth } from '@/contexts/AuthContext';
+import { buildHostedUiLogoutUrl, getHostedUiRuntimeConfig } from '@/lib/cognitoHostedUi';
 
 export const AppShell = ({ children }: { children: ReactNode }) => {
   const { isAuthenticated, role, signOut, user } = useAuth();
@@ -30,6 +31,19 @@ export const AppShell = ({ children }: { children: ReactNode }) => {
               <button
                 onClick={() => {
                   signOut();
+                  if (typeof window !== 'undefined') {
+                    const logoutUrl = buildHostedUiLogoutUrl(
+                      getHostedUiRuntimeConfig(window.location.origin),
+                    );
+                    if (logoutUrl) {
+                      try {
+                        window.location.assign(logoutUrl);
+                        return;
+                      } catch {
+                        // Fall back to local route navigation in non-browser/test environments.
+                      }
+                    }
+                  }
                   router.push('/');
                 }}
               >
