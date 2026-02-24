@@ -65,7 +65,7 @@ const getHeader = (
 };
 
 const getRequestIdentity = (event: APIGatewayProxyEvent): RequestIdentity => {
-  const claims = event.requestContext.authorizer?.claims as Record<string, string | undefined> | undefined;
+  const claims = event.requestContext?.authorizer?.claims as Record<string, string | undefined> | undefined;
   if (!claims) return {};
 
   const userRoles = parseStringArrayClaim(claims['cognito:groups'])
@@ -92,13 +92,14 @@ const buildRequestLogBase = (
   context: Context,
 ): RequestLogBase => {
   const requestContext = event.requestContext;
-  const route = requestContext.resourcePath ?? event.resource ?? event.path ?? 'unknown';
+  const route = requestContext?.resourcePath ?? event.resource ?? event.path ?? 'unknown';
   const path = event.path ?? route;
-  const method = requestContext.httpMethod ?? event.httpMethod ?? 'UNKNOWN';
-  const requestId = requestContext.requestId;
+  const method = requestContext?.httpMethod ?? event.httpMethod ?? 'UNKNOWN';
+  const requestId = requestContext?.requestId;
   const extendedRequestId =
-    (requestContext as APIGatewayProxyEvent['requestContext'] & { extendedRequestId?: string })
-      .extendedRequestId;
+    (
+      requestContext as (APIGatewayProxyEvent['requestContext'] & { extendedRequestId?: string }) | undefined
+    )?.extendedRequestId;
   const headerCorrelationId =
     getHeader(event.headers, 'x-correlation-id') ?? getHeader(event.headers, 'x-request-id');
 
@@ -107,7 +108,7 @@ const buildRequestLogBase = (
     route,
     path,
     method,
-    stage: requestContext.stage,
+    stage: requestContext?.stage,
     requestId,
     extendedRequestId,
     lambdaRequestId: context.awsRequestId,
