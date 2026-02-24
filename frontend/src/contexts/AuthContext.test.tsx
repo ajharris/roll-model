@@ -23,11 +23,11 @@ vi.mock('@/lib/apiClient', () => ({
 
 vi.mock('amazon-cognito-identity-js', () => {
   class CognitoUserPool {
-    constructor(_config: unknown) {}
+    constructor() {}
   }
 
   class AuthenticationDetails {
-    constructor(_config: unknown) {}
+    constructor() {}
   }
 
   class CognitoRefreshToken {
@@ -43,7 +43,7 @@ vi.mock('amazon-cognito-identity-js', () => {
   }
 
   class CognitoUser {
-    constructor(_config: unknown) {}
+    constructor() {}
 
     authenticateUser(details: unknown, callbacks: unknown) {
       return cognitoAuthenticateUserMock(details, callbacks);
