@@ -16,6 +16,7 @@ export interface EntrySections {
 export interface Entry {
   entryId: string;
   athleteId: string;
+  schemaVersion: number;
   createdAt: string;
   updatedAt: string;
   sections: EntrySections;

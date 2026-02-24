@@ -3,6 +3,7 @@ import type { APIGatewayProxyEvent, APIGatewayProxyHandler } from 'aws-lambda';
 
 import { getAuthContext, requireRole } from '../../shared/auth';
 import { batchWriteItems, deleteItem, getItem, putItem } from '../../shared/db';
+import { parseEntryRecord, withCurrentEntrySchemaVersion } from '../../shared/entries';
 import { buildKeywordIndexItems, extractEntryTokens } from '../../shared/keywords';
 import { withRequestLogging } from '../../shared/logger';
 import { ApiError, errorResponse, response } from '../../shared/responses';
@@ -54,18 +55,6 @@ const getEntryIdFromPath = (entryId?: string): string => {
   }
 
   return entryId;
-};
-
-const stripEntryKeys = (item: Record<string, unknown>): Entry => {
-  const { PK: _pk, SK: _sk, entityType: _entityType, ...entry } = item as unknown as Entry & {
-    PK: string;
-    SK: string;
-    entityType: string;
-  };
-  void _pk;
-  void _sk;
-  void _entityType;
-  return entry;
 };
 
 const getKeywordTokenGroups = (entry: Entry): { shared: string[]; privateOnly: string[] } => {
@@ -139,14 +128,14 @@ const baseHandler: APIGatewayProxyHandler = async (event) => {
       });
     }
 
-    const existingEntry = stripEntryKeys(existingEntryResult.Item as Record<string, unknown>);
-    const updatedEntry: Entry = {
+    const existingEntry = parseEntryRecord(existingEntryResult.Item as Record<string, unknown>);
+    const updatedEntry: Entry = withCurrentEntrySchemaVersion({
       ...existingEntry,
       sections: payload.sections,
       sessionMetrics: payload.sessionMetrics,
       rawTechniqueMentions: sanitizeTechniqueMentions(payload.rawTechniqueMentions),
       updatedAt: nowIso
-    };
+    });
 
     await putItem({
       Item: {

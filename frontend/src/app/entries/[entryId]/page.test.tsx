@@ -75,7 +75,7 @@ describe('EntryDetailPage', () => {
     render(<EntryDetailPage />);
 
     const sharedTextarea = await screen.findByLabelText('Shared notes');
-    expect(sharedTextarea).toHaveValue('shared text');
+    await waitFor(() => expect(sharedTextarea).toHaveValue('shared text'));
 
     await user.clear(sharedTextarea);
     await user.type(sharedTextarea, 'updated shared');

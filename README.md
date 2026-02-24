@@ -401,6 +401,7 @@ Athletes can export data via `GET /export`.
   - `schemaVersion`
   - `generatedAt`
   - full and/or tidy datasets for entries, comments, links, AI threads, and AI messages.
+- Each exported `Entry` now includes its own `schemaVersion` (currently `1`) so downstream tools can migrate record shapes independently of the export envelope version.
 - Designed for downstream analysis in Python, Pandas, notebooks, and ML experimentation.
 
 ## Security and Privacy

@@ -3,6 +3,7 @@ import type { APIGatewayProxyHandler } from 'aws-lambda';
 
 import { getAuthContext, hasRole, requireRole } from '../../shared/auth';
 import { getItem, queryItems } from '../../shared/db';
+import { parseEntryRecord } from '../../shared/entries';
 import { isCoachLinkActive } from '../../shared/links';
 import { withRequestLogging } from '../../shared/logger';
 import { ApiError, errorResponse, response } from '../../shared/responses';
@@ -64,17 +65,7 @@ const baseHandler: APIGatewayProxyHandler = async (event) => {
 
     const entries = (queryResult.Items ?? [])
       .filter((item) => item.entityType === 'ENTRY')
-      .map((item) => {
-        const { PK: _pk, SK: _sk, entityType: _entityType, ...entry } = item as Entry & {
-          PK: string;
-          SK: string;
-          entityType: string;
-        };
-        void _pk;
-        void _sk;
-        void _entityType;
-        return entry;
-      });
+      .map((item) => parseEntryRecord(item as Record<string, unknown>));
 
     return response(200, {
       entries: isCoachRequest ? entries.map(sanitizeForCoach) : entries

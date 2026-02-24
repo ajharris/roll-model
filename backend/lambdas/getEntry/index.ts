@@ -3,9 +3,9 @@ import type { APIGatewayProxyHandler } from 'aws-lambda';
 
 import { getAuthContext, requireRole } from '../../shared/auth';
 import { getItem } from '../../shared/db';
+import { parseEntryRecord } from '../../shared/entries';
 import { withRequestLogging } from '../../shared/logger';
 import { ApiError, errorResponse, response } from '../../shared/responses';
-import type { Entry } from '../../shared/types';
 
 const getEntryIdFromPath = (entryId?: string): string => {
   if (!entryId) {
@@ -68,14 +68,7 @@ const baseHandler: APIGatewayProxyHandler = async (event) => {
       });
     }
 
-    const { PK: _pk, SK: _sk, entityType: _entityType, ...entry } = entryResult.Item as Entry & {
-      PK: string;
-      SK: string;
-      entityType: string;
-    };
-    void _pk;
-    void _sk;
-    void _entityType;
+    const entry = parseEntryRecord(entryResult.Item as Record<string, unknown>);
 
     return response(200, { entry });
   } catch (error) {

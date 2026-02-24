@@ -3,6 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 
 import { getAuthContext, requireRole } from '../../shared/auth';
 import { batchWriteItems, putItem } from '../../shared/db';
+import { withCurrentEntrySchemaVersion } from '../../shared/entries';
 import { buildKeywordIndexItems, extractEntryTokens } from '../../shared/keywords';
 import { withRequestLogging } from '../../shared/logger';
 import { ApiError, errorResponse, response } from '../../shared/responses';
@@ -49,15 +50,16 @@ export const buildEntry = (
   input: CreateEntryRequest,
   nowIso: string,
   entryId = uuidv4()
-): Entry => ({
-  entryId,
-  athleteId,
-  createdAt: nowIso,
-  updatedAt: nowIso,
-  sections: input.sections,
-  sessionMetrics: input.sessionMetrics,
-  rawTechniqueMentions: sanitizeTechniqueMentions(input.rawTechniqueMentions)
-});
+): Entry =>
+  withCurrentEntrySchemaVersion({
+    entryId,
+    athleteId,
+    createdAt: nowIso,
+    updatedAt: nowIso,
+    sections: input.sections,
+    sessionMetrics: input.sessionMetrics,
+    rawTechniqueMentions: sanitizeTechniqueMentions(input.rawTechniqueMentions)
+  });
 
 const baseHandler: APIGatewayProxyHandler = async (event) => {
   try {

@@ -1,6 +1,7 @@
 import type { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 
 import { batchWriteItems, putItem } from '../../shared/db';
+import { CURRENT_ENTRY_SCHEMA_VERSION } from '../../shared/entries';
 import { buildKeywordIndexItems, extractEntryTokens } from '../../shared/keywords';
 import { upsertTechniqueCandidates } from '../../shared/techniques';
 
@@ -59,8 +60,18 @@ describe('createEntry handler auth', () => {
     const result = (await handler(buildEvent('athlete'), {} as never, () => undefined)) as APIGatewayProxyResult;
 
     expect(result.statusCode).toBe(201);
-    const body = JSON.parse(result.body) as { entry: { athleteId: string } };
+    const body = JSON.parse(result.body) as { entry: { athleteId: string; schemaVersion: number } };
     expect(body.entry.athleteId).toBe('user-123');
+    expect(body.entry.schemaVersion).toBe(CURRENT_ENTRY_SCHEMA_VERSION);
+    expect(mockPutItem).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        Item: expect.objectContaining({
+          entityType: 'ENTRY',
+          schemaVersion: CURRENT_ENTRY_SCHEMA_VERSION
+        })
+      })
+    );
     expect(mockPutItem).toHaveBeenCalledTimes(2);
     expect(mockExtractEntryTokens).toHaveBeenCalledTimes(2);
     expect(mockUpsertTechniqueCandidates).toHaveBeenCalledWith(['Knee Slice'], expect.any(String), expect.any(String));
