@@ -92,6 +92,7 @@ const renderWithProvider = (children?: ReactNode) =>
 describe('AuthContext refresh flow', () => {
   beforeEach(() => {
     vi.useRealTimers();
+    vi.restoreAllMocks();
     vi.clearAllMocks();
     sessionStorage.clear();
     latestApiTokenGetter = null;
@@ -102,8 +103,7 @@ describe('AuthContext refresh flow', () => {
 
   it('refreshes stored session on startup hydration when ID token is expired', async () => {
     const now = new Date('2026-02-24T12:00:00.000Z');
-    vi.useFakeTimers();
-    vi.setSystemTime(now);
+    vi.spyOn(Date, 'now').mockReturnValue(now.getTime());
 
     const expiredIdToken = makeJwt({
       sub: 'user-1',
@@ -155,10 +155,14 @@ describe('AuthContext refresh flow', () => {
 
   it('clears session and routes to sign-in when refresh fails during hydration', async () => {
     const now = new Date('2026-02-24T12:00:00.000Z');
-    vi.useFakeTimers();
-    vi.setSystemTime(now);
+    vi.spyOn(Date, 'now').mockReturnValue(now.getTime());
     window.history.replaceState(null, '', '/entries');
-    const replaceSpy = vi.spyOn(window.location, 'replace').mockImplementation(() => undefined);
+    const replaceSpy = vi.fn();
+    vi.spyOn(window, 'location', 'get').mockReturnValue({
+      ...window.location,
+      pathname: '/entries',
+      replace: replaceSpy,
+    } as Location);
 
     const expiredIdToken = makeJwt({
       sub: 'user-2',
@@ -242,9 +246,10 @@ describe('AuthContext refresh flow', () => {
 
     renderWithProvider();
 
-    await waitFor(() => {
-      expect(screen.getByTestId('id-token')).toHaveTextContent(initialIdToken);
+    await act(async () => {
+      await Promise.resolve();
     });
+    expect(screen.getByTestId('id-token')).toHaveTextContent(initialIdToken);
 
     act(() => {
       vi.advanceTimersByTime(119_000);
@@ -255,10 +260,11 @@ describe('AuthContext refresh flow', () => {
       vi.advanceTimersByTime(1_000);
     });
 
-    await waitFor(() => {
-      expect(cognitoRefreshSessionMock).toHaveBeenCalledTimes(1);
-      expect(screen.getByTestId('id-token')).toHaveTextContent(refreshedIdToken);
+    await act(async () => {
+      await Promise.resolve();
     });
+    expect(cognitoRefreshSessionMock).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId('id-token')).toHaveTextContent(refreshedIdToken);
 
     expect(latestApiTokenGetter?.()).toBe(refreshedIdToken);
   });
