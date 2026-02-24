@@ -2,6 +2,7 @@ import type { GetCommandOutput } from '@aws-sdk/lib-dynamodb';
 import type { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 
 import { getItem } from '../../shared/db';
+import { CURRENT_ENTRY_SCHEMA_VERSION } from '../../shared/entries';
 
 import { handler } from './index';
 
@@ -63,6 +64,44 @@ describe('getEntry handler', () => {
     expect(result.statusCode).toBe(200);
     const body = JSON.parse(result.body) as { entry: { entryId: string } };
     expect(body.entry.entryId).toBe('entry-1');
+  });
+
+  it('migrates legacy entries without schemaVersion on read', async () => {
+    mockGetItem
+      .mockResolvedValueOnce({
+        Item: {
+          PK: 'ENTRY#entry-1',
+          SK: 'META',
+          athleteId: 'athlete-1',
+          createdAt: '2024-01-01T00:00:00.000Z'
+        }
+      } as unknown as GetCommandOutput)
+      .mockResolvedValueOnce({
+        Item: {
+          PK: 'USER#athlete-1',
+          SK: 'ENTRY#2024-01-01T00:00:00.000Z#entry-1',
+          entityType: 'ENTRY',
+          entryId: 'entry-1',
+          athleteId: 'athlete-1',
+          createdAt: '2024-01-01T00:00:00.000Z',
+          updatedAt: '2024-01-01T00:00:00.000Z',
+          sections: { shared: 'shared', private: 'private' },
+          sessionMetrics: {
+            durationMinutes: 60,
+            intensity: 6,
+            rounds: 5,
+            giOrNoGi: 'gi',
+            tags: ['guard']
+          }
+        }
+      } as unknown as GetCommandOutput);
+
+    const result = (await handler(buildEvent('athlete'), {} as never, () => undefined)) as APIGatewayProxyResult;
+
+    expect(result.statusCode).toBe(200);
+    const body = JSON.parse(result.body) as { entry: { schemaVersion: number; rawTechniqueMentions: string[] } };
+    expect(body.entry.schemaVersion).toBe(CURRENT_ENTRY_SCHEMA_VERSION);
+    expect(body.entry.rawTechniqueMentions).toEqual([]);
   });
 
   it('rejects coach access', async () => {

@@ -28,9 +28,10 @@
 
 ## Attributes
 ### Entry
-- `entryId`, `athleteId`, `createdAt`, `updatedAt`
+- `entryId`, `athleteId`, `schemaVersion`, `createdAt`, `updatedAt`
 - `sections.private`, `sections.shared`
 - `sessionMetrics.durationMinutes`, `sessionMetrics.intensity`, `sessionMetrics.rounds`, `sessionMetrics.giOrNoGi`, `sessionMetrics.tags`
+- `rawTechniqueMentions` (string[])
 
 ### Entry meta
 - `athleteId`, `createdAt`
@@ -59,6 +60,7 @@
   "entityType": "ENTRY",
   "entryId": "entry-abc",
   "athleteId": "athlete-123",
+  "schemaVersion": 1,
   "createdAt": "2026-02-19T12:00:00.000Z",
   "updatedAt": "2026-02-19T12:00:00.000Z",
   "sections": {
@@ -71,9 +73,30 @@
     "rounds": 8,
     "giOrNoGi": "gi",
     "tags": ["guard", "sparring"]
-  }
+  },
+  "rawTechniqueMentions": ["knee cut", "crossface"]
 }
 ```
+
+## Entry Schema Versioning
+- `Entry.schemaVersion` is the per-entry canonical schema version (current: `1`).
+- New writes (`createEntry`, `updateEntry`) always persist the current version.
+- Reads normalize legacy entries that predate `schemaVersion` (treated as legacy v0) into the current in-memory shape.
+- Legacy v0 migration currently backfills:
+  - `schemaVersion: 1`
+  - `rawTechniqueMentions: []` when missing or invalid
+- Unsupported future entry schema versions fail closed (server error) until an explicit migration is added.
+
+## Version Bump / Compatibility Policy
+- Additive, backward-compatible entry changes:
+  - keep the same `schemaVersion` when older reads can be normalized without ambiguity.
+  - extend the read normalizer to supply defaults/derived values for legacy rows.
+- Breaking entry shape changes:
+  - increment `Entry.schemaVersion`
+  - add a deterministic migration path from prior supported versions to current
+  - update tests for backward-compat reads and write-through behavior on update
+  - document the new version and migration rules in this file
+- Export payload `schemaVersion` is separate and versions the export envelope/format, not individual `Entry` records.
 
 ### Entry meta
 ```json

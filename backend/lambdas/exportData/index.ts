@@ -3,9 +3,10 @@ import type { APIGatewayProxyHandler } from 'aws-lambda';
 
 import { getAuthContext, requireRole } from '../../shared/auth';
 import { queryItems } from '../../shared/db';
+import { parseEntryRecord } from '../../shared/entries';
 import { withRequestLogging } from '../../shared/logger';
 import { ApiError, errorResponse, response } from '../../shared/responses';
-import type { AIMessage, AIThread, CoachLink, Comment, Entry } from '../../shared/types';
+import type { AIMessage, AIThread, CoachLink, Comment } from '../../shared/types';
 
 const SCHEMA_VERSION = '2026-02-19';
 const MODE_VALUES = new Set(['full', 'tidy']);
@@ -45,13 +46,7 @@ const baseHandler: APIGatewayProxyHandler = async (event) => {
 
     const entries = (entriesResult.Items ?? [])
       .filter((item) => item.entityType === 'ENTRY')
-      .map((item) => {
-        return stripKeys(item as Entry & {
-          PK: string;
-          SK: string;
-          entityType: string;
-        });
-      });
+      .map((item) => parseEntryRecord(item as Record<string, unknown>));
 
     const commentsByEntryId = new Map<string, Comment[]>();
 
