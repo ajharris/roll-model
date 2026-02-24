@@ -1,9 +1,10 @@
 import type { APIGatewayProxyHandler } from 'aws-lambda';
-import { withRequestLogging } from '../../shared/logger';
+
 
 import { getAuthContext, requireRole } from '../../shared/auth';
 import { deleteItem, getItem, queryItems } from '../../shared/db';
 import { extractEntryTokens } from '../../shared/keywords';
+import { withRequestLogging } from '../../shared/logger';
 import { ApiError, errorResponse, response } from '../../shared/responses';
 import type { Entry } from '../../shared/types';
 

@@ -1,9 +1,8 @@
 import { GetParameterCommand, SSMClient } from '@aws-sdk/client-ssm';
 import type { APIGatewayProxyEvent, APIGatewayProxyHandler } from 'aws-lambda';
-import { withRequestLogging } from '../../shared/logger';
-
 
 import { getAuthContext } from '../../shared/auth';
+import { withRequestLogging } from '../../shared/logger';
 import { ApiError, errorResponse, response } from '../../shared/responses';
 
 type FeedbackType = 'bug' | 'feature' | 'other';
