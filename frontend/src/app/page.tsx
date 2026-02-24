@@ -10,7 +10,7 @@ import type { HostedUiRuntimeConfig } from '@/lib/cognitoHostedUi';
 import { beginHostedUiSignIn, getHostedUiRuntimeConfig } from '@/lib/cognitoHostedUi';
 
 export default function HomePage() {
-  const { isAuthenticated, role, signIn } = useAuth();
+  const { isAuthenticated, signIn } = useAuth();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -26,8 +26,8 @@ export default function HomePage() {
     event.preventDefault();
     setError('');
     try {
-      await signIn(username, password);
-      router.push(role === 'coach' ? '/coach' : '/entries');
+      const signedInRole = await signIn(username, password);
+      router.push(signedInRole === 'coach' ? '/coach' : '/entries');
     } catch {
       setError('Sign in failed. Verify credentials and user pool settings.');
     }

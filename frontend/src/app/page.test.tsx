@@ -91,4 +91,46 @@ describe('HomePage Hosted UI', () => {
       screen.queryByRole('button', { name: 'Sign in with Cognito Hosted UI' }),
     ).not.toBeInTheDocument();
   });
+
+  it('routes coach users to /coach using the fresh sign-in role', async () => {
+    const user = userEvent.setup();
+    const signInMock = vi.fn().mockResolvedValue('coach');
+    useAuthMock.mockReturnValue({
+      isAuthenticated: false,
+      role: 'athlete',
+      signIn: signInMock,
+    });
+
+    render(<HomePage />);
+
+    await user.type(screen.getByLabelText('Email or username'), 'coach@example.com');
+    await user.type(screen.getByLabelText('Password'), 'password123');
+    await user.click(screen.getByRole('button', { name: 'Sign in' }));
+
+    await waitFor(() => {
+      expect(signInMock).toHaveBeenCalledWith('coach@example.com', 'password123');
+      expect(pushMock).toHaveBeenCalledWith('/coach');
+    });
+  });
+
+  it('routes athlete users to /entries using the fresh sign-in role', async () => {
+    const user = userEvent.setup();
+    const signInMock = vi.fn().mockResolvedValue('athlete');
+    useAuthMock.mockReturnValue({
+      isAuthenticated: false,
+      role: 'coach',
+      signIn: signInMock,
+    });
+
+    render(<HomePage />);
+
+    await user.type(screen.getByLabelText('Email or username'), 'athlete@example.com');
+    await user.type(screen.getByLabelText('Password'), 'password123');
+    await user.click(screen.getByRole('button', { name: 'Sign in' }));
+
+    await waitFor(() => {
+      expect(signInMock).toHaveBeenCalledWith('athlete@example.com', 'password123');
+      expect(pushMock).toHaveBeenCalledWith('/entries');
+    });
+  });
 });
