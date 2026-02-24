@@ -1,3 +1,4 @@
+import { getFrontendRuntimeConfig } from '@/lib/runtimeConfig';
 import type {
   CommentPayload,
   Entry,
@@ -5,7 +6,6 @@ import type {
   FeedbackPayload,
   SignupRequestPayload,
 } from '@/types/api';
-import { getFrontendRuntimeConfig } from '@/lib/runtimeConfig';
 
 export class ApiError extends Error {
   status: number;
