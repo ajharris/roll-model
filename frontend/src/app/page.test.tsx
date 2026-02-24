@@ -59,6 +59,11 @@ describe('HomePage Hosted UI', () => {
 
     render(<HomePage />);
 
+    expect(screen.getByRole('link', { name: 'Forgot password?' })).toHaveAttribute(
+      'href',
+      '/forgot-password',
+    );
+
     const hostedUiButton = await screen.findByRole('button', {
       name: 'Sign in with Cognito Hosted UI',
     });
