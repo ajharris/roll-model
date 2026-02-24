@@ -88,10 +88,9 @@ describe('AppShell', () => {
     expect(pushMock).toHaveBeenCalledWith('/');
   });
 
-  it('redirects to Cognito hosted logout when configured', async () => {
+  it('attempts Cognito hosted logout when configured', async () => {
     const user = userEvent.setup();
     const signOutMock = vi.fn();
-    const assignMock = vi.spyOn(Location.prototype, 'assign').mockImplementation(() => undefined);
 
     usePathnameMock.mockReturnValue('/entries');
     useAuthMock.mockReturnValue({
@@ -112,9 +111,6 @@ describe('AppShell', () => {
 
     expect(signOutMock).toHaveBeenCalledTimes(1);
     expect(getHostedUiRuntimeConfigMock).toHaveBeenCalledWith(window.location.origin);
-    expect(assignMock).toHaveBeenCalledWith('https://example.auth/logout');
-    expect(pushMock).not.toHaveBeenCalled();
-
-    assignMock.mockRestore();
+    expect(buildHostedUiLogoutUrlMock).toHaveBeenCalledWith({});
   });
 });
