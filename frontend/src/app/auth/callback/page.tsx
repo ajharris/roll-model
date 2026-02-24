@@ -12,6 +12,7 @@ import {
   hostedUiStateKey,
   parseHostedUiCallback,
 } from '@/lib/cognitoHostedUi';
+import { logAuthFailure } from '@/lib/clientErrorLogging';
 import { getDefaultRouteForRole } from '@/lib/roleRouting';
 
 export default function HostedUiCallbackPage() {
@@ -70,6 +71,14 @@ export default function HostedUiCallbackPage() {
       } catch (cause) {
         sessionStorage.removeItem(hostedUiPkceVerifierKey);
         sessionStorage.removeItem(hostedUiStateKey);
+        logAuthFailure({
+          source: 'HostedUiCallbackPage',
+          operation: 'hosted-ui-callback',
+          error: cause,
+          details: {
+            pathname: window.location.pathname,
+          },
+        });
         if (!cancelled) {
           setError(cause instanceof Error ? cause.message : 'Hosted UI sign-in failed.');
         }

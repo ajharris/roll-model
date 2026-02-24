@@ -9,6 +9,7 @@ const hydrateHostedUiTokensMock = vi.fn();
 const exchangeHostedUiCodeForTokensMock = vi.fn();
 const getHostedUiRuntimeConfigMock = vi.fn();
 const parseHostedUiCallbackMock = vi.fn();
+const logAuthFailureMock = vi.fn();
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ replace: replaceMock }),
@@ -28,6 +29,10 @@ vi.mock('@/lib/cognitoHostedUi', () => ({
   parseHostedUiCallback: (...args: unknown[]) => parseHostedUiCallbackMock(...args),
 }));
 
+vi.mock('@/lib/clientErrorLogging', () => ({
+  logAuthFailure: (...args: unknown[]) => logAuthFailureMock(...args),
+}));
+
 describe('HostedUiCallbackPage', () => {
   beforeEach(() => {
     replaceMock.mockReset();
@@ -36,6 +41,7 @@ describe('HostedUiCallbackPage', () => {
     exchangeHostedUiCodeForTokensMock.mockReset();
     getHostedUiRuntimeConfigMock.mockReset();
     parseHostedUiCallbackMock.mockReset();
+    logAuthFailureMock.mockReset();
     sessionStorage.clear();
 
     window.history.replaceState(null, '', '/auth/callback?code=abc123&state=state-1');
@@ -122,5 +128,11 @@ describe('HostedUiCallbackPage', () => {
     expect(exchangeHostedUiCodeForTokensMock).not.toHaveBeenCalled();
     expect(replaceMock).not.toHaveBeenCalled();
     expect(sessionStorage.getItem('roll-model-hosted-ui-state')).toBeNull();
+    expect(logAuthFailureMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        source: 'HostedUiCallbackPage',
+        operation: 'hosted-ui-callback',
+      }),
+    );
   });
 });
