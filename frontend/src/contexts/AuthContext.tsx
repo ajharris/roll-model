@@ -11,7 +11,7 @@ import type { ReactNode } from 'react';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 
 import { configureApiClient } from '@/lib/apiClient';
-import { getFrontendRuntimeConfig } from '@/lib/runtimeConfig';
+import { frontendConfig } from '@/lib/config';
 import type { UserRole } from '@/types/api';
 
 export interface AuthTokens {
@@ -102,12 +102,11 @@ const getMsUntilTokenExpiry = (idToken: string): number | null => {
 };
 
 const createUserPool = (): CognitoUserPool | null => {
-  const config = getFrontendRuntimeConfig();
-  const userPoolId = config.cognitoUserPoolId;
-  const clientId = config.cognitoClientId;
-  if (!userPoolId || !clientId) return null;
   try {
-    return new CognitoUserPool({ UserPoolId: userPoolId, ClientId: clientId });
+    return new CognitoUserPool({
+      UserPoolId: frontendConfig.cognitoUserPoolId,
+      ClientId: frontendConfig.cognitoClientId,
+    });
   } catch {
     return null;
   }

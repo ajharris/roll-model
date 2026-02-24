@@ -1,5 +1,7 @@
 'use client';
 
+import { frontendConfig } from '@/lib/config';
+
 export interface HostedUiTokens {
   idToken: string;
   accessToken?: string;
@@ -58,6 +60,14 @@ const normalizeDomainUrl = (raw: string | undefined): string | null => {
   }
 };
 
+const getHostedUiEnvFromConfig = (): HostedUiEnv => ({
+  NEXT_PUBLIC_COGNITO_CLIENT_ID: frontendConfig.cognitoClientId,
+  NEXT_PUBLIC_COGNITO_DOMAIN: frontendConfig.cognitoDomain ?? undefined,
+  NEXT_PUBLIC_COGNITO_REDIRECT_URI: frontendConfig.cognitoLegacyRedirectUri ?? undefined,
+  NEXT_PUBLIC_COGNITO_SIGN_IN_REDIRECT_URIS: frontendConfig.cognitoSignInRedirectUris.join(','),
+  NEXT_PUBLIC_COGNITO_SIGN_OUT_REDIRECT_URIS: frontendConfig.cognitoSignOutRedirectUris.join(','),
+});
+
 const parseRedirectUris = (env: HostedUiEnv) => {
   const signInRedirectUris = splitEnvList(env.NEXT_PUBLIC_COGNITO_SIGN_IN_REDIRECT_URIS);
   const signOutRedirectUris = splitEnvList(env.NEXT_PUBLIC_COGNITO_SIGN_OUT_REDIRECT_URIS);
@@ -98,7 +108,7 @@ export const getHostedUiRuntimeConfig = (
   origin?: string,
   env?: HostedUiEnv,
 ): HostedUiRuntimeConfig => {
-  const resolvedEnv = env ?? (process.env as HostedUiEnv);
+  const resolvedEnv = env ?? getHostedUiEnvFromConfig();
   const validationErrors: string[] = [];
   const hasHostedUiConfig = Boolean(
     resolvedEnv.NEXT_PUBLIC_COGNITO_DOMAIN ||

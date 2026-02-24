@@ -1,4 +1,4 @@
-import { getFrontendRuntimeConfig } from '@/lib/runtimeConfig';
+import { frontendConfig } from '@/lib/config';
 import type {
   CommentPayload,
   Entry,
@@ -16,11 +16,7 @@ export class ApiError extends Error {
   }
 }
 
-const baseUrl = getFrontendRuntimeConfig().apiBaseUrl;
-
-if (!baseUrl) {
-  console.warn('NEXT_PUBLIC_API_BASE_URL is not set. API calls will fail.');
-}
+const baseUrl = frontendConfig.apiBaseUrl;
 
 type TokenGetter = () => string | null;
 
@@ -57,7 +53,7 @@ const request = async <T>(path: string, init?: RequestInit): Promise<T> => {
     });
   }
 
-  const url = joinUrl(baseUrl ?? '', path);
+  const url = joinUrl(baseUrl, path);
   const response = await fetch(url, {
     ...init,
     headers,
