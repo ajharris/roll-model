@@ -59,6 +59,11 @@ export default function HomePage() {
         <label htmlFor="password">Password</label>
         <input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
         <div className="row">
+          <Link className="button-link" href="/forgot-password">
+            Forgot password?
+          </Link>
+        </div>
+        <div className="row">
           <button type="submit">Sign in</button>
           {error && <span>{error}</span>}
         </div>
