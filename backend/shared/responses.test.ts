@@ -8,7 +8,7 @@ describe('responses helpers', () => {
     expect(result.headers).toEqual({
       'Content-Type': 'application/json',
       'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Headers': 'Content-Type,Authorization,X-Authorization-Bearer',
+      'Access-Control-Allow-Headers': 'Content-Type,Authorization',
       'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS'
     });
     expect(result.body).toBe(JSON.stringify({ ok: true }));

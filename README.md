@@ -355,6 +355,26 @@ Replace `<ACCOUNT_ID>` and `<REGION>`. This example assumes stack name `RollMode
   - recent thread messages (default 20),
   - optional keyword-based retrieval with privacy scope enforcement.
 
+### OpenAI Tweak Points (Developer Reference)
+
+Search for markers:
+
+```bash
+rg -n "OPENAI_TWEAK_POINT" backend
+```
+
+Current markers and what they control:
+
+- `backend/shared/openai.ts`
+  - OpenAI HTTP request transport and payload (endpoint, headers, model, request body).
+  - OpenAI response parsing and validation.
+- `backend/lambdas/aiChat/index.ts`
+  - Prompt context serialization (`buildPromptContext`) for what app data is sent.
+  - System prompt (`buildSystemPrompt`) for behavior and output contract.
+  - Message assembly at `callOpenAI(...)` (history formatting and user payload).
+
+These markers are intended as stable search anchors even if exact line numbers move.
+
 ## Data Export
 
 Athletes can export data via `GET /export`.
