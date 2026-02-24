@@ -3,6 +3,7 @@ import * as path from 'path';
 
 import * as cdk from 'aws-cdk-lib';
 import * as apigateway from 'aws-cdk-lib/aws-apigateway';
+import * as cloudwatch from 'aws-cdk-lib/aws-cloudwatch';
 import * as cognito from 'aws-cdk-lib/aws-cognito';
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 import * as iam from 'aws-cdk-lib/aws-iam';
@@ -113,6 +114,20 @@ export class RollModelStack extends cdk.Stack {
       'backend/lambdas/submitFeedback/index.ts',
       table
     );
+    const backendLambdas: Array<{ name: string; fn: nodejs.NodejsFunction }> = [
+      { name: 'createEntry', fn: createEntryLambda },
+      { name: 'getEntries', fn: getEntriesLambda },
+      { name: 'getEntry', fn: getEntryLambda },
+      { name: 'updateEntry', fn: updateEntryLambda },
+      { name: 'deleteEntry', fn: deleteEntryLambda },
+      { name: 'postComment', fn: postCommentLambda },
+      { name: 'linkCoachAthlete', fn: linkCoachAthleteLambda },
+      { name: 'revokeCoachLink', fn: revokeCoachLinkLambda },
+      { name: 'exportData', fn: exportDataLambda },
+      { name: 'aiChat', fn: aiChatLambda },
+      { name: 'requestSignup', fn: requestSignupLambda },
+      { name: 'submitFeedback', fn: submitFeedbackLambda }
+    ];
 
     aiChatLambda.addToRolePolicy(
       new iam.PolicyStatement({
@@ -157,6 +172,7 @@ export class RollModelStack extends cdk.Stack {
         stageName: 'prod',
         loggingLevel: apigateway.MethodLoggingLevel.INFO,
         metricsEnabled: true,
+        tracingEnabled: true,
         dataTraceEnabled: false,
         accessLogDestination: new apigateway.LogGroupLogDestination(apiAccessLogGroup),
         accessLogFormat: apigateway.AccessLogFormat.jsonWithStandardFields({
@@ -292,6 +308,143 @@ export class RollModelStack extends cdk.Stack {
       allowHeaders: ['Content-Type', 'Authorization']
     });
 
+    const observabilityNamespace = 'RollModel/Backend';
+    const structuredRequestErrorMetricName = 'StructuredRequestErrors';
+    const structuredLatencyMetricName = 'StructuredRequestLatencyMs';
+
+    for (const { name, fn } of backendLambdas) {
+      new logs.MetricFilter(this, `${name}StructuredRequestErrorMetricFilter`, {
+        logGroup: fn.logGroup,
+        filterPattern: logs.FilterPattern.literal('{ $.event = "request.error" }'),
+        metricNamespace: observabilityNamespace,
+        metricName: structuredRequestErrorMetricName,
+        metricValue: '1'
+      });
+
+      new logs.MetricFilter(this, `${name}StructuredRequestLatencyMetricFilter`, {
+        logGroup: fn.logGroup,
+        filterPattern: logs.FilterPattern.literal('{ $.latencyMs = * }'),
+        metricNamespace: observabilityNamespace,
+        metricName: structuredLatencyMetricName,
+        metricValue: '$.latencyMs',
+        unit: cloudwatch.Unit.MILLISECONDS
+      });
+    }
+
+    const apiRequestCountMetric = api.metricCount({
+      statistic: 'Sum',
+      period: cdk.Duration.minutes(5)
+    });
+    const api4xxMetric = api.metricClientError({
+      statistic: 'Sum',
+      period: cdk.Duration.minutes(5)
+    });
+    const api5xxMetric = api.metricServerError({
+      statistic: 'Sum',
+      period: cdk.Duration.minutes(5)
+    });
+    const apiLatencyP95Metric = api.metricLatency({
+      statistic: 'p95',
+      period: cdk.Duration.minutes(5)
+    });
+
+    const structuredRequestErrorsMetric = new cloudwatch.Metric({
+      namespace: observabilityNamespace,
+      metricName: structuredRequestErrorMetricName,
+      statistic: 'Sum',
+      period: cdk.Duration.minutes(5)
+    });
+    const structuredLatencyP95Metric = new cloudwatch.Metric({
+      namespace: observabilityNamespace,
+      metricName: structuredLatencyMetricName,
+      statistic: 'p95',
+      period: cdk.Duration.minutes(5),
+      unit: cloudwatch.Unit.MILLISECONDS
+    });
+
+    const lambdaErrorMetrics = backendLambdas.map(({ name, fn }) =>
+      fn.metricErrors({
+        label: name,
+        statistic: 'Sum',
+        period: cdk.Duration.minutes(5)
+      })
+    );
+    const lambdaDurationP95Metrics = backendLambdas.map(({ name, fn }) =>
+      fn.metricDuration({
+        label: name,
+        statistic: 'p95',
+        period: cdk.Duration.minutes(5)
+      })
+    );
+
+    const operationsDashboard = new cloudwatch.Dashboard(this, 'RollModelOperationsDashboard', {
+      dashboardName: `${cdk.Stack.of(this).stackName}-Operations`
+    });
+
+    operationsDashboard.addWidgets(
+      new cloudwatch.TextWidget({
+        markdown:
+          '## RollModel Operational Dashboard\nStructured Lambda logs emit `request.start`, `request.success`, and `request.error` with correlation IDs and latency.',
+        width: 24,
+        height: 3
+      }),
+      new cloudwatch.GraphWidget({
+        title: 'API Gateway Traffic and Errors (5m)',
+        left: [apiRequestCountMetric],
+        right: [api4xxMetric, api5xxMetric],
+        width: 12
+      }),
+      new cloudwatch.GraphWidget({
+        title: 'API Gateway Latency p95 (5m)',
+        left: [apiLatencyP95Metric],
+        width: 12
+      }),
+      new cloudwatch.GraphWidget({
+        title: 'Structured Request Errors (from Lambda JSON logs)',
+        left: [structuredRequestErrorsMetric],
+        width: 12
+      }),
+      new cloudwatch.GraphWidget({
+        title: 'Structured Request Latency p95 (latencyMs from Lambda JSON logs)',
+        left: [structuredLatencyP95Metric],
+        width: 12
+      }),
+      new cloudwatch.GraphWidget({
+        title: 'Lambda Errors by Handler (5m)',
+        left: lambdaErrorMetrics,
+        width: 12
+      }),
+      new cloudwatch.GraphWidget({
+        title: 'Lambda Duration p95 by Handler (5m)',
+        left: lambdaDurationP95Metrics,
+        width: 12
+      })
+    );
+
+    const structuredRequestErrorAlarm = new cloudwatch.Alarm(this, 'StructuredRequestErrorAlarm', {
+      metric: structuredRequestErrorsMetric,
+      threshold: 5,
+      evaluationPeriods: 1,
+      datapointsToAlarm: 1,
+      comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
+      treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
+      alarmDescription:
+        'Triggers when structured Lambda request.error events reach 5+ within 5 minutes across backend handlers.'
+    });
+
+    const structuredLatencyAlarm = new cloudwatch.Alarm(this, 'StructuredRequestLatencyP95Alarm', {
+      metric: structuredLatencyP95Metric,
+      threshold: 3000,
+      evaluationPeriods: 2,
+      datapointsToAlarm: 2,
+      comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
+      treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
+      alarmDescription:
+        'Triggers when structured request latency p95 exceeds 3000ms for two consecutive 5 minute periods.'
+    });
+
+    // TODO: Attach alarm actions (for example SNS / Slack / PagerDuty) to structuredRequestErrorAlarm and structuredLatencyAlarm.
+
     new cdk.CfnOutput(this, 'ApiUrl', {
       value: `https://${api.restApiId}.execute-api.${cdk.Stack.of(this).region}.${cdk.Stack.of(this).urlSuffix}/${api.deploymentStage.stageName}`
     });
@@ -323,6 +476,18 @@ export class RollModelStack extends cdk.Stack {
     new cdk.CfnOutput(this, 'ApiAccessLogGroupName', {
       value: apiAccessLogGroup.logGroupName
     });
+
+    new cdk.CfnOutput(this, 'OperationsDashboardName', {
+      value: operationsDashboard.dashboardName
+    });
+
+    new cdk.CfnOutput(this, 'StructuredRequestErrorAlarmName', {
+      value: structuredRequestErrorAlarm.alarmName
+    });
+
+    new cdk.CfnOutput(this, 'StructuredRequestLatencyAlarmName', {
+      value: structuredLatencyAlarm.alarmName
+    });
   }
 
   private createLambda(name: string, entryPath: string, table: dynamodb.Table): nodejs.NodejsFunction {
@@ -335,6 +500,7 @@ export class RollModelStack extends cdk.Stack {
       environment: {
         TABLE_NAME: table.tableName
       },
+      tracing: lambda.Tracing.ACTIVE,
       bundling: {
         target: 'node20',
         minify: true,

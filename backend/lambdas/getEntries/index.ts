@@ -1,8 +1,10 @@
 import type { APIGatewayProxyHandler } from 'aws-lambda';
 
+
 import { getAuthContext, hasRole, requireRole } from '../../shared/auth';
 import { getItem, queryItems } from '../../shared/db';
 import { isCoachLinkActive } from '../../shared/links';
+import { withRequestLogging } from '../../shared/logger';
 import { ApiError, errorResponse, response } from '../../shared/responses';
 import type { Entry } from '../../shared/types';
 
@@ -13,7 +15,7 @@ const sanitizeForCoach = (entry: Entry): Omit<Entry, 'sections'> & { sections: {
   }
 });
 
-export const handler: APIGatewayProxyHandler = async (event) => {
+const baseHandler: APIGatewayProxyHandler = async (event) => {
   try {
     const auth = getAuthContext(event);
     requireRole(auth, ['athlete', 'coach']);
@@ -81,3 +83,5 @@ export const handler: APIGatewayProxyHandler = async (event) => {
     return errorResponse(error);
   }
 };
+
+export const handler: APIGatewayProxyHandler = withRequestLogging('getEntries', baseHandler);

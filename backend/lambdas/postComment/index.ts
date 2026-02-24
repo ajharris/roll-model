@@ -4,6 +4,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { getAuthContext, requireRole } from '../../shared/auth';
 import { getItem, putItem } from '../../shared/db';
 import { isCoachLinkActive } from '../../shared/links';
+import { withRequestLogging } from '../../shared/logger';
 import { ApiError, errorResponse, response } from '../../shared/responses';
 import type { Comment, PostCommentRequest } from '../../shared/types';
 
@@ -49,7 +50,7 @@ const resolveEntryId = (entryIdFromPath: string | undefined, entryIdFromBody?: s
   return entryId;
 };
 
-export const handler: APIGatewayProxyHandler = async (event) => {
+const baseHandler: APIGatewayProxyHandler = async (event) => {
   try {
     const auth = getAuthContext(event);
     requireRole(auth, ['coach']);
@@ -109,3 +110,5 @@ export const handler: APIGatewayProxyHandler = async (event) => {
     return errorResponse(error);
   }
 };
+
+export const handler: APIGatewayProxyHandler = withRequestLogging('postComment', baseHandler);

@@ -1,7 +1,9 @@
 import type { APIGatewayProxyHandler } from 'aws-lambda';
 
+
 import { getAuthContext, requireRole } from '../../shared/auth';
 import { getItem, putItem } from '../../shared/db';
+import { withRequestLogging } from '../../shared/logger';
 import { ApiError, errorResponse, response } from '../../shared/responses';
 
 interface RevokeCoachLinkRequest {
@@ -29,7 +31,7 @@ const parseBody = (rawBody: string | null): RevokeCoachLinkRequest => {
   return parsed as RevokeCoachLinkRequest;
 };
 
-export const handler: APIGatewayProxyHandler = async (event) => {
+const baseHandler: APIGatewayProxyHandler = async (event) => {
   try {
     const auth = getAuthContext(event);
     requireRole(auth, ['athlete']);
@@ -76,3 +78,5 @@ export const handler: APIGatewayProxyHandler = async (event) => {
     return errorResponse(error);
   }
 };
+
+export const handler: APIGatewayProxyHandler = withRequestLogging('revokeCoachLink', baseHandler);

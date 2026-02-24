@@ -1,8 +1,8 @@
 import { GetParameterCommand, SSMClient } from '@aws-sdk/client-ssm';
 import type { APIGatewayProxyEvent, APIGatewayProxyHandler } from 'aws-lambda';
 
-
 import { getAuthContext } from '../../shared/auth';
+import { withRequestLogging } from '../../shared/logger';
 import { ApiError, errorResponse, response } from '../../shared/responses';
 
 type FeedbackType = 'bug' | 'feature' | 'other';
@@ -137,7 +137,7 @@ const getGithubToken = async (): Promise<string> => {
   return value;
 };
 
-export const handler: APIGatewayProxyHandler = async (event) => {
+const baseHandler: APIGatewayProxyHandler = async (event) => {
   try {
     console.log(
       JSON.stringify({
@@ -257,3 +257,5 @@ export const handler: APIGatewayProxyHandler = async (event) => {
     return errorResponse(error);
   }
 };
+
+export const handler: APIGatewayProxyHandler = withRequestLogging('submitFeedback', baseHandler);

@@ -4,6 +4,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { getAuthContext, requireRole } from '../../shared/auth';
 import { batchWriteItems, putItem } from '../../shared/db';
 import { buildKeywordIndexItems, extractEntryTokens } from '../../shared/keywords';
+import { withRequestLogging } from '../../shared/logger';
 import { ApiError, errorResponse, response } from '../../shared/responses';
 import { sanitizeTechniqueMentions, upsertTechniqueCandidates } from '../../shared/techniques';
 import type { CreateEntryRequest, Entry } from '../../shared/types';
@@ -58,7 +59,7 @@ export const buildEntry = (
   rawTechniqueMentions: sanitizeTechniqueMentions(input.rawTechniqueMentions)
 });
 
-export const handler: APIGatewayProxyHandler = async (event) => {
+const baseHandler: APIGatewayProxyHandler = async (event) => {
   try {
     const auth = getAuthContext(event);
     requireRole(auth, ['athlete']);
@@ -111,3 +112,5 @@ export const handler: APIGatewayProxyHandler = async (event) => {
     return errorResponse(error);
   }
 };
+
+export const handler: APIGatewayProxyHandler = withRequestLogging('createEntry', baseHandler);

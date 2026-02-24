@@ -5,6 +5,7 @@ import { getAuthContext, hasRole, requireRole } from '../../shared/auth';
 import { getItem, putItem, queryItems } from '../../shared/db';
 import { normalizeToken, tokenizeText } from '../../shared/keywords';
 import { isCoachLinkActive } from '../../shared/links';
+import { withRequestLogging } from '../../shared/logger';
 import { callOpenAI } from '../../shared/openai';
 import { ApiError, errorResponse, response } from '../../shared/responses';
 import { batchGetEntries, queryKeywordMatches, rankKeywordMatches } from '../../shared/retrieval';
@@ -278,7 +279,7 @@ export const storeMessage = async (message: AIMessage): Promise<void> => {
   });
 };
 
-export const handler: APIGatewayProxyHandler = async (event) => {
+const baseHandler: APIGatewayProxyHandler = async (event) => {
   try {
     const auth = getAuthContext(event);
     requireRole(auth, ['athlete', 'coach']);
@@ -352,3 +353,5 @@ export const handler: APIGatewayProxyHandler = async (event) => {
     return errorResponse(error);
   }
 };
+
+export const handler: APIGatewayProxyHandler = withRequestLogging('aiChat', baseHandler);

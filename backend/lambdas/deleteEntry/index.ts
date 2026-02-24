@@ -1,8 +1,10 @@
 import type { APIGatewayProxyHandler } from 'aws-lambda';
 
+
 import { getAuthContext, requireRole } from '../../shared/auth';
 import { deleteItem, getItem, queryItems } from '../../shared/db';
 import { extractEntryTokens } from '../../shared/keywords';
+import { withRequestLogging } from '../../shared/logger';
 import { ApiError, errorResponse, response } from '../../shared/responses';
 import type { Entry } from '../../shared/types';
 
@@ -48,7 +50,7 @@ const buildKeywordDeleteKeys = (entry: Entry): Array<{ PK: string; SK: string }>
   ];
 };
 
-export const handler: APIGatewayProxyHandler = async (event) => {
+const baseHandler: APIGatewayProxyHandler = async (event) => {
   try {
     const auth = getAuthContext(event);
     requireRole(auth, ['athlete']);
@@ -134,3 +136,5 @@ export const handler: APIGatewayProxyHandler = async (event) => {
     return errorResponse(error);
   }
 };
+
+export const handler: APIGatewayProxyHandler = withRequestLogging('deleteEntry', baseHandler);

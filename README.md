@@ -341,6 +341,20 @@ Replace `<ACCOUNT_ID>` and `<REGION>`. This example assumes stack name `RollMode
   - `/roll-model/github_token`
 - Local/test fallback: `GITHUB_TOKEN` env var is still supported when present.
 
+## Observability
+
+- Lambda handlers emit structured JSON logs for `request.start`, `request.success`, and `request.error`.
+- Standard log fields include correlation identifiers and request context (for example: `requestId`, `lambdaRequestId`, `correlationId`, `traceId`, `route`, `method`, `statusCode`, `latencyMs`).
+- When Cognito claims are present, logs also include `userId`, `userRole`, and `userRoles`.
+- AWS X-Ray tracing is enabled for the API Gateway stage and all backend Lambda functions to support request debugging across hops.
+- CloudWatch metric filters derive aggregate backend metrics from structured Lambda logs:
+  - `RollModel/Backend :: StructuredRequestErrors`
+  - `RollModel/Backend :: StructuredRequestLatencyMs`
+- A CloudWatch dashboard (`<stack-name>-Operations`) is provisioned with API Gateway, Lambda, and structured-log observability widgets.
+- Default alarms are provisioned (no notification actions attached by default):
+  - structured request errors >= `5` in `5` minutes
+  - structured request latency p95 >= `3000ms` for `10` minutes (2x5m periods)
+
 ## AI Integration
 
 - OpenAI calls are server-side only (`backend/lambdas/aiChat/index.ts`).

@@ -1,6 +1,7 @@
 import { SESClient, SendEmailCommand } from '@aws-sdk/client-ses';
 import type { APIGatewayProxyEvent, APIGatewayProxyHandler } from 'aws-lambda';
 
+import { withRequestLogging } from '../../shared/logger';
 import { ApiError, errorResponse, response } from '../../shared/responses';
 
 type SignupRequest = {
@@ -68,7 +69,7 @@ const buildEmailBody = (request: SignupRequest, submittedAt: string) => {
   return lines.join('\n');
 };
 
-export const handler: APIGatewayProxyHandler = async (event) => {
+const baseHandler: APIGatewayProxyHandler = async (event) => {
   try {
     const approvalEmail = process.env.SIGNUP_APPROVAL_EMAIL;
     const sourceEmail = process.env.SIGNUP_SOURCE_EMAIL;
@@ -107,3 +108,5 @@ export const handler: APIGatewayProxyHandler = async (event) => {
     return errorResponse(error);
   }
 };
+
+export const handler: APIGatewayProxyHandler = withRequestLogging('requestSignup', baseHandler);

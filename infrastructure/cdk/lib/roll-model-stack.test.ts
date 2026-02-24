@@ -43,3 +43,43 @@ describe('RollModelStack CORS', () => {
     }
   });
 });
+
+describe('RollModelStack observability', () => {
+  it('enables tracing and provisions dashboard/alarm observability resources', () => {
+    const app = new cdk.App();
+    const stack = new RollModelStack(app, 'TestRollModelStackTracing');
+    const template = Template.fromStack(stack);
+
+    const stages = template.findResources('AWS::ApiGateway::Stage');
+    expect(Object.keys(stages).length).toBeGreaterThan(0);
+
+    for (const resource of Object.values(stages)) {
+      expect(resource.Properties.TracingEnabled).toBe(true);
+    }
+
+    const lambdas = template.findResources('AWS::Lambda::Function');
+    const backendLambdas = Object.values(lambdas).filter(
+      (resource) => resource.Properties.Environment?.Variables?.TABLE_NAME !== undefined
+    );
+    expect(backendLambdas.length).toBeGreaterThan(0);
+
+    for (const resource of backendLambdas) {
+      expect(resource.Properties.TracingConfig?.Mode).toBe('Active');
+    }
+
+    const dashboards = template.findResources('AWS::CloudWatch::Dashboard');
+    expect(Object.keys(dashboards)).toHaveLength(1);
+
+    const alarms = template.findResources('AWS::CloudWatch::Alarm');
+    expect(Object.keys(alarms).length).toBeGreaterThanOrEqual(2);
+
+    const metricFilters = template.findResources('AWS::Logs::MetricFilter');
+    expect(Object.keys(metricFilters).length).toBeGreaterThanOrEqual(24);
+
+    const filterPatterns = Object.values(metricFilters).map((resource) => resource.Properties.FilterPattern as string);
+    expect(filterPatterns.some((pattern) => pattern.includes('$.event') && pattern.includes('request.error'))).toBe(
+      true
+    );
+    expect(filterPatterns.some((pattern) => pattern.includes('$.latencyMs'))).toBe(true);
+  });
+});
