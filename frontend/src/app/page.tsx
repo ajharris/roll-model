@@ -8,6 +8,7 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import type { HostedUiRuntimeConfig } from '@/lib/cognitoHostedUi';
 import { beginHostedUiSignIn, getHostedUiRuntimeConfig } from '@/lib/cognitoHostedUi';
+import { getDefaultRouteForRole } from '@/lib/roleRouting';
 
 export default function HomePage() {
   const { isAuthenticated, signIn } = useAuth();
@@ -27,7 +28,7 @@ export default function HomePage() {
     setError('');
     try {
       const signedInRole = await signIn(username, password);
-      router.push(signedInRole === 'coach' ? '/coach' : '/entries');
+      router.push(getDefaultRouteForRole(signedInRole));
     } catch {
       setError('Sign in failed. Verify credentials and user pool settings.');
     }

@@ -5,6 +5,7 @@ import type {
   FeedbackPayload,
   SignupRequestPayload,
 } from '@/types/api';
+import { getFrontendRuntimeConfig } from '@/lib/runtimeConfig';
 
 export class ApiError extends Error {
   status: number;
@@ -15,7 +16,7 @@ export class ApiError extends Error {
   }
 }
 
-const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
+const baseUrl = getFrontendRuntimeConfig().apiBaseUrl;
 
 if (!baseUrl) {
   console.warn('NEXT_PUBLIC_API_BASE_URL is not set. API calls will fail.');

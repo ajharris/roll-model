@@ -1,6 +1,6 @@
 import type { APIGatewayProxyHandler } from 'aws-lambda';
 
-import { getAuthContext, requireRole } from '../../shared/auth';
+import { getAuthContext, hasRole, requireRole } from '../../shared/auth';
 import { getItem, queryItems } from '../../shared/db';
 import { isCoachLinkActive } from '../../shared/links';
 import { ApiError, errorResponse, response } from '../../shared/responses';
@@ -19,7 +19,12 @@ export const handler: APIGatewayProxyHandler = async (event) => {
     requireRole(auth, ['athlete', 'coach']);
 
     const requestedAthleteId = event.pathParameters?.athleteId;
-    const athleteId = auth.role === 'athlete' ? auth.userId : requestedAthleteId;
+    const canAthlete = hasRole(auth, 'athlete');
+    const canCoach = hasRole(auth, 'coach');
+    const isCoachRequest = Boolean(
+      requestedAthleteId && requestedAthleteId !== auth.userId && canCoach,
+    );
+    const athleteId = isCoachRequest ? requestedAthleteId : canAthlete ? auth.userId : requestedAthleteId;
 
     if (!athleteId) {
       throw new ApiError({
@@ -29,7 +34,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
       });
     }
 
-    if (auth.role === 'coach') {
+    if (isCoachRequest) {
       const link = await getItem({
         Key: {
           PK: `USER#${athleteId}`,
@@ -70,7 +75,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
       });
 
     return response(200, {
-      entries: auth.role === 'coach' ? entries.map(sanitizeForCoach) : entries
+      entries: isCoachRequest ? entries.map(sanitizeForCoach) : entries
     });
   } catch (error) {
     return errorResponse(error);

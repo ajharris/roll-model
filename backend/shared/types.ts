@@ -1,4 +1,4 @@
-export type UserRole = 'athlete' | 'coach';
+export type UserRole = 'athlete' | 'coach' | 'admin';
 
 export interface SessionMetrics {
   durationMinutes: number;

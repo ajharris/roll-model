@@ -1,7 +1,7 @@
 import type { APIGatewayProxyHandler } from 'aws-lambda';
 import { v4 as uuidv4 } from 'uuid';
 
-import { getAuthContext, requireRole } from '../../shared/auth';
+import { getAuthContext, hasRole, requireRole } from '../../shared/auth';
 import { getItem, putItem, queryItems } from '../../shared/db';
 import { normalizeToken, tokenizeText } from '../../shared/keywords';
 import { isCoachLinkActive } from '../../shared/links';
@@ -77,6 +77,30 @@ export const sanitizeContext = (
     to: context?.dateRange?.to,
     keywords: context?.keywords ?? []
   };
+};
+
+const resolveRequestRole = (
+  auth: ReturnType<typeof getAuthContext>,
+  context: AIChatContext | undefined
+): Extract<UserRole, 'athlete' | 'coach'> => {
+  const requestedAthleteId = context?.athleteId;
+  if (requestedAthleteId && requestedAthleteId !== auth.userId && hasRole(auth, 'coach')) {
+    return 'coach';
+  }
+
+  if (hasRole(auth, 'athlete')) {
+    return 'athlete';
+  }
+
+  if (hasRole(auth, 'coach')) {
+    return 'coach';
+  }
+
+  throw new ApiError({
+    code: 'FORBIDDEN',
+    message: 'User does not have permission for this action.',
+    statusCode: 403
+  });
 };
 
 const ensureCoachLink = async (coachId: string, athleteId: string): Promise<void> => {
@@ -260,9 +284,10 @@ export const handler: APIGatewayProxyHandler = async (event) => {
     requireRole(auth, ['athlete', 'coach']);
 
     const req = parseBody(event.body);
-    const sanitized = sanitizeContext(auth.role, auth.userId, req.context);
+    const requestRole = resolveRequestRole(auth, req.context);
+    const sanitized = sanitizeContext(requestRole, auth.userId, req.context);
 
-    if (auth.role === 'coach') {
+    if (requestRole === 'coach') {
       await ensureCoachLink(auth.userId, sanitized.athleteId);
     }
 

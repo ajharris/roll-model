@@ -11,6 +11,7 @@ import type { ReactNode } from 'react';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 
 import { configureApiClient } from '@/lib/apiClient';
+import { getFrontendRuntimeConfig } from '@/lib/runtimeConfig';
 import type { UserRole } from '@/types/api';
 
 export interface AuthTokens {
@@ -29,21 +30,58 @@ interface DecodedIdToken {
   email?: string;
   exp?: number;
   'custom:role'?: UserRole;
+  'cognito:groups'?: string[] | string;
   'cognito:username'?: string;
 }
+
+const resolveRolesFromToken = (decoded: DecodedIdToken): UserRole[] => {
+  const roles: UserRole[] = [];
+  const explicitRole = decoded['custom:role'];
+  if (explicitRole === 'athlete' || explicitRole === 'coach' || explicitRole === 'admin') {
+    roles.push(explicitRole);
+  }
+
+  const rawGroups = decoded['cognito:groups'];
+  const groups = Array.isArray(rawGroups)
+    ? rawGroups
+    : typeof rawGroups === 'string'
+      ? rawGroups.split(',').map((group) => group.trim())
+      : [];
+
+  if (groups.includes('athlete')) roles.push('athlete');
+  if (groups.includes('coach')) roles.push('coach');
+  if (groups.includes('admin')) roles.push('admin');
+
+  const uniqueRoles = [...new Set(roles)];
+  return uniqueRoles.length ? uniqueRoles : ['unknown'];
+};
+
+const pickDefaultActiveRole = (roles: UserRole[], preferredRole?: UserRole | null): UserRole => {
+  if (preferredRole && preferredRole !== 'unknown' && roles.includes(preferredRole)) {
+    return preferredRole;
+  }
+  if (roles.includes('athlete')) return 'athlete';
+  if (roles.includes('coach')) return 'coach';
+  if (roles.includes('admin')) return 'admin';
+  return 'unknown';
+};
 
 interface AuthContextValue {
   isAuthenticated: boolean;
   user: UserInfo | null;
+  roles: UserRole[];
+  activeRole: UserRole;
   role: UserRole;
   tokens: AuthTokens | null;
   signIn: (username: string, password: string) => Promise<UserRole>;
   signOut: () => void;
   hydrateHostedUiTokens: (tokens: AuthTokens) => UserRole | null;
+  setActiveRole: (role: UserRole) => void;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 const sessionKey = 'roll-model-auth';
+const activeRoleKey = 'roll-model-active-role';
 const refreshLeadTimeMs = 60_000;
 
 const decodeIdToken = (idToken: string): DecodedIdToken => jwtDecode<DecodedIdToken>(idToken);
@@ -64,8 +102,9 @@ const getMsUntilTokenExpiry = (idToken: string): number | null => {
 };
 
 const createUserPool = (): CognitoUserPool | null => {
-  const userPoolId = process.env.NEXT_PUBLIC_COGNITO_USER_POOL_ID;
-  const clientId = process.env.NEXT_PUBLIC_COGNITO_CLIENT_ID;
+  const config = getFrontendRuntimeConfig();
+  const userPoolId = config.cognitoUserPoolId;
+  const clientId = config.cognitoClientId;
   if (!userPoolId || !clientId) return null;
   try {
     return new CognitoUserPool({ UserPoolId: userPoolId, ClientId: clientId });
@@ -77,9 +116,11 @@ const createUserPool = (): CognitoUserPool | null => {
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [tokens, setTokens] = useState<AuthTokens | null>(null);
   const [user, setUser] = useState<UserInfo | null>(null);
+  const [roles, setRoles] = useState<UserRole[]>(['unknown']);
   const [role, setRole] = useState<UserRole>('unknown');
   const userPool = useMemo(() => createUserPool(), []);
   const tokensRef = useRef<AuthTokens | null>(null);
+  const rolesRef = useRef<UserRole[]>(['unknown']);
   const refreshTimeoutRef = useRef<number | null>(null);
   const refreshInFlightRef = useRef<Promise<AuthTokens | null> | null>(null);
 
@@ -103,8 +144,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       tokensRef.current = null;
       setTokens(null);
       setUser(null);
+      rolesRef.current = ['unknown'];
+      setRoles(['unknown']);
       setRole('unknown');
       sessionStorage.removeItem(sessionKey);
+      sessionStorage.removeItem(activeRoleKey);
       if (options?.redirectToSignIn) {
         redirectToSignIn();
       }
@@ -115,18 +159,29 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const hydrateFromToken = useCallback((nextTokens: AuthTokens): UserRole | null => {
     try {
       const decoded = decodeIdToken(nextTokens.idToken);
-      const nextRole = decoded['custom:role'] ?? 'unknown';
+      const nextRoles = resolveRolesFromToken(decoded);
+      const storedActiveRole = sessionStorage.getItem(activeRoleKey);
+      const preferredRole =
+        storedActiveRole === 'athlete' || storedActiveRole === 'coach' || storedActiveRole === 'admin'
+          ? storedActiveRole
+          : role;
+      const nextRole = pickDefaultActiveRole(nextRoles, preferredRole);
       tokensRef.current = nextTokens;
       setTokens(nextTokens);
       setUser({ sub: decoded.sub, email: decoded.email });
+      rolesRef.current = nextRoles;
+      setRoles(nextRoles);
       setRole(nextRole);
+      if (nextRole !== 'unknown') {
+        sessionStorage.setItem(activeRoleKey, nextRole);
+      }
       sessionStorage.setItem(sessionKey, JSON.stringify(nextTokens));
       return nextRole;
     } catch {
       clearSession();
       return null;
     }
-  }, [clearSession]);
+  }, [clearSession, role]);
 
   const refreshSession = useCallback(
     async (
@@ -311,17 +366,27 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     [hydrateFromToken],
   );
 
+  const setActiveRole = useCallback((nextRole: UserRole) => {
+    if (nextRole === 'unknown') return;
+    if (!rolesRef.current.includes(nextRole)) return;
+    setRole(nextRole);
+    sessionStorage.setItem(activeRoleKey, nextRole);
+  }, []);
+
   const value = useMemo(
     () => ({
       isAuthenticated: Boolean(tokens?.idToken),
       user,
+      roles,
+      activeRole: role,
       role,
       tokens,
       signIn,
       signOut,
       hydrateHostedUiTokens,
+      setActiveRole,
     }),
-    [hydrateHostedUiTokens, role, signIn, signOut, tokens, user],
+    [hydrateHostedUiTokens, role, roles, setActiveRole, signIn, signOut, tokens, user],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

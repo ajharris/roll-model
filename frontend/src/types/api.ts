@@ -1,4 +1,4 @@
-export type UserRole = 'athlete' | 'coach' | 'unknown';
+export type UserRole = 'athlete' | 'coach' | 'admin' | 'unknown';
 
 export interface EntrySections {
   private?: string;
