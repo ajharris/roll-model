@@ -69,6 +69,7 @@ export const resetOpenAIApiKeyCache = (): void => {
 export const callOpenAI = async (messages: OpenAIMessage[]): Promise<OpenAIResponsePayload> => {
   const apiKey = await getOpenAIApiKey();
 
+  // OPENAI_TWEAK_POINT: Adjust endpoint, headers, model, and request payload here.
   const response = await fetch('https://api.openai.com/v1/responses', {
     method: 'POST',
     headers: {
@@ -92,6 +93,7 @@ export const callOpenAI = async (messages: OpenAIMessage[]): Promise<OpenAIRespo
     });
   }
 
+  // OPENAI_TWEAK_POINT: Update parsing/validation here if response format changes.
   const raw = (await response.json()) as {
     output_text?: string;
   };

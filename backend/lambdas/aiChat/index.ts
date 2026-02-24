@@ -148,6 +148,7 @@ const getKeywordDrivenEntries = async (context: SanitizedContext): Promise<Entry
 };
 
 export const buildPromptContext = (entries: Entry[], includePrivate: boolean): string => {
+  // OPENAI_TWEAK_POINT: Change what training/context data gets sent to the model here.
   return JSON.stringify(
     entries.map((entry) => ({
       entryId: entry.entryId,
@@ -161,6 +162,7 @@ export const buildPromptContext = (entries: Entry[], includePrivate: boolean): s
 };
 
 const buildSystemPrompt = (): string =>
+  // OPENAI_TWEAK_POINT: Tune system instructions and output contract here.
   [
     'You are Roll Model AI, a scientific, coach-like, practical grappling training assistant.',
     'You must respond as strict JSON only with this exact shape:',
@@ -297,6 +299,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
       .map((msg) => `${msg.role.toUpperCase()}: ${msg.content}`)
       .join('\n');
 
+    // OPENAI_TWEAK_POINT: Change how messages/history are assembled before sending to OpenAI.
     const aiPayload = await callOpenAI([
       { role: 'system', content: buildSystemPrompt() },
       {

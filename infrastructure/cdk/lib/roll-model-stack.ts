@@ -156,7 +156,7 @@ export class RollModelStack extends cdk.Stack {
       type: apigateway.ResponseType.DEFAULT_4XX,
       responseHeaders: {
         'Access-Control-Allow-Origin': "'*'",
-        'Access-Control-Allow-Headers': "'Content-Type,Authorization,X-Authorization-Bearer'",
+        'Access-Control-Allow-Headers': "'Content-Type,Authorization'",
         'Access-Control-Allow-Methods': "'GET,POST,PUT,DELETE,OPTIONS'"
       }
     });
@@ -165,7 +165,7 @@ export class RollModelStack extends cdk.Stack {
       type: apigateway.ResponseType.DEFAULT_5XX,
       responseHeaders: {
         'Access-Control-Allow-Origin': "'*'",
-        'Access-Control-Allow-Headers': "'Content-Type,Authorization,X-Authorization-Bearer'",
+        'Access-Control-Allow-Headers': "'Content-Type,Authorization'",
         'Access-Control-Allow-Methods': "'GET,POST,PUT,DELETE,OPTIONS'"
       }
     });
@@ -189,7 +189,7 @@ export class RollModelStack extends cdk.Stack {
     entries.addCorsPreflight({
       allowOrigins: apigateway.Cors.ALL_ORIGINS,
       allowMethods: ['GET', 'POST', 'OPTIONS'],
-      allowHeaders: ['Content-Type', 'Authorization', 'X-Authorization-Bearer']
+      allowHeaders: ['Content-Type', 'Authorization']
     });
 
     const comments = entries.addResource('comments');
@@ -197,7 +197,7 @@ export class RollModelStack extends cdk.Stack {
     comments.addCorsPreflight({
       allowOrigins: apigateway.Cors.ALL_ORIGINS,
       allowMethods: ['POST', 'OPTIONS'],
-      allowHeaders: ['Content-Type', 'Authorization', 'X-Authorization-Bearer']
+      allowHeaders: ['Content-Type', 'Authorization']
     });
 
     const entryById = entries.addResource('{entryId}');
@@ -207,7 +207,7 @@ export class RollModelStack extends cdk.Stack {
     entryById.addCorsPreflight({
       allowOrigins: apigateway.Cors.ALL_ORIGINS,
       allowMethods: ['GET', 'PUT', 'DELETE', 'OPTIONS'],
-      allowHeaders: ['Content-Type', 'Authorization', 'X-Authorization-Bearer']
+      allowHeaders: ['Content-Type', 'Authorization']
     });
 
     const entryComments = entryById.addResource('comments');
@@ -215,7 +215,7 @@ export class RollModelStack extends cdk.Stack {
     entryComments.addCorsPreflight({
       allowOrigins: apigateway.Cors.ALL_ORIGINS,
       allowMethods: ['POST', 'OPTIONS'],
-      allowHeaders: ['Content-Type', 'Authorization', 'X-Authorization-Bearer']
+      allowHeaders: ['Content-Type', 'Authorization']
     });
 
     const links = api.root.addResource('links');
@@ -225,7 +225,7 @@ export class RollModelStack extends cdk.Stack {
     athleteCoach.addCorsPreflight({
       allowOrigins: apigateway.Cors.ALL_ORIGINS,
       allowMethods: ['POST', 'DELETE', 'OPTIONS'],
-      allowHeaders: ['Content-Type', 'Authorization', 'X-Authorization-Bearer']
+      allowHeaders: ['Content-Type', 'Authorization']
     });
 
     const exportResource = api.root.addResource('export');
@@ -233,7 +233,7 @@ export class RollModelStack extends cdk.Stack {
     exportResource.addCorsPreflight({
       allowOrigins: apigateway.Cors.ALL_ORIGINS,
       allowMethods: ['GET', 'OPTIONS'],
-      allowHeaders: ['Content-Type', 'Authorization', 'X-Authorization-Bearer']
+      allowHeaders: ['Content-Type', 'Authorization']
     });
 
     const ai = api.root.addResource('ai');
@@ -242,7 +242,7 @@ export class RollModelStack extends cdk.Stack {
     aiChat.addCorsPreflight({
       allowOrigins: apigateway.Cors.ALL_ORIGINS,
       allowMethods: ['POST', 'OPTIONS'],
-      allowHeaders: ['Content-Type', 'Authorization', 'X-Authorization-Bearer']
+      allowHeaders: ['Content-Type', 'Authorization']
     });
 
     const signupRequests = api.root.addResource('signup-requests');
@@ -250,7 +250,7 @@ export class RollModelStack extends cdk.Stack {
     signupRequests.addCorsPreflight({
       allowOrigins: apigateway.Cors.ALL_ORIGINS,
       allowMethods: ['POST', 'OPTIONS'],
-      allowHeaders: ['Content-Type', 'Authorization', 'X-Authorization-Bearer']
+      allowHeaders: ['Content-Type', 'Authorization']
     });
 
     const feedback = api.root.addResource('feedback');
@@ -258,7 +258,7 @@ export class RollModelStack extends cdk.Stack {
     feedback.addCorsPreflight({
       allowOrigins: apigateway.Cors.ALL_ORIGINS,
       allowMethods: ['POST', 'OPTIONS'],
-      allowHeaders: ['Content-Type', 'Authorization', 'X-Authorization-Bearer']
+      allowHeaders: ['Content-Type', 'Authorization']
     });
 
     const athletes = api.root.addResource('athletes');
@@ -268,7 +268,7 @@ export class RollModelStack extends cdk.Stack {
     athleteEntries.addCorsPreflight({
       allowOrigins: apigateway.Cors.ALL_ORIGINS,
       allowMethods: ['GET', 'OPTIONS'],
-      allowHeaders: ['Content-Type', 'Authorization', 'X-Authorization-Bearer']
+      allowHeaders: ['Content-Type', 'Authorization']
     });
 
     new cdk.CfnOutput(this, 'ApiUrl', {
