@@ -96,20 +96,21 @@ const selectRedirectUri = (candidates: string[], origin?: string): string | null
 
 export const getHostedUiRuntimeConfig = (
   origin?: string,
-  env: HostedUiEnv = process.env as HostedUiEnv,
+  env?: HostedUiEnv,
 ): HostedUiRuntimeConfig => {
+  const resolvedEnv = env ?? (process.env as HostedUiEnv);
   const validationErrors: string[] = [];
   const hasHostedUiConfig = Boolean(
-    env.NEXT_PUBLIC_COGNITO_DOMAIN ||
-      env.NEXT_PUBLIC_COGNITO_REDIRECT_URI ||
-      env.NEXT_PUBLIC_COGNITO_SIGN_IN_REDIRECT_URIS ||
-      env.NEXT_PUBLIC_COGNITO_SIGN_OUT_REDIRECT_URIS,
+    resolvedEnv.NEXT_PUBLIC_COGNITO_DOMAIN ||
+      resolvedEnv.NEXT_PUBLIC_COGNITO_REDIRECT_URI ||
+      resolvedEnv.NEXT_PUBLIC_COGNITO_SIGN_IN_REDIRECT_URIS ||
+      resolvedEnv.NEXT_PUBLIC_COGNITO_SIGN_OUT_REDIRECT_URIS,
   );
-  const clientId = env.NEXT_PUBLIC_COGNITO_CLIENT_ID?.trim() ?? null;
-  const domainUrl = normalizeDomainUrl(env.NEXT_PUBLIC_COGNITO_DOMAIN);
-  const { signInRedirectUris, signOutRedirectUris } = parseRedirectUris(env);
+  const clientId = resolvedEnv.NEXT_PUBLIC_COGNITO_CLIENT_ID?.trim() ?? null;
+  const domainUrl = normalizeDomainUrl(resolvedEnv.NEXT_PUBLIC_COGNITO_DOMAIN);
+  const { signInRedirectUris, signOutRedirectUris } = parseRedirectUris(resolvedEnv);
 
-  if (env.NEXT_PUBLIC_COGNITO_DOMAIN && !domainUrl) {
+  if (resolvedEnv.NEXT_PUBLIC_COGNITO_DOMAIN && !domainUrl) {
     validationErrors.push('NEXT_PUBLIC_COGNITO_DOMAIN must be a valid Cognito Hosted UI domain.');
   }
   if (!clientId) {
