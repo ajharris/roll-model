@@ -1,3 +1,4 @@
+import { logAuthFailure, logNetworkFailure } from '@/lib/clientErrorLogging';
 import { frontendConfig } from '@/lib/config';
 import type {
   CommentPayload,
@@ -39,6 +40,7 @@ const buildAuthHeaders = () => {
 };
 
 const request = async <T>(path: string, init?: RequestInit): Promise<T> => {
+  const method = (init?.method ?? 'GET').toUpperCase();
   const headers = new Headers();
   headers.set('Content-Type', 'application/json');
 
@@ -54,11 +56,24 @@ const request = async <T>(path: string, init?: RequestInit): Promise<T> => {
   }
 
   const url = joinUrl(baseUrl, path);
-  const response = await fetch(url, {
-    ...init,
-    headers,
-    cache: 'no-store',
-  });
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      ...init,
+      headers,
+      cache: 'no-store',
+    });
+  } catch (error) {
+    logNetworkFailure({
+      source: 'apiClient',
+      url,
+      path,
+      method,
+      authRequired: headers.has('Authorization'),
+      error,
+    });
+    throw error;
+  }
 
   if (!response.ok) {
     let message = 'Request failed';
@@ -67,6 +82,28 @@ const request = async <T>(path: string, init?: RequestInit): Promise<T> => {
       message = json.message ?? message;
     } catch {
       message = response.statusText || message;
+    }
+    if (response.status === 401 || response.status === 403) {
+      logAuthFailure({
+        source: 'apiClient',
+        operation: `${method} ${path}`,
+        status: response.status,
+        message,
+        details: {
+          url,
+          authRequired: headers.has('Authorization'),
+        },
+      });
+    } else {
+      logNetworkFailure({
+        source: 'apiClient',
+        url,
+        path,
+        method,
+        status: response.status,
+        authRequired: headers.has('Authorization'),
+        responseMessage: message,
+      });
     }
     throw new ApiError(message, response.status);
   }

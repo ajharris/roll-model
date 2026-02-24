@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
 import { useAuth } from '@/contexts/AuthContext';
+import { logAuthFailure } from '@/lib/clientErrorLogging';
 import {
   HOSTED_UI_CALLBACK_PATH,
   exchangeHostedUiCodeForTokens,
@@ -70,6 +71,14 @@ export default function HostedUiCallbackPage() {
       } catch (cause) {
         sessionStorage.removeItem(hostedUiPkceVerifierKey);
         sessionStorage.removeItem(hostedUiStateKey);
+        logAuthFailure({
+          source: 'HostedUiCallbackPage',
+          operation: 'hosted-ui-callback',
+          error: cause,
+          details: {
+            pathname: window.location.pathname,
+          },
+        });
         if (!cancelled) {
           setError(cause instanceof Error ? cause.message : 'Hosted UI sign-in failed.');
         }

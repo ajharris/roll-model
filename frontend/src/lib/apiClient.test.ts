@@ -1,9 +1,19 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+const logAuthFailureMock = vi.fn();
+const logNetworkFailureMock = vi.fn();
+
+vi.mock('@/lib/clientErrorLogging', () => ({
+  logAuthFailure: (...args: unknown[]) => logAuthFailureMock(...args),
+  logNetworkFailure: (...args: unknown[]) => logNetworkFailureMock(...args),
+}));
+
 describe('apiClient', () => {
   beforeEach(() => {
     vi.resetModules();
     vi.unstubAllGlobals();
+    logAuthFailureMock.mockReset();
+    logNetworkFailureMock.mockReset();
     process.env.NEXT_PUBLIC_API_BASE_URL = 'https://api.example.test';
   });
 
@@ -49,6 +59,61 @@ describe('apiClient', () => {
       message: 'AI provider error',
       status: 502,
     });
+
+    expect(logNetworkFailureMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        source: 'apiClient',
+        path: '/ai/chat',
+        method: 'POST',
+        status: 502,
+      }),
+    );
+  });
+
+  it('logs auth failures with a consistent auth category for 401/403 responses', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 401,
+      statusText: 'Unauthorized',
+      json: async () => ({ message: 'Unauthorized' }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { apiClient, configureApiClient } = await import('./apiClient');
+    configureApiClient(() => 'jwt-token');
+
+    await expect(apiClient.getEntries()).rejects.toMatchObject({
+      message: 'Unauthorized',
+      status: 401,
+    });
+
+    expect(logAuthFailureMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        source: 'apiClient',
+        operation: 'GET /entries',
+        status: 401,
+        message: 'Unauthorized',
+      }),
+    );
+  });
+
+  it('logs fetch rejections as network failures', async () => {
+    const fetchMock = vi.fn().mockRejectedValue(new TypeError('Failed to fetch'));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { apiClient } = await import('./apiClient');
+
+    await expect(apiClient.getEntries()).rejects.toThrow('Failed to fetch');
+
+    expect(logNetworkFailureMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        source: 'apiClient',
+        path: '/entries',
+        method: 'GET',
+        authRequired: false,
+        error: expect.any(TypeError),
+      }),
+    );
   });
 
   it('posts signup requests to the public endpoint', async () => {
