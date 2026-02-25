@@ -6,6 +6,8 @@ applications:
         preBuild:
           commands:
             - npm ci
+            - rm -rf .next
+            - rm -rf node_modules/.cache || true
         build:
           commands:
             - npm run build
@@ -16,4 +18,3 @@ applications:
       cache:
         paths:
           - node_modules/**/*
-          - .next/cache/**/*
