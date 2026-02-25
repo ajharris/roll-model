@@ -32,6 +32,17 @@ export class FrontendConfigError extends Error {
   }
 }
 
+const getFrontendEnvFromProcessEnv = (): FrontendEnv => ({
+  NEXT_PUBLIC_API_BASE_URL: process.env.NEXT_PUBLIC_API_BASE_URL,
+  NEXT_PUBLIC_AWS_REGION: process.env.NEXT_PUBLIC_AWS_REGION,
+  NEXT_PUBLIC_COGNITO_USER_POOL_ID: process.env.NEXT_PUBLIC_COGNITO_USER_POOL_ID,
+  NEXT_PUBLIC_COGNITO_CLIENT_ID: process.env.NEXT_PUBLIC_COGNITO_CLIENT_ID,
+  NEXT_PUBLIC_COGNITO_DOMAIN: process.env.NEXT_PUBLIC_COGNITO_DOMAIN,
+  NEXT_PUBLIC_COGNITO_REDIRECT_URI: process.env.NEXT_PUBLIC_COGNITO_REDIRECT_URI,
+  NEXT_PUBLIC_COGNITO_SIGN_IN_REDIRECT_URIS: process.env.NEXT_PUBLIC_COGNITO_SIGN_IN_REDIRECT_URIS,
+  NEXT_PUBLIC_COGNITO_SIGN_OUT_REDIRECT_URIS: process.env.NEXT_PUBLIC_COGNITO_SIGN_OUT_REDIRECT_URIS,
+});
+
 const trimOptional = (value?: string): string | null => {
   const trimmed = value?.trim();
   return trimmed ? trimmed : null;
@@ -178,8 +189,8 @@ export const parseFrontendConfig = (env: FrontendEnv): FrontendConfig => {
   };
 };
 
-export const getFrontendConfig = (env: FrontendEnv = process.env as FrontendEnv): FrontendConfig =>
-  parseFrontendConfig(env);
+export const getFrontendConfig = (env?: FrontendEnv): FrontendConfig =>
+  parseFrontendConfig(env ?? getFrontendEnvFromProcessEnv());
 
 export const frontendConfig = getFrontendConfig();
 
