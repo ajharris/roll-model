@@ -16,6 +16,40 @@ export class RollModelStack extends cdk.Stack {
   public constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
 
+    const splitCsvEnv = (value?: string): string[] =>
+      (value ?? '')
+        .split(',')
+        .map((item) => item.trim())
+        .filter(Boolean);
+
+    const cognitoHostedUiDomainPrefix =
+      process.env.COGNITO_HOSTED_UI_DOMAIN_PREFIX?.trim() || process.env.COGNITO_DOMAIN_PREFIX?.trim() || '';
+    const cognitoHostedUiCallbackUrls = splitCsvEnv(
+      process.env.COGNITO_HOSTED_UI_CALLBACK_URLS ?? process.env.NEXT_PUBLIC_COGNITO_SIGN_IN_REDIRECT_URIS,
+    );
+    const cognitoHostedUiLogoutUrls = splitCsvEnv(
+      process.env.COGNITO_HOSTED_UI_LOGOUT_URLS ?? process.env.NEXT_PUBLIC_COGNITO_SIGN_OUT_REDIRECT_URIS,
+    );
+    const hostedUiEnabled =
+      Boolean(cognitoHostedUiDomainPrefix) ||
+      cognitoHostedUiCallbackUrls.length > 0 ||
+      cognitoHostedUiLogoutUrls.length > 0;
+
+    if (
+      hostedUiEnabled &&
+      (!cognitoHostedUiDomainPrefix || !cognitoHostedUiCallbackUrls.length || !cognitoHostedUiLogoutUrls.length)
+    ) {
+      throw new Error(
+        [
+          'Incomplete Cognito Hosted UI configuration for CDK deploy.',
+          'When enabling Hosted UI, set all of:',
+          '- COGNITO_HOSTED_UI_DOMAIN_PREFIX (or COGNITO_DOMAIN_PREFIX)',
+          '- COGNITO_HOSTED_UI_CALLBACK_URLS (or NEXT_PUBLIC_COGNITO_SIGN_IN_REDIRECT_URIS)',
+          '- COGNITO_HOSTED_UI_LOGOUT_URLS (or NEXT_PUBLIC_COGNITO_SIGN_OUT_REDIRECT_URIS)'
+        ].join('\n')
+      );
+    }
+
     const table = new dynamodb.Table(this, 'RollModelTable', {
       tableName: 'RollModel',
       partitionKey: { name: 'PK', type: dynamodb.AttributeType.STRING },
@@ -62,8 +96,28 @@ export class RollModelStack extends cdk.Stack {
       authFlows: {
         userPassword: true,
         userSrp: true
-      }
+      },
+      ...(hostedUiEnabled
+        ? {
+            oAuth: {
+              flows: {
+                authorizationCodeGrant: true
+              },
+              scopes: [cognito.OAuthScope.OPENID, cognito.OAuthScope.EMAIL, cognito.OAuthScope.PROFILE],
+              callbackUrls: cognitoHostedUiCallbackUrls,
+              logoutUrls: cognitoHostedUiLogoutUrls
+            }
+          }
+        : {})
     });
+
+    const userPoolDomain = hostedUiEnabled
+      ? userPool.addDomain('RollModelHostedUiDomain', {
+          cognitoDomain: {
+            domainPrefix: cognitoHostedUiDomainPrefix
+          }
+        })
+      : null;
 
     const athleteGroup = new cognito.CfnUserPoolGroup(this, 'RollModelAthleteGroup', {
       groupName: 'athlete',
@@ -456,6 +510,30 @@ export class RollModelStack extends cdk.Stack {
     new cdk.CfnOutput(this, 'UserPoolClientId', {
       value: userPoolClient.userPoolClientId
     });
+
+    if (userPoolDomain) {
+      new cdk.CfnOutput(this, 'CognitoHostedUiDomain', {
+        value: userPoolDomain.domainName
+      });
+
+      new cdk.CfnOutput(this, 'CognitoHostedUiBaseUrl', {
+        value: userPoolDomain.baseUrl()
+      });
+
+      new cdk.CfnOutput(this, 'FrontendNextPublicCognitoDomain', {
+        value: userPoolDomain.domainName
+      });
+    }
+
+    if (hostedUiEnabled) {
+      new cdk.CfnOutput(this, 'FrontendNextPublicCognitoSignInRedirectUris', {
+        value: cognitoHostedUiCallbackUrls.join(',')
+      });
+
+      new cdk.CfnOutput(this, 'FrontendNextPublicCognitoSignOutRedirectUris', {
+        value: cognitoHostedUiLogoutUrls.join(',')
+      });
+    }
 
     new cdk.CfnOutput(this, 'CognitoAthleteGroupName', {
       value: athleteGroup.groupName ?? 'athlete'
