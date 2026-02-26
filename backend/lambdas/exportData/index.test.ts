@@ -34,6 +34,19 @@ const buildEventWithMode = (mode: string): APIGatewayProxyEvent =>
     }
   }) as unknown as APIGatewayProxyEvent;
 
+const buildEventWithFormat = (format: string): APIGatewayProxyEvent =>
+  ({
+    queryStringParameters: { format },
+    requestContext: {
+      authorizer: {
+        claims: {
+          sub: 'athlete-1',
+          'custom:role': 'athlete'
+        }
+      }
+    }
+  }) as unknown as APIGatewayProxyEvent;
+
 describe('exportData handler', () => {
   beforeEach(() => {
     mockQueryItems.mockReset();
@@ -129,5 +142,38 @@ describe('exportData handler', () => {
     expect(body.generatedAt).toBeDefined();
     expect(body.tidy).toBeDefined();
     expect(body.full).toBeUndefined();
+  });
+
+  it('exports entries as csv when format=csv', async () => {
+    mockQueryItems.mockResolvedValueOnce({
+      Items: [
+        {
+          PK: 'USER#athlete-1',
+          SK: 'ENTRY#2024-01-01',
+          entityType: 'ENTRY',
+          entryId: 'entry-1',
+          athleteId: 'athlete-1',
+          createdAt: '2024-01-01T00:00:00.000Z',
+          updatedAt: '2024-01-01T00:00:00.000Z',
+          sections: { shared: 'shared notes', private: 'private notes' },
+          sessionMetrics: {
+            durationMinutes: 60,
+            intensity: 7,
+            rounds: 6,
+            giOrNoGi: 'gi',
+            tags: ['guard']
+          },
+          rawTechniqueMentions: ['knee cut']
+        }
+      ]
+    } as unknown as QueryCommandOutput);
+
+    const result = (await handler(buildEventWithFormat('csv'), {} as never, () => undefined)) as APIGatewayProxyResult;
+
+    expect(result.statusCode).toBe(200);
+    expect(result.headers?.['Content-Type']).toContain('text/csv');
+    expect(result.body).toContain('entryId,athleteId,schemaVersion');
+    expect(result.body).toContain('entry-1');
+    expect(mockQueryItems).toHaveBeenCalledTimes(1);
   });
 });

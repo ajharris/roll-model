@@ -28,7 +28,9 @@
     "@aws-sdk/lib-dynamodb": "^3.863.0",
     "aws-cdk-lib": "^2.209.1",
     "constructs": "^10.4.2",
-    "uuid": "^11.1.0"
+    "next": "^16.1.6",
+    "uuid": "^11.1.0",
+    "vite": "^7.3.1"
   },
   "devDependencies": {
     "@types/aws-lambda": "^8.10.147",

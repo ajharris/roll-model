@@ -2,14 +2,15 @@ import type { APIGatewayProxyHandler } from 'aws-lambda';
 
 
 import { getAuthContext, requireRole } from '../../shared/auth';
+import { buildEntriesCsv, CURRENT_BACKUP_SCHEMA_VERSION } from '../../shared/backups';
 import { queryItems } from '../../shared/db';
 import { parseEntryRecord } from '../../shared/entries';
 import { withRequestLogging } from '../../shared/logger';
 import { ApiError, errorResponse, response } from '../../shared/responses';
 import type { AIMessage, AIThread, CoachLink, Comment } from '../../shared/types';
 
-const SCHEMA_VERSION = '2026-02-19';
 const MODE_VALUES = new Set(['full', 'tidy']);
+const FORMAT_VALUES = new Set(['json', 'csv']);
 
 const stripKeys = <T extends { PK: string; SK: string; entityType: string }>(item: T): Omit<
   T,
@@ -35,6 +36,14 @@ const baseHandler: APIGatewayProxyHandler = async (event) => {
         statusCode: 400
       });
     }
+    const format = event.queryStringParameters?.format?.toLowerCase() ?? 'json';
+    if (!FORMAT_VALUES.has(format)) {
+      throw new ApiError({
+        code: 'INVALID_REQUEST',
+        message: 'format must be one of: json, csv.',
+        statusCode: 400
+      });
+    }
 
     const entriesResult = await queryItems({
       KeyConditionExpression: 'PK = :pk AND begins_with(SK, :entryPrefix)',
@@ -47,6 +56,20 @@ const baseHandler: APIGatewayProxyHandler = async (event) => {
     const entries = (entriesResult.Items ?? [])
       .filter((item) => item.entityType === 'ENTRY')
       .map((item) => parseEntryRecord(item as Record<string, unknown>));
+
+    if (format === 'csv') {
+      return {
+        statusCode: 200,
+        headers: {
+          'Content-Type': 'text/csv; charset=utf-8',
+          'Content-Disposition': `attachment; filename="roll-model-entries-${auth.userId}.csv"`,
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Headers': 'Content-Type,Authorization',
+          'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS'
+        },
+        body: buildEntriesCsv(entries)
+      };
+    }
 
     const commentsByEntryId = new Map<string, Comment[]>();
 
@@ -168,7 +191,7 @@ const baseHandler: APIGatewayProxyHandler = async (event) => {
     };
 
     const payload = {
-      schemaVersion: SCHEMA_VERSION,
+      schemaVersion: CURRENT_BACKUP_SCHEMA_VERSION,
       generatedAt: new Date().toISOString(),
       ...(mode === 'full'
         ? { full: fullExport }

@@ -177,6 +177,7 @@ export class RollModelStack extends cdk.Stack {
       table
     );
     const exportDataLambda = this.createLambda('exportData', 'backend/lambdas/exportData/index.ts', table);
+    const restoreDataLambda = this.createLambda('restoreData', 'backend/lambdas/restoreData/index.ts', table);
     const aiChatLambda = this.createLambda('aiChat', 'backend/lambdas/aiChat/index.ts', table);
     const requestSignupLambda = this.createLambda(
       'requestSignup',
@@ -202,6 +203,7 @@ export class RollModelStack extends cdk.Stack {
       { name: 'linkCoachAthlete', fn: linkCoachAthleteLambda },
       { name: 'revokeCoachLink', fn: revokeCoachLinkLambda },
       { name: 'exportData', fn: exportDataLambda },
+      { name: 'restoreData', fn: restoreDataLambda },
       { name: 'aiChat', fn: aiChatLambda },
       { name: 'requestSignup', fn: requestSignupLambda },
       { name: 'submitFeedback', fn: submitFeedbackLambda }
@@ -366,6 +368,14 @@ export class RollModelStack extends cdk.Stack {
     exportResource.addCorsPreflight({
       allowOrigins: apigateway.Cors.ALL_ORIGINS,
       allowMethods: ['GET', 'OPTIONS'],
+      allowHeaders: ['Content-Type', 'Authorization']
+    });
+
+    const restoreResource = api.root.addResource('restore');
+    restoreResource.addMethod('POST', new apigateway.LambdaIntegration(restoreDataLambda), methodOptions);
+    restoreResource.addCorsPreflight({
+      allowOrigins: apigateway.Cors.ALL_ORIGINS,
+      allowMethods: ['POST', 'OPTIONS'],
       allowHeaders: ['Content-Type', 'Authorization']
     });
 

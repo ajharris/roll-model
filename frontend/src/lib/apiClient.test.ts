@@ -70,6 +70,28 @@ describe('apiClient', () => {
     );
   });
 
+  it('reads nested backend error.message payloads', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 400,
+      statusText: 'Bad Request',
+      json: async () => ({
+        error: {
+          code: 'INVALID_BACKUP_FORMAT',
+          message: 'Backup field "full.entries" must be an array.',
+        },
+      }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { apiClient } = await import('./apiClient');
+
+    await expect(apiClient.restoreData({ bad: true })).rejects.toMatchObject({
+      status: 400,
+      message: 'Backup field "full.entries" must be an array.',
+    });
+  });
+
   it('logs auth failures with a consistent auth category for 401/403 responses', async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: false,
@@ -152,6 +174,68 @@ describe('apiClient', () => {
     expect(response.issueNumber).toBe(5);
     expect(fetchMock).toHaveBeenCalledWith(
       'https://api.example.test/feedback',
+      expect.objectContaining({
+        method: 'POST',
+      }),
+    );
+  });
+
+  it('downloads CSV export as text', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: async () => 'entryId,athleteId\nentry-1,athlete-1',
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { apiClient, configureApiClient } = await import('./apiClient');
+    configureApiClient(() => 'jwt-token');
+
+    const csv = await apiClient.exportEntriesCsv();
+
+    expect(csv).toContain('entryId,athleteId');
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://api.example.test/export?format=csv',
+      expect.objectContaining({ cache: 'no-store' }),
+    );
+  });
+
+  it('posts restore payload to /restore', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        restored: true,
+        athleteId: 'athlete-1',
+        counts: {
+          entries: 1,
+          comments: 0,
+          links: 0,
+          aiThreads: 0,
+          aiMessages: 0,
+          itemsWritten: 2,
+        },
+      }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { apiClient } = await import('./apiClient');
+    const result = await apiClient.restoreData({
+      schemaVersion: '2026-02-19',
+      generatedAt: '2026-02-26T00:00:00.000Z',
+      full: {
+        athleteId: 'athlete-1',
+        entries: [],
+        comments: [],
+        links: [],
+        aiThreads: [],
+        aiMessages: [],
+      },
+    });
+
+    expect(result.restored).toBe(true);
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://api.example.test/restore',
       expect.objectContaining({
         method: 'POST',
       }),
