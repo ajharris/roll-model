@@ -60,6 +60,15 @@ describe('aiChat context/privacy', () => {
         schemaVersion: 1,
         createdAt: '2026-01-01T00:00:00.000Z',
         updatedAt: '2026-01-01T00:00:00.000Z',
+        quickAdd: {
+          time: '2026-01-01T18:00:00.000Z',
+          class: 'Open mat',
+          gym: 'North Academy',
+          partners: ['Alex'],
+          rounds: 5,
+          notes: 'shared text'
+        },
+        tags: [],
         sections: { private: 'private text', shared: 'shared text' },
         sessionMetrics: {
           durationMinutes: 60,

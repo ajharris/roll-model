@@ -27,6 +27,19 @@ const buildEvent = (role: 'athlete' | 'coach'): APIGatewayProxyEvent =>
   ({
     pathParameters: { entryId: 'entry-1' },
     body: JSON.stringify({
+      quickAdd: {
+        time: '2026-02-26T18:30:00.000Z',
+        class: 'No-gi advanced',
+        gym: 'North Academy',
+        partners: ['Blake'],
+        rounds: 4,
+        notes: 'new shared'
+      },
+      structured: {
+        position: 'mount',
+        problem: 'lost elbow-knee connection'
+      },
+      tags: ['top', 'submission'],
       sections: { shared: 'new shared', private: 'new private' },
       sessionMetrics: {
         durationMinutes: 45,
@@ -83,6 +96,15 @@ describe('updateEntry handler', () => {
           athleteId: 'athlete-1',
           createdAt: '2024-01-01T00:00:00.000Z',
           updatedAt: '2024-01-01T00:00:00.000Z',
+          quickAdd: {
+            time: '2024-01-01T18:00:00.000Z',
+            class: 'Open mat',
+            gym: 'North Academy',
+            partners: ['Chris'],
+            rounds: 6,
+            notes: 'old shared'
+          },
+          tags: ['guard-type'],
           sections: { shared: 'old shared', private: 'old private' },
           sessionMetrics: {
             durationMinutes: 60,
@@ -158,6 +180,8 @@ describe('updateEntry handler', () => {
     const result = (await handler(event, {} as never, () => undefined)) as APIGatewayProxyResult;
 
     expect(result.statusCode).toBe(400);
+    const body = JSON.parse(result.body) as { error: { message: string } };
+    expect(body.error.message).toContain('quickAdd');
     expect(mockGetItem).not.toHaveBeenCalled();
   });
 
@@ -220,6 +244,15 @@ describe('updateEntry handler', () => {
           athleteId: 'athlete-1',
           createdAt: '2024-01-01T00:00:00.000Z',
           updatedAt: '2024-01-01T00:00:00.000Z',
+          quickAdd: {
+            time: '2024-01-01T18:00:00.000Z',
+            class: 'Open mat',
+            gym: 'North Academy',
+            partners: ['Chris'],
+            rounds: 6,
+            notes: 'old shared'
+          },
+          tags: ['guard-type'],
           sections: { shared: 'old shared', private: 'old private' },
           sessionMetrics: {
             durationMinutes: 60,
@@ -264,6 +297,15 @@ describe('updateEntry handler', () => {
           athleteId: 'athlete-1',
           createdAt: '2024-01-01T00:00:00.000Z',
           updatedAt: '2024-01-01T00:00:00.000Z',
+          quickAdd: {
+            time: '2024-01-01T18:00:00.000Z',
+            class: 'Open mat',
+            gym: 'North Academy',
+            partners: ['Chris'],
+            rounds: 6,
+            notes: 'old shared'
+          },
+          tags: ['guard-type'],
           sections: { shared: 'old shared', private: 'old private' },
           sessionMetrics: {
             durationMinutes: 60,

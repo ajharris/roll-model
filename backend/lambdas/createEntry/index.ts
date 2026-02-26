@@ -1,54 +1,15 @@
-import type { APIGatewayProxyEvent, APIGatewayProxyHandler } from 'aws-lambda';
+import type { APIGatewayProxyHandler } from 'aws-lambda';
 import { v4 as uuidv4 } from 'uuid';
 
 import { getAuthContext, requireRole } from '../../shared/auth';
 import { batchWriteItems, putItem } from '../../shared/db';
 import { sanitizeMediaAttachments, withCurrentEntrySchemaVersion } from '../../shared/entries';
+import { parseEntryPayload } from '../../shared/entryPayload';
 import { buildKeywordIndexItems, extractEntryTokens } from '../../shared/keywords';
 import { withRequestLogging } from '../../shared/logger';
-import { ApiError, errorResponse, response } from '../../shared/responses';
+import { errorResponse, response } from '../../shared/responses';
 import { sanitizeTechniqueMentions, upsertTechniqueCandidates } from '../../shared/techniques';
 import type { CreateEntryRequest, Entry } from '../../shared/types';
-
-const parseBody = (event: APIGatewayProxyEvent): CreateEntryRequest => {
-  if (!event.body) {
-    throw new ApiError({
-      code: 'INVALID_REQUEST',
-      message: 'Request body is required.',
-      statusCode: 400
-    });
-  }
-
-  const parsed = JSON.parse(event.body) as Partial<CreateEntryRequest>;
-  const mediaAttachmentsValid =
-    parsed.mediaAttachments === undefined ||
-    (Array.isArray(parsed.mediaAttachments) &&
-      parsed.mediaAttachments.every((attachment) => typeof attachment === 'object' && attachment !== null));
-
-  if (
-    !parsed.sections ||
-    typeof parsed.sections.private !== 'string' ||
-    typeof parsed.sections.shared !== 'string' ||
-    !parsed.sessionMetrics ||
-    typeof parsed.sessionMetrics.durationMinutes !== 'number' ||
-    typeof parsed.sessionMetrics.intensity !== 'number' ||
-    typeof parsed.sessionMetrics.rounds !== 'number' ||
-    typeof parsed.sessionMetrics.giOrNoGi !== 'string' ||
-    !Array.isArray(parsed.sessionMetrics.tags) ||
-    (parsed.rawTechniqueMentions !== undefined &&
-      (!Array.isArray(parsed.rawTechniqueMentions) ||
-        parsed.rawTechniqueMentions.some((mention) => typeof mention !== 'string'))) ||
-    !mediaAttachmentsValid
-  ) {
-    throw new ApiError({
-      code: 'INVALID_REQUEST',
-      message: 'Entry payload is invalid.',
-      statusCode: 400
-    });
-  }
-
-  return parsed as CreateEntryRequest;
-};
 
 export const buildEntry = (
   athleteId: string,
@@ -61,6 +22,9 @@ export const buildEntry = (
     athleteId,
     createdAt: nowIso,
     updatedAt: nowIso,
+    quickAdd: input.quickAdd,
+    structured: input.structured,
+    tags: input.tags,
     sections: input.sections,
     sessionMetrics: input.sessionMetrics,
     rawTechniqueMentions: sanitizeTechniqueMentions(input.rawTechniqueMentions),
@@ -72,7 +36,7 @@ const baseHandler: APIGatewayProxyHandler = async (event) => {
     const auth = getAuthContext(event);
     requireRole(auth, ['athlete']);
 
-    const payload = parseBody(event);
+    const payload = parseEntryPayload(event);
     const nowIso = new Date().toISOString();
     const entry = buildEntry(auth.userId, payload, nowIso);
 

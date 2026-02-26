@@ -7,6 +7,15 @@ describe('entry schema versioning', () => {
       athleteId: 'athlete-1',
       createdAt: '2024-01-01T00:00:00.000Z',
       updatedAt: '2024-01-01T00:00:00.000Z',
+      quickAdd: {
+        time: '2024-01-01T18:00:00.000Z',
+        class: 'Open mat',
+        gym: 'North Academy',
+        partners: ['Alex'],
+        rounds: 6,
+        notes: 'shared'
+      },
+      tags: ['guard-type'],
       sections: { shared: 'shared', private: 'private' },
       sessionMetrics: {
         durationMinutes: 60,
@@ -40,6 +49,8 @@ describe('entry schema versioning', () => {
 
     expect(entry.schemaVersion).toBe(CURRENT_ENTRY_SCHEMA_VERSION);
     expect(entry.rawTechniqueMentions).toEqual([]);
+    expect(entry.quickAdd.notes).toBe('shared');
+    expect(entry.tags).toEqual([]);
   });
 
   it('parses and migrates stored entry records', () => {
@@ -51,6 +62,15 @@ describe('entry schema versioning', () => {
       athleteId: 'athlete-1',
       createdAt: '2024-01-01T00:00:00.000Z',
       updatedAt: '2024-01-01T00:00:00.000Z',
+      quickAdd: {
+        time: '2024-01-01T18:00:00.000Z',
+        class: 'Open mat',
+        gym: 'North Academy',
+        partners: ['Alex'],
+        rounds: 6,
+        notes: 'shared'
+      },
+      tags: ['guard-type'],
       sections: { shared: 'shared', private: 'private' },
       sessionMetrics: {
         durationMinutes: 60,

@@ -47,6 +47,15 @@ describe('getEntry handler', () => {
           athleteId: 'athlete-1',
           createdAt: '2024-01-01T00:00:00.000Z',
           updatedAt: '2024-01-01T00:00:00.000Z',
+          quickAdd: {
+            time: '2024-01-01T18:00:00.000Z',
+            class: 'Open mat',
+            gym: 'North Academy',
+            partners: ['Alex'],
+            rounds: 5,
+            notes: 'shared'
+          },
+          tags: ['guard-type'],
           sections: { shared: 'shared', private: 'private' },
           sessionMetrics: {
             durationMinutes: 60,
@@ -62,8 +71,9 @@ describe('getEntry handler', () => {
     const result = (await handler(buildEvent('athlete'), {} as never, () => undefined)) as APIGatewayProxyResult;
 
     expect(result.statusCode).toBe(200);
-    const body = JSON.parse(result.body) as { entry: { entryId: string } };
+    const body = JSON.parse(result.body) as { entry: { entryId: string; tags: string[] } };
     expect(body.entry.entryId).toBe('entry-1');
+    expect(body.entry.tags).toEqual(['guard-type']);
   });
 
   it('migrates legacy entries without schemaVersion on read', async () => {
