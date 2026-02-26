@@ -20,7 +20,7 @@ const mockExtractEntryTokens = jest.mocked(extractEntryTokens);
 const mockBuildKeywordIndexItems = jest.mocked(buildKeywordIndexItems);
 const mockUpsertTechniqueCandidates = jest.mocked(upsertTechniqueCandidates);
 
-const buildEvent = (role: 'athlete' | 'coach'): APIGatewayProxyEvent =>
+const buildEvent = (role: 'athlete' | 'coach', bodyOverride?: Record<string, unknown>): APIGatewayProxyEvent =>
   ({
     body: JSON.stringify({
       sections: { private: 'private notes', shared: 'shared notes' },
@@ -31,7 +31,8 @@ const buildEvent = (role: 'athlete' | 'coach'): APIGatewayProxyEvent =>
         giOrNoGi: 'gi',
         tags: ['guard']
       },
-      rawTechniqueMentions: ['Knee Slice']
+      rawTechniqueMentions: ['Knee Slice'],
+      ...bodyOverride
     }),
     requestContext: {
       authorizer: {
@@ -90,6 +91,26 @@ describe('createEntry handler auth', () => {
       { visibilityScope: 'private' }
     );
     expect(mockBatchWriteItems).toHaveBeenCalledWith([{ id: 'shared' }, { id: 'private' }]);
+  });
+
+  it('rejects invalid media url and timestamp payloads', async () => {
+    const result = (await handler(
+      buildEvent('athlete', {
+        mediaAttachments: [
+          {
+            mediaId: 'media-1',
+            title: 'Round 1',
+            url: 'not-a-url',
+            clipNotes: [{ clipId: 'clip-1', timestamp: '32', text: 'Late frame' }]
+          }
+        ]
+      }),
+      {} as never,
+      () => undefined
+    )) as APIGatewayProxyResult;
+
+    expect(result.statusCode).toBe(400);
+    expect(mockPutItem).not.toHaveBeenCalled();
   });
 
   it('rejects coach tokens', async () => {

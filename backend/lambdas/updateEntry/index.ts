@@ -3,7 +3,12 @@ import type { APIGatewayProxyEvent, APIGatewayProxyHandler } from 'aws-lambda';
 
 import { getAuthContext, requireRole } from '../../shared/auth';
 import { batchWriteItems, deleteItem, getItem, putItem } from '../../shared/db';
-import { parseEntryRecord, sanitizeMediaAttachments, withCurrentEntrySchemaVersion } from '../../shared/entries';
+import {
+  isValidMediaAttachmentsInput,
+  parseEntryRecord,
+  sanitizeMediaAttachments,
+  withCurrentEntrySchemaVersion
+} from '../../shared/entries';
 import { buildKeywordIndexItems, extractEntryTokens } from '../../shared/keywords';
 import { withRequestLogging } from '../../shared/logger';
 import { ApiError, errorResponse, response } from '../../shared/responses';
@@ -20,10 +25,7 @@ const parseBody = (event: APIGatewayProxyEvent): CreateEntryRequest => {
   }
 
   const parsed = JSON.parse(event.body) as Partial<CreateEntryRequest>;
-  const mediaAttachmentsValid =
-    parsed.mediaAttachments === undefined ||
-    (Array.isArray(parsed.mediaAttachments) &&
-      parsed.mediaAttachments.every((attachment) => typeof attachment === 'object' && attachment !== null));
+  const mediaAttachmentsValid = isValidMediaAttachmentsInput(parsed.mediaAttachments);
 
   if (
     !parsed.sections ||

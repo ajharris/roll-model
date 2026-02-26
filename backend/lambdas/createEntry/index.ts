@@ -3,7 +3,11 @@ import { v4 as uuidv4 } from 'uuid';
 
 import { getAuthContext, requireRole } from '../../shared/auth';
 import { batchWriteItems, putItem } from '../../shared/db';
-import { sanitizeMediaAttachments, withCurrentEntrySchemaVersion } from '../../shared/entries';
+import {
+  isValidMediaAttachmentsInput,
+  sanitizeMediaAttachments,
+  withCurrentEntrySchemaVersion
+} from '../../shared/entries';
 import { buildKeywordIndexItems, extractEntryTokens } from '../../shared/keywords';
 import { withRequestLogging } from '../../shared/logger';
 import { ApiError, errorResponse, response } from '../../shared/responses';
@@ -20,10 +24,7 @@ const parseBody = (event: APIGatewayProxyEvent): CreateEntryRequest => {
   }
 
   const parsed = JSON.parse(event.body) as Partial<CreateEntryRequest>;
-  const mediaAttachmentsValid =
-    parsed.mediaAttachments === undefined ||
-    (Array.isArray(parsed.mediaAttachments) &&
-      parsed.mediaAttachments.every((attachment) => typeof attachment === 'object' && attachment !== null));
+  const mediaAttachmentsValid = isValidMediaAttachmentsInput(parsed.mediaAttachments);
 
   if (
     !parsed.sections ||
