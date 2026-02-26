@@ -3,21 +3,11 @@
 import { useState } from 'react';
 
 import { Protected } from '@/components/Protected';
-import { apiClient } from '@/lib/apiClient';
+import { ApiError, apiClient } from '@/lib/apiClient';
 import {
   buildLocalJournalBackup,
   restoreLocalJournalBackup,
 } from '@/lib/journalLocal';
-import type { Entry } from '@/types/api';
-
-type ExportPayload = {
-  full?: {
-    entries?: Entry[];
-  };
-  tidy?: {
-    entries?: Entry[];
-  };
-};
 
 const downloadJson = (filenamePrefix: string, data: unknown) => {
   const json = JSON.stringify(data, null, 2);
@@ -31,30 +21,56 @@ const downloadJson = (filenamePrefix: string, data: unknown) => {
   return json;
 };
 
-const readJsonFile = async (file: File): Promise<unknown> => JSON.parse(await file.text()) as unknown;
-
-const extractEntriesFromExport = (payload: unknown): Entry[] => {
-  const candidate = (payload ?? {}) as ExportPayload;
-  if (Array.isArray(candidate.full?.entries)) return candidate.full.entries;
-  if (Array.isArray(candidate.tidy?.entries)) return candidate.tidy.entries;
-  return [];
+const downloadTextFile = (filename: string, content: string, mimeType: string) => {
+  const blob = new Blob([content], { type: mimeType });
+  const href = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = href;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(href);
 };
+
+const readJsonFile = async (file: File): Promise<unknown> => JSON.parse(await file.text()) as unknown;
 
 export default function ExportPage() {
   const [preview, setPreview] = useState('');
   const [status, setStatus] = useState('');
+  const [busy, setBusy] = useState(false);
   const [restoreFile, setRestoreFile] = useState<File | null>(null);
   const [localRestoreFile, setLocalRestoreFile] = useState<File | null>(null);
 
-  const onExport = async () => {
+  const onExportJson = async () => {
     setStatus('Preparing export...');
+    setBusy(true);
     try {
       const data = await apiClient.exportData();
       const json = downloadJson('roll-model-export', data);
       setPreview(json.slice(0, 2000));
-      setStatus('Export downloaded.');
-    } catch {
-      setStatus('Export failed.');
+      setStatus('JSON export downloaded.');
+    } catch (error) {
+      setStatus(error instanceof ApiError ? `Export failed: ${error.message}` : 'Export failed.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const onExportCsv = async () => {
+    setStatus('Preparing CSV export...');
+    setBusy(true);
+    try {
+      const csv = await apiClient.exportEntriesCsv();
+      downloadTextFile(
+        `roll-model-entries-${new Date().toISOString()}.csv`,
+        csv,
+        'text/csv;charset=utf-8',
+      );
+      setPreview(csv.slice(0, 2000));
+      setStatus('CSV export downloaded.');
+    } catch (error) {
+      setStatus(error instanceof ApiError ? `CSV export failed: ${error.message}` : 'CSV export failed.');
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -70,31 +86,19 @@ export default function ExportPage() {
       setStatus('Choose an export file first.');
       return;
     }
-    setStatus('Reading export file...');
+    setStatus('Uploading backup for restore...');
+    setBusy(true);
     try {
       const json = await readJsonFile(restoreFile);
-      const entries = extractEntriesFromExport(json);
-      if (entries.length === 0) {
-        setStatus('No entries found in export.');
-        return;
-      }
-
-      let restored = 0;
-      for (const entry of entries) {
-        await apiClient.createEntry({
-          sections: {
-            shared: entry.sections.shared,
-            private: entry.sections.private ?? '',
-          },
-          sessionMetrics: entry.sessionMetrics,
-          rawTechniqueMentions: entry.rawTechniqueMentions ?? [],
-          mediaAttachments: entry.mediaAttachments ?? [],
-        });
-        restored += 1;
-      }
-      setStatus(`Restored ${restored} entries from export (entries only).`);
-    } catch {
-      setStatus('Restore failed. Check file format and try again.');
+      const result = await apiClient.restoreData(json);
+      setPreview(JSON.stringify(json, null, 2).slice(0, 2000));
+      setStatus(
+        `Restore complete: ${result.counts.entries} entries, ${result.counts.comments} comments, ${result.counts.links} links, ${result.counts.aiThreads} AI threads, ${result.counts.aiMessages} AI messages.`,
+      );
+    } catch (error) {
+      setStatus(error instanceof ApiError ? `Restore failed: ${error.message}` : 'Restore failed. Check file format and try again.');
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -104,6 +108,7 @@ export default function ExportPage() {
       return;
     }
     setStatus('Restoring local backup...');
+    setBusy(true);
     try {
       const json = await readJsonFile(localRestoreFile);
       const result = restoreLocalJournalBackup(json);
@@ -112,6 +117,8 @@ export default function ExportPage() {
       );
     } catch {
       setStatus('Local restore failed.');
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -119,18 +126,28 @@ export default function ExportPage() {
     <Protected allow={['athlete']}>
       <section>
         <h2>Export</h2>
-        <p className="small">Use server export for data portability. Local backup captures drafts/saved searches/offline queue.</p>
+        <p className="small">
+          Use server export for data portability. Local backup captures drafts/saved
+          searches/offline queue.
+        </p>
 
         <div className="panel">
           <h3>Export / backup</h3>
           <div className="row">
-            <button onClick={onExport}>Download JSON export</button>
-            <button onClick={onLocalBackup}>Download local backup</button>
+            <button onClick={onExportJson} disabled={busy}>
+              Download JSON export
+            </button>
+            <button onClick={onExportCsv} disabled={busy}>
+              Download CSV entries
+            </button>
+            <button onClick={onLocalBackup} disabled={busy}>
+              Download local backup
+            </button>
           </div>
         </div>
 
         <div className="panel">
-          <h3>Restore from export (entries)</h3>
+          <h3>Restore server backup</h3>
           <label htmlFor="restore-export-file">Export JSON file</label>
           <input
             id="restore-export-file"
@@ -139,10 +156,12 @@ export default function ExportPage() {
             onChange={(event) => setRestoreFile(event.target.files?.[0] ?? null)}
           />
           <div className="row">
-            <button type="button" onClick={onRestoreEntries}>
-              Restore entries from export
+            <button type="button" onClick={onRestoreEntries} disabled={busy}>
+              Restore backup
             </button>
-            <span className="small">Creates new entries from the exported journal entries.</span>
+            <span className="small">
+              Uploads a JSON backup exported from this app and restores supported data.
+            </span>
           </div>
         </div>
 
@@ -155,7 +174,7 @@ export default function ExportPage() {
             accept="application/json"
             onChange={(event) => setLocalRestoreFile(event.target.files?.[0] ?? null)}
           />
-          <button type="button" onClick={onRestoreLocalBackup}>
+          <button type="button" onClick={onRestoreLocalBackup} disabled={busy}>
             Restore drafts / saved searches / queue
           </button>
         </div>
