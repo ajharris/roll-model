@@ -237,6 +237,15 @@ export const apiClient = {
       body: JSON.stringify(payload),
     }),
   exportData: () => request<unknown>('/export'),
+  exportEntriesCsv: async () => {
+    const response = await sendRequest('/export?format=csv');
+    return response.text();
+  },
+  restoreData: (payload: unknown) =>
+    request<unknown>('/restore', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
   getAthleteEntries: async (athleteId: string, query?: EntrySearchRequest) => {
     const result = await request<unknown>(withQueryString(`/athletes/${athleteId}/entries`, query));
     return asEntryArray(result);
