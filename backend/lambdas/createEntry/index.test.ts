@@ -23,6 +23,19 @@ const mockUpsertTechniqueCandidates = jest.mocked(upsertTechniqueCandidates);
 const buildEvent = (role: 'athlete' | 'coach', bodyOverride?: Record<string, unknown>): APIGatewayProxyEvent =>
   ({
     body: JSON.stringify({
+      quickAdd: {
+        time: '2026-02-26T18:00:00.000Z',
+        class: 'Evening fundamentals',
+        gym: 'North Academy',
+        partners: ['Alex'],
+        rounds: 6,
+        notes: 'shared notes'
+      },
+      structured: {
+        position: 'half guard',
+        technique: 'knee cut'
+      },
+      tags: ['guard-type', 'pass'],
       sections: { private: 'private notes', shared: 'shared notes' },
       sessionMetrics: {
         durationMinutes: 60,
@@ -69,7 +82,11 @@ describe('createEntry handler auth', () => {
       expect.objectContaining({
         Item: expect.objectContaining({
           entityType: 'ENTRY',
-          schemaVersion: CURRENT_ENTRY_SCHEMA_VERSION
+          schemaVersion: CURRENT_ENTRY_SCHEMA_VERSION,
+          quickAdd: expect.objectContaining({
+            class: 'Evening fundamentals'
+          }),
+          tags: ['guard-type', 'pass']
         })
       })
     );
@@ -119,5 +136,34 @@ describe('createEntry handler auth', () => {
     expect(result.statusCode).toBe(403);
     const body = JSON.parse(result.body) as { error: { code: string } };
     expect(body.error.code).toBe('FORBIDDEN');
+  });
+
+  it('rejects malformed payloads with clear validation message', async () => {
+    const event = buildEvent('athlete');
+    event.body = JSON.stringify({
+      quickAdd: {
+        time: '2026-02-26T18:00:00.000Z',
+        class: 'Evening fundamentals',
+        gym: 'North Academy',
+        partners: ['Alex'],
+        rounds: 6,
+        notes: 'shared notes'
+      },
+      tags: ['unknown-tag'],
+      sections: { private: 'private notes', shared: 'shared notes' },
+      sessionMetrics: {
+        durationMinutes: 60,
+        intensity: 7,
+        rounds: 6,
+        giOrNoGi: 'gi',
+        tags: ['guard']
+      }
+    });
+
+    const result = (await handler(event, {} as never, () => undefined)) as APIGatewayProxyResult;
+
+    expect(result.statusCode).toBe(400);
+    const body = JSON.parse(result.body) as { error: { message: string } };
+    expect(body.error.message).toContain('tags contains unsupported value');
   });
 });

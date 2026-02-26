@@ -50,6 +50,15 @@ describe('getEntries handler auth', () => {
           athleteId: 'athlete-1',
           createdAt: '2024-01-01T00:00:00.000Z',
           updatedAt: '2024-01-01T00:00:00.000Z',
+          quickAdd: {
+            time: '2024-01-01T18:00:00.000Z',
+            class: 'Open mat',
+            gym: 'North Academy',
+            partners: ['Alex'],
+            rounds: 6,
+            notes: 'shared notes'
+          },
+          tags: ['guard-type'],
           sections: { shared: 'shared notes', private: 'private notes' },
           sessionMetrics: {
             durationMinutes: 60,
@@ -82,6 +91,15 @@ describe('getEntries handler auth', () => {
           athleteId: 'athlete-1',
           createdAt: '2024-01-01T00:00:00.000Z',
           updatedAt: '2024-01-01T00:00:00.000Z',
+          quickAdd: {
+            time: '2024-01-01T18:00:00.000Z',
+            class: 'Open mat',
+            gym: 'North Academy',
+            partners: ['Alex'],
+            rounds: 6,
+            notes: 'shared notes'
+          },
+          tags: ['guard-type'],
           sections: { shared: 'shared notes', private: 'private notes' },
           sessionMetrics: {
             durationMinutes: 60,

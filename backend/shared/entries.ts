@@ -1,6 +1,6 @@
 import type { Entry, MediaAttachment, MediaClipNote } from './types';
 
-export const CURRENT_ENTRY_SCHEMA_VERSION = 2;
+export const CURRENT_ENTRY_SCHEMA_VERSION = 3;
 
 type EntryRecordEnvelope = {
   PK: string;
@@ -8,13 +8,26 @@ type EntryRecordEnvelope = {
   entityType: string;
 };
 
-type LegacyEntryV0 = Omit<Entry, 'schemaVersion' | 'rawTechniqueMentions'> & {
+type LegacyEntryV0 = Omit<Entry, 'schemaVersion' | 'rawTechniqueMentions' | 'quickAdd' | 'structured' | 'tags'> & {
+  quickAdd?: unknown;
+  structured?: unknown;
+  tags?: unknown;
   rawTechniqueMentions?: unknown;
   mediaAttachments?: unknown;
   schemaVersion?: undefined;
 };
 
+type EntryV2 = Omit<Entry, 'rawTechniqueMentions' | 'quickAdd' | 'structured' | 'tags'> & {
+  schemaVersion: 2;
+  quickAdd?: unknown;
+  structured?: unknown;
+  tags?: unknown;
+  rawTechniqueMentions?: unknown;
+  mediaAttachments?: unknown;
+};
+
 type VersionedEntryInput = Omit<Entry, 'rawTechniqueMentions'> & {
+  schemaVersion: number;
   rawTechniqueMentions?: unknown;
   mediaAttachments?: unknown;
 };
@@ -153,6 +166,9 @@ export const sanitizeMediaAttachments = (value: unknown): MediaAttachment[] => {
 const migrateLegacyEntryV0 = (legacy: LegacyEntryV0): Entry => ({
   ...legacy,
   schemaVersion: CURRENT_ENTRY_SCHEMA_VERSION,
+  quickAdd: sanitizeQuickAdd((legacy as Record<string, unknown>).quickAdd, legacy as unknown as Record<string, unknown>),
+  structured: sanitizeStructuredFields((legacy as Record<string, unknown>).structured),
+  tags: sanitizeEntryTags((legacy as Record<string, unknown>).tags, legacy.sessionMetrics?.tags),
   rawTechniqueMentions: sanitizeRawTechniqueMentions(legacy.rawTechniqueMentions),
   mediaAttachments: sanitizeMediaAttachments(legacy.mediaAttachments)
 });
@@ -165,17 +181,22 @@ export const withCurrentEntrySchemaVersion = (
 });
 
 export const normalizeEntry = (entry: NormalizableEntryInput): Entry => {
-  if (entry.schemaVersion === undefined) {
+  const schemaVersion = (entry as { schemaVersion?: number }).schemaVersion;
+
+  if (schemaVersion === undefined) {
     return migrateLegacyEntryV0(entry as LegacyEntryV0);
   }
 
-  if (entry.schemaVersion !== CURRENT_ENTRY_SCHEMA_VERSION) {
-    throw new Error(`Unsupported entry schema version: ${String(entry.schemaVersion)}`);
+  if (schemaVersion !== 2 && schemaVersion !== CURRENT_ENTRY_SCHEMA_VERSION) {
+    throw new Error(`Unsupported entry schema version: ${String(schemaVersion)}`);
   }
 
   return {
     ...entry,
     schemaVersion: CURRENT_ENTRY_SCHEMA_VERSION,
+    quickAdd: sanitizeQuickAdd((entry as Record<string, unknown>).quickAdd, entry as unknown as Record<string, unknown>),
+    structured: sanitizeStructuredFields((entry as Record<string, unknown>).structured),
+    tags: sanitizeEntryTags((entry as Record<string, unknown>).tags, entry.sessionMetrics?.tags),
     rawTechniqueMentions: sanitizeRawTechniqueMentions(entry.rawTechniqueMentions),
     mediaAttachments: sanitizeMediaAttachments(entry.mediaAttachments)
   };
