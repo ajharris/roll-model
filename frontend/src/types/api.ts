@@ -53,24 +53,33 @@ export interface EntryCreatePayload {
   mediaAttachments?: MediaAttachment[];
 }
 
-export interface ExportBackupResponse {
-  schemaVersion: string;
-  generatedAt: string;
-  full?: unknown;
-  tidy?: unknown;
+export type EntrySearchSortBy = 'createdAt' | 'intensity';
+export type EntrySearchSortDirection = 'asc' | 'desc';
+
+export interface EntrySearchRequest {
+  query?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  position?: string;
+  partner?: string;
+  technique?: string;
+  outcome?: string;
+  classType?: string;
+  tag?: string;
+  giOrNoGi?: '' | 'gi' | 'no-gi';
+  minIntensity?: string;
+  maxIntensity?: string;
+  sortBy?: EntrySearchSortBy;
+  sortDirection?: EntrySearchSortDirection;
+  limit?: string;
 }
 
-export interface RestoreDataResponse {
-  restored: boolean;
-  athleteId: string;
-  counts: {
-    entries: number;
-    comments: number;
-    links: number;
-    aiThreads: number;
-    aiMessages: number;
-    itemsWritten: number;
-  };
+export interface EntrySearchMeta {
+  queryApplied: boolean;
+  scannedCount: number;
+  matchedCount: number;
+  latencyMs: number;
+  latencyTargetMs: number;
 }
 
 export interface ChatMessage {
@@ -104,8 +113,34 @@ export interface SignupRequestPayload {
   intendedRole?: string;
 }
 
-export type SavedEntrySearchSortBy = 'createdAt' | 'intensity';
-export type SavedEntrySearchSortDirection = 'asc' | 'desc';
+export interface RestoreDataPayload {
+  schemaVersion: string;
+  generatedAt: string;
+  full: {
+    athleteId: string;
+    entries: unknown[];
+    comments: unknown[];
+    links: unknown[];
+    aiThreads: unknown[];
+    aiMessages: unknown[];
+  };
+}
+
+export interface RestoreDataResult {
+  restored: boolean;
+  athleteId: string;
+  counts: {
+    entries: number;
+    comments: number;
+    links: number;
+    aiThreads: number;
+    aiMessages: number;
+    itemsWritten: number;
+  };
+}
+
+export type SavedEntrySearchSortBy = EntrySearchSortBy;
+export type SavedEntrySearchSortDirection = EntrySearchSortDirection;
 
 export interface SavedEntrySearch {
   id: string;
@@ -116,6 +151,13 @@ export interface SavedEntrySearch {
   giOrNoGi: '' | 'gi' | 'no-gi';
   minIntensity: string;
   maxIntensity: string;
+  dateFrom?: string;
+  dateTo?: string;
+  position?: string;
+  partner?: string;
+  technique?: string;
+  outcome?: string;
+  classType?: string;
   sortBy: SavedEntrySearchSortBy;
   sortDirection: SavedEntrySearchSortDirection;
   isPinned?: boolean;
@@ -131,6 +173,13 @@ export interface SavedEntrySearchUpsertPayload {
   giOrNoGi: '' | 'gi' | 'no-gi';
   minIntensity: string;
   maxIntensity: string;
+  dateFrom?: string;
+  dateTo?: string;
+  position?: string;
+  partner?: string;
+  technique?: string;
+  outcome?: string;
+  classType?: string;
   sortBy: SavedEntrySearchSortBy;
   sortDirection: SavedEntrySearchSortDirection;
   isPinned?: boolean;

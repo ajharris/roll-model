@@ -10,6 +10,12 @@ type SavedSearchRecordEnvelope = {
 };
 
 const asString = (value: unknown): string | null => (typeof value === 'string' ? value : null);
+const optionalString = (value: unknown): string | undefined => {
+  const parsed = asString(value);
+  if (parsed === null) return undefined;
+  const trimmed = parsed.trim();
+  return trimmed ? trimmed : undefined;
+};
 
 const normalizeGiOrNoGi = (value: unknown): '' | 'gi' | 'no-gi' => {
   if (value === 'gi' || value === 'no-gi') return value;
@@ -83,6 +89,13 @@ export const parseUpsertSavedEntrySearchRequest = (
     giOrNoGi: normalizeGiOrNoGi(parsed.giOrNoGi),
     minIntensity,
     maxIntensity,
+    ...(optionalString(parsed.dateFrom) ? { dateFrom: optionalString(parsed.dateFrom) } : {}),
+    ...(optionalString(parsed.dateTo) ? { dateTo: optionalString(parsed.dateTo) } : {}),
+    ...(optionalString(parsed.position) ? { position: optionalString(parsed.position) } : {}),
+    ...(optionalString(parsed.partner) ? { partner: optionalString(parsed.partner) } : {}),
+    ...(optionalString(parsed.technique) ? { technique: optionalString(parsed.technique) } : {}),
+    ...(optionalString(parsed.outcome) ? { outcome: optionalString(parsed.outcome) } : {}),
+    ...(optionalString(parsed.classType) ? { classType: optionalString(parsed.classType) } : {}),
     sortBy: normalizeSortBy(parsed.sortBy),
     sortDirection: normalizeSortDirection(parsed.sortDirection),
     ...(typeof parsed.isPinned === 'boolean' ? { isPinned: parsed.isPinned } : {}),
@@ -104,6 +117,13 @@ export const buildSavedEntrySearch = (
   giOrNoGi: payload.giOrNoGi,
   minIntensity: payload.minIntensity,
   maxIntensity: payload.maxIntensity,
+  ...(payload.dateFrom ? { dateFrom: payload.dateFrom } : {}),
+  ...(payload.dateTo ? { dateTo: payload.dateTo } : {}),
+  ...(payload.position ? { position: payload.position } : {}),
+  ...(payload.partner ? { partner: payload.partner } : {}),
+  ...(payload.technique ? { technique: payload.technique } : {}),
+  ...(payload.outcome ? { outcome: payload.outcome } : {}),
+  ...(payload.classType ? { classType: payload.classType } : {}),
   sortBy: payload.sortBy,
   sortDirection: payload.sortDirection,
   ...(payload.isPinned !== undefined ? { isPinned: payload.isPinned } : {}),
@@ -126,6 +146,13 @@ export const parseSavedEntrySearchRecord = (item: Record<string, unknown>): Save
   const tag = asString(rest.tag) ?? '';
   const minIntensity = asString(rest.minIntensity) ?? '';
   const maxIntensity = asString(rest.maxIntensity) ?? '';
+  const dateFrom = optionalString(rest.dateFrom);
+  const dateTo = optionalString(rest.dateTo);
+  const position = optionalString(rest.position);
+  const partner = optionalString(rest.partner);
+  const technique = optionalString(rest.technique);
+  const outcome = optionalString(rest.outcome);
+  const classType = optionalString(rest.classType);
   const createdAt = asString(rest.createdAt)?.trim() ?? '';
   const updatedAt = asString(rest.updatedAt)?.trim() ?? '';
 
@@ -142,6 +169,13 @@ export const parseSavedEntrySearchRecord = (item: Record<string, unknown>): Save
     giOrNoGi: normalizeGiOrNoGi(rest.giOrNoGi),
     minIntensity,
     maxIntensity,
+    ...(dateFrom ? { dateFrom } : {}),
+    ...(dateTo ? { dateTo } : {}),
+    ...(position ? { position } : {}),
+    ...(partner ? { partner } : {}),
+    ...(technique ? { technique } : {}),
+    ...(outcome ? { outcome } : {}),
+    ...(classType ? { classType } : {}),
     sortBy: normalizeSortBy(rest.sortBy),
     sortDirection: normalizeSortDirection(rest.sortDirection),
     ...(typeof rest.isPinned === 'boolean' ? { isPinned: rest.isPinned } : {}),

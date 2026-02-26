@@ -14,9 +14,11 @@ const buildEvent = (
   role: 'athlete' | 'coach',
   athleteId?: string,
   claimsOverride?: Record<string, string>,
+  queryStringParameters?: Record<string, string>,
 ): APIGatewayProxyEvent =>
   ({
     pathParameters: athleteId ? { athleteId } : undefined,
+    queryStringParameters,
     requestContext: {
       authorizer: {
         claims: {
@@ -124,5 +126,164 @@ describe('getEntries handler auth', () => {
     expect(result.statusCode).toBe(403);
     const body = JSON.parse(result.body) as { error: { code: string } };
     expect(body.error.code).toBe('FORBIDDEN');
+  });
+
+  it('applies combined text and journaling filters with relevance ranking', async () => {
+    mockQueryItems.mockResolvedValueOnce({
+      Items: [
+        {
+          PK: 'USER#athlete-1',
+          SK: 'ENTRY#2026-02-24',
+          entityType: 'ENTRY',
+          entryId: 'entry-1',
+          athleteId: 'athlete-1',
+          createdAt: '2026-02-24T10:00:00.000Z',
+          updatedAt: '2026-02-24T10:00:00.000Z',
+          schemaVersion: 2,
+          sections: {
+            shared: 'Open mat with Alex. Knee shield guard retention from half guard worked. Won two rounds by sweep.',
+            private: 'Partner Alex gave strong pressure. Class type open mat.',
+          },
+          sessionMetrics: {
+            durationMinutes: 75,
+            intensity: 7,
+            rounds: 6,
+            giOrNoGi: 'no-gi',
+            tags: ['open-mat', 'guard'],
+          },
+          rawTechniqueMentions: ['knee shield', 'hip heist sweep'],
+        },
+        {
+          PK: 'USER#athlete-1',
+          SK: 'ENTRY#2026-02-23',
+          entityType: 'ENTRY',
+          entryId: 'entry-2',
+          athleteId: 'athlete-1',
+          createdAt: '2026-02-23T10:00:00.000Z',
+          updatedAt: '2026-02-23T10:00:00.000Z',
+          schemaVersion: 2,
+          sections: {
+            shared: 'Competition class with Alex. Guard passing rounds. Lost on points.',
+            private: 'Outcome was rough but passing timing improved.',
+          },
+          sessionMetrics: {
+            durationMinutes: 60,
+            intensity: 8,
+            rounds: 5,
+            giOrNoGi: 'no-gi',
+            tags: ['competition', 'passing'],
+          },
+          rawTechniqueMentions: ['knee slice'],
+        },
+        {
+          PK: 'USER#athlete-1',
+          SK: 'ENTRY#2026-02-22',
+          entityType: 'ENTRY',
+          entryId: 'entry-3',
+          athleteId: 'athlete-1',
+          createdAt: '2026-02-22T10:00:00.000Z',
+          updatedAt: '2026-02-22T10:00:00.000Z',
+          schemaVersion: 2,
+          sections: {
+            shared: 'Open mat with Alex. Knee shield guard retention and knee shield guard drills from half guard.',
+            private: 'Won by sweep, then another sweep. Outcome win.',
+          },
+          sessionMetrics: {
+            durationMinutes: 80,
+            intensity: 7,
+            rounds: 7,
+            giOrNoGi: 'no-gi',
+            tags: ['open-mat', 'guard'],
+          },
+          rawTechniqueMentions: ['knee shield', 'knee shield', 'sit-up sweep'],
+        },
+      ]
+    } as unknown as QueryCommandOutput);
+
+    const result = (await handler(
+      buildEvent('athlete', undefined, undefined, {
+        q: 'knee shield guard',
+        dateFrom: '2026-02-22T00:00:00.000Z',
+        dateTo: '2026-02-25T00:00:00.000Z',
+        partner: 'alex',
+        technique: 'knee shield',
+        outcome: 'sweep',
+        classType: 'open mat',
+        giOrNoGi: 'no-gi',
+        minIntensity: '6',
+        maxIntensity: '8',
+        sortBy: 'createdAt',
+        sortDirection: 'desc',
+      }),
+      {} as never,
+      () => undefined,
+    )) as APIGatewayProxyResult;
+
+    expect(result.statusCode).toBe(200);
+    const body = JSON.parse(result.body) as {
+      entries: Array<{ entryId: string }>;
+      search: { queryApplied: boolean; scannedCount: number; matchedCount: number; latencyMs: number; latencyTargetMs: number };
+    };
+
+    expect(body.entries.map((entry) => entry.entryId)).toEqual(['entry-3', 'entry-1']);
+    expect(body.search.queryApplied).toBe(true);
+    expect(body.search.scannedCount).toBe(3);
+    expect(body.search.matchedCount).toBe(2);
+    expect(body.search.latencyTargetMs).toBeGreaterThan(0);
+    expect(body.search.latencyMs).toBeGreaterThanOrEqual(0);
+  });
+
+  it('returns search latency metadata within the defined target for a realistic in-memory dataset', async () => {
+    const now = '2026-02-26T12:00:00.000Z';
+    mockQueryItems.mockResolvedValueOnce({
+      Items: Array.from({ length: 1000 }, (_, index) => ({
+        PK: 'USER#athlete-1',
+        SK: `ENTRY#${index.toString().padStart(4, '0')}`,
+        entityType: 'ENTRY',
+        entryId: `entry-${index}`,
+        athleteId: 'athlete-1',
+        createdAt: now,
+        updatedAt: now,
+        schemaVersion: 2,
+        sections: {
+          shared:
+            index % 10 === 0
+              ? `Open mat with partner ${index}. Knee shield guard retention win by sweep.`
+              : `General notes ${index} on passing and escapes.`,
+          private: `Private note ${index}`,
+        },
+        sessionMetrics: {
+          durationMinutes: 60,
+          intensity: (index % 10) + 1,
+          rounds: 5,
+          giOrNoGi: index % 2 === 0 ? 'gi' : 'no-gi',
+          tags: index % 10 === 0 ? ['open-mat', 'guard'] : ['class'],
+        },
+        rawTechniqueMentions: index % 10 === 0 ? ['knee shield'] : ['knee slice'],
+      })),
+    } as unknown as QueryCommandOutput);
+
+    const result = (await handler(
+      buildEvent('athlete', undefined, undefined, {
+        q: 'knee shield guard',
+        partner: 'partner',
+        outcome: 'win',
+        classType: 'open mat',
+      }),
+      {} as never,
+      () => undefined,
+    )) as APIGatewayProxyResult;
+
+    expect(result.statusCode).toBe(200);
+    const body = JSON.parse(result.body) as {
+      search: { latencyMs: number; latencyTargetMs: number; scannedCount: number; matchedCount: number };
+      entries: Array<{ entryId: string }>;
+    };
+
+    expect(body.search.scannedCount).toBe(1000);
+    expect(body.search.matchedCount).toBe(100);
+    expect(body.entries.length).toBe(100);
+    expect(body.search.latencyTargetMs).toBe(75);
+    expect(body.search.latencyMs).toBeLessThan(500);
   });
 });

@@ -70,6 +70,35 @@ export interface CreateEntryRequest {
 
 export type UpdateEntryRequest = CreateEntryRequest;
 
+export type EntrySearchSortBy = 'createdAt' | 'intensity';
+export type EntrySearchSortDirection = 'asc' | 'desc';
+
+export interface EntrySearchRequest {
+  query?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  position?: string;
+  partner?: string;
+  technique?: string;
+  outcome?: string;
+  classType?: string;
+  tag?: string;
+  giOrNoGi?: '' | 'gi' | 'no-gi';
+  minIntensity?: string;
+  maxIntensity?: string;
+  sortBy?: EntrySearchSortBy;
+  sortDirection?: EntrySearchSortDirection;
+  limit?: string;
+}
+
+export interface EntrySearchMeta {
+  queryApplied: boolean;
+  scannedCount: number;
+  matchedCount: number;
+  latencyMs: number;
+  latencyTargetMs: number;
+}
+
 export interface TechniqueCandidate {
   phrase: string;
   normalizedPhrase: string;
@@ -146,6 +175,13 @@ export interface SavedEntrySearch {
   giOrNoGi: GiOrNoGiFilter;
   minIntensity: string;
   maxIntensity: string;
+  dateFrom?: string;
+  dateTo?: string;
+  position?: string;
+  partner?: string;
+  technique?: string;
+  outcome?: string;
+  classType?: string;
   sortBy: SavedEntrySearchSortBy;
   sortDirection: SavedEntrySearchSortDirection;
   isPinned?: boolean;
@@ -161,6 +197,13 @@ export interface UpsertSavedEntrySearchRequest {
   giOrNoGi: GiOrNoGiFilter;
   minIntensity: string;
   maxIntensity: string;
+  dateFrom?: string;
+  dateTo?: string;
+  position?: string;
+  partner?: string;
+  technique?: string;
+  outcome?: string;
+  classType?: string;
   sortBy: SavedEntrySearchSortBy;
   sortDirection: SavedEntrySearchSortDirection;
   isPinned?: boolean;
