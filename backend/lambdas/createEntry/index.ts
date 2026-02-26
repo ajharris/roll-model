@@ -3,8 +3,8 @@ import { v4 as uuidv4 } from 'uuid';
 
 import { getAuthContext, requireRole } from '../../shared/auth';
 import { batchWriteItems, putItem } from '../../shared/db';
-import { parseEntryPayload } from '../../shared/entryPayload';
 import { sanitizeMediaAttachments, withCurrentEntrySchemaVersion } from '../../shared/entries';
+import { parseEntryPayload } from '../../shared/entryPayload';
 import { buildKeywordIndexItems, extractEntryTokens } from '../../shared/keywords';
 import { withRequestLogging } from '../../shared/logger';
 import { errorResponse, response } from '../../shared/responses';
