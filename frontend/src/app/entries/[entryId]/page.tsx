@@ -3,16 +3,48 @@
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import type { FormEvent } from 'react';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import { ChipInput } from '@/components/ChipInput';
+import { MediaAttachmentsInput } from '@/components/MediaAttachmentsInput';
 import { Protected } from '@/components/Protected';
 import { apiClient } from '@/lib/apiClient';
-import type { Entry } from '@/types/api';
+import { clearEntryDraft, readEntryDraft, writeEntryDraft } from '@/lib/journalLocal';
+import type { Entry, MediaAttachment } from '@/types/api';
+
+type EntryEditDraft = {
+  shared: string;
+  privateText: string;
+  durationMinutes: number;
+  intensity: number;
+  rounds: number;
+  giOrNoGi: 'gi' | 'no-gi';
+  tags: string[];
+  techniques: string[];
+  mediaAttachments: MediaAttachment[];
+};
+
+const sanitizeAttachments = (attachments: MediaAttachment[]): MediaAttachment[] =>
+  attachments
+    .map((attachment) => ({
+      ...attachment,
+      title: attachment.title.trim(),
+      url: attachment.url.trim(),
+      notes: attachment.notes?.trim() ?? '',
+      clipNotes: attachment.clipNotes
+        .map((clip) => ({
+          ...clip,
+          label: clip.label.trim(),
+          note: clip.note.trim(),
+        }))
+        .filter((clip) => clip.label && clip.note),
+    }))
+    .filter((attachment) => attachment.title && attachment.url);
 
 export default function EntryDetailPage() {
   const { entryId } = useParams<{ entryId: string }>();
   const router = useRouter();
+  const draftKey = useMemo(() => `edit.${entryId}`, [entryId]);
   const [entry, setEntry] = useState<Entry | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [shared, setShared] = useState('');
@@ -23,7 +55,9 @@ export default function EntryDetailPage() {
   const [giOrNoGi, setGiOrNoGi] = useState<'gi' | 'no-gi'>('gi');
   const [tags, setTags] = useState<string[]>([]);
   const [techniques, setTechniques] = useState<string[]>([]);
+  const [mediaAttachments, setMediaAttachments] = useState<MediaAttachment[]>([]);
   const [status, setStatus] = useState('');
+  const [draftState, setDraftState] = useState<'idle' | 'saved'>('idle');
   const canEdit = Boolean(entry) && !isLoading;
 
   useEffect(() => {
@@ -36,6 +70,22 @@ export default function EntryDetailPage() {
       .then((loadedEntry) => {
         if (cancelled) return;
         setEntry(loadedEntry);
+
+        const draft = readEntryDraft<EntryEditDraft>(draftKey);
+        if (draft) {
+          setShared(draft.shared ?? loadedEntry.sections.shared);
+          setPrivateText(draft.privateText ?? (loadedEntry.sections.private ?? ''));
+          setDurationMinutes(draft.durationMinutes ?? loadedEntry.sessionMetrics.durationMinutes);
+          setIntensity(draft.intensity ?? loadedEntry.sessionMetrics.intensity);
+          setRounds(draft.rounds ?? loadedEntry.sessionMetrics.rounds);
+          setGiOrNoGi(draft.giOrNoGi ?? loadedEntry.sessionMetrics.giOrNoGi);
+          setTags(draft.tags ?? loadedEntry.sessionMetrics.tags);
+          setTechniques(draft.techniques ?? loadedEntry.rawTechniqueMentions);
+          setMediaAttachments(draft.mediaAttachments ?? (loadedEntry.mediaAttachments ?? []));
+          setStatus('Draft restored.');
+          return;
+        }
+
         setShared(loadedEntry.sections.shared);
         setPrivateText(loadedEntry.sections.private ?? '');
         setDurationMinutes(loadedEntry.sessionMetrics.durationMinutes);
@@ -44,6 +94,7 @@ export default function EntryDetailPage() {
         setGiOrNoGi(loadedEntry.sessionMetrics.giOrNoGi);
         setTags(loadedEntry.sessionMetrics.tags);
         setTechniques(loadedEntry.rawTechniqueMentions);
+        setMediaAttachments(loadedEntry.mediaAttachments ?? []);
       })
       .catch(() => {
         if (!cancelled) {
@@ -60,7 +111,29 @@ export default function EntryDetailPage() {
     return () => {
       cancelled = true;
     };
-  }, [entryId]);
+  }, [draftKey, entryId]);
+
+  useEffect(() => {
+    if (!entry) return;
+
+    const timeout = window.setTimeout(() => {
+      writeEntryDraft(draftKey, {
+        shared,
+        privateText,
+        durationMinutes,
+        intensity,
+        rounds,
+        giOrNoGi,
+        tags,
+        techniques,
+        mediaAttachments,
+      } satisfies EntryEditDraft);
+      setDraftState('saved');
+    }, 350);
+
+    setDraftState('idle');
+    return () => window.clearTimeout(timeout);
+  }, [draftKey, durationMinutes, entry, giOrNoGi, intensity, mediaAttachments, privateText, rounds, shared, tags, techniques]);
 
   const save = async (event: FormEvent) => {
     event.preventDefault();
@@ -75,8 +148,10 @@ export default function EntryDetailPage() {
         sections: { shared, private: privateText },
         sessionMetrics: { durationMinutes, intensity, rounds, giOrNoGi, tags },
         rawTechniqueMentions: techniques,
+        mediaAttachments: sanitizeAttachments(mediaAttachments),
       });
       setEntry(updated);
+      clearEntryDraft(draftKey);
       setStatus('Saved.');
     } catch {
       setStatus('Save failed.');
@@ -98,6 +173,7 @@ export default function EntryDetailPage() {
     setStatus('Deleting...');
     try {
       await apiClient.deleteEntry(entryId);
+      clearEntryDraft(draftKey);
       router.push('/entries');
     } catch {
       setStatus('Delete failed.');
@@ -113,7 +189,11 @@ export default function EntryDetailPage() {
         </p>
         {isLoading && <p>Loading entry...</p>}
         {!isLoading && !entry && <p>{status || 'Entry not found.'}</p>}
-        {entry && <p className="small">Created: {new Date(entry.createdAt).toLocaleString()}</p>}
+        {entry && (
+          <p className="small">
+            Created: {new Date(entry.createdAt).toLocaleString()} • Draft: {draftState === 'saved' ? 'autosaved' : 'editing'}
+          </p>
+        )}
         <form onSubmit={save}>
           <label htmlFor="shared-notes">Shared notes</label>
           <textarea
@@ -179,6 +259,7 @@ export default function EntryDetailPage() {
           </div>
           <ChipInput label="Tags" values={tags} onChange={setTags} />
           <ChipInput label="Technique mentions" values={techniques} onChange={setTechniques} />
+          <MediaAttachmentsInput value={mediaAttachments} onChange={setMediaAttachments} disabled={!canEdit} />
           <div className="grid">
             <button type="submit" disabled={!canEdit}>
               Update entry

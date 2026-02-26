@@ -5,6 +5,22 @@ export interface EntrySections {
   shared: string;
 }
 
+export interface MediaClipNote {
+  clipId: string;
+  label: string;
+  note: string;
+  startSeconds?: number;
+  endSeconds?: number;
+}
+
+export interface MediaAttachment {
+  mediaId: string;
+  title: string;
+  url: string;
+  notes?: string;
+  clipNotes: MediaClipNote[];
+}
+
 export interface SessionMetrics {
   durationMinutes: number;
   intensity: number;
@@ -17,9 +33,12 @@ export interface Entry {
   entryId: string;
   athleteId: string;
   createdAt: string;
+  updatedAt?: string;
+  schemaVersion?: number;
   sections: EntrySections;
   sessionMetrics: SessionMetrics;
   rawTechniqueMentions: string[];
+  mediaAttachments?: MediaAttachment[];
 }
 
 export interface CommentPayload {
@@ -31,6 +50,7 @@ export interface EntryCreatePayload {
   sections: EntrySections;
   sessionMetrics: SessionMetrics;
   rawTechniqueMentions: string[];
+  mediaAttachments?: MediaAttachment[];
 }
 
 export interface ChatMessage {

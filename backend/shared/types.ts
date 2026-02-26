@@ -13,6 +13,22 @@ export interface EntrySections {
   shared: string;
 }
 
+export interface MediaClipNote {
+  clipId: string;
+  label: string;
+  note: string;
+  startSeconds?: number;
+  endSeconds?: number;
+}
+
+export interface MediaAttachment {
+  mediaId: string;
+  title: string;
+  url: string;
+  notes?: string;
+  clipNotes: MediaClipNote[];
+}
+
 export interface Entry {
   entryId: string;
   athleteId: string;
@@ -22,6 +38,7 @@ export interface Entry {
   sections: EntrySections;
   sessionMetrics: SessionMetrics;
   rawTechniqueMentions: string[];
+  mediaAttachments?: MediaAttachment[];
 }
 
 export interface Comment {
@@ -48,6 +65,7 @@ export interface CreateEntryRequest {
   sections: EntrySections;
   sessionMetrics: SessionMetrics;
   rawTechniqueMentions?: string[];
+  mediaAttachments?: MediaAttachment[];
 }
 
 export type UpdateEntryRequest = CreateEntryRequest;

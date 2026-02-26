@@ -3,7 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 
 import { getAuthContext, requireRole } from '../../shared/auth';
 import { batchWriteItems, putItem } from '../../shared/db';
-import { withCurrentEntrySchemaVersion } from '../../shared/entries';
+import { sanitizeMediaAttachments, withCurrentEntrySchemaVersion } from '../../shared/entries';
 import { buildKeywordIndexItems, extractEntryTokens } from '../../shared/keywords';
 import { withRequestLogging } from '../../shared/logger';
 import { ApiError, errorResponse, response } from '../../shared/responses';
@@ -20,6 +20,10 @@ const parseBody = (event: APIGatewayProxyEvent): CreateEntryRequest => {
   }
 
   const parsed = JSON.parse(event.body) as Partial<CreateEntryRequest>;
+  const mediaAttachmentsValid =
+    parsed.mediaAttachments === undefined ||
+    (Array.isArray(parsed.mediaAttachments) &&
+      parsed.mediaAttachments.every((attachment) => typeof attachment === 'object' && attachment !== null));
 
   if (
     !parsed.sections ||
@@ -33,7 +37,8 @@ const parseBody = (event: APIGatewayProxyEvent): CreateEntryRequest => {
     !Array.isArray(parsed.sessionMetrics.tags) ||
     (parsed.rawTechniqueMentions !== undefined &&
       (!Array.isArray(parsed.rawTechniqueMentions) ||
-        parsed.rawTechniqueMentions.some((mention) => typeof mention !== 'string')))
+        parsed.rawTechniqueMentions.some((mention) => typeof mention !== 'string'))) ||
+    !mediaAttachmentsValid
   ) {
     throw new ApiError({
       code: 'INVALID_REQUEST',
@@ -58,7 +63,8 @@ export const buildEntry = (
     updatedAt: nowIso,
     sections: input.sections,
     sessionMetrics: input.sessionMetrics,
-    rawTechniqueMentions: sanitizeTechniqueMentions(input.rawTechniqueMentions)
+    rawTechniqueMentions: sanitizeTechniqueMentions(input.rawTechniqueMentions),
+    mediaAttachments: sanitizeMediaAttachments(input.mediaAttachments)
   });
 
 const baseHandler: APIGatewayProxyHandler = async (event) => {
