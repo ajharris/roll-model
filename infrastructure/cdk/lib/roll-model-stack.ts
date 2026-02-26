@@ -145,6 +145,26 @@ export class RollModelStack extends cdk.Stack {
     const getEntryLambda = this.createLambda('getEntry', 'backend/lambdas/getEntry/index.ts', table);
     const updateEntryLambda = this.createLambda('updateEntry', 'backend/lambdas/updateEntry/index.ts', table);
     const deleteEntryLambda = this.createLambda('deleteEntry', 'backend/lambdas/deleteEntry/index.ts', table);
+    const listSavedSearchesLambda = this.createLambda(
+      'listSavedSearches',
+      'backend/lambdas/listSavedSearches/index.ts',
+      table
+    );
+    const createSavedSearchLambda = this.createLambda(
+      'createSavedSearch',
+      'backend/lambdas/createSavedSearch/index.ts',
+      table
+    );
+    const updateSavedSearchLambda = this.createLambda(
+      'updateSavedSearch',
+      'backend/lambdas/updateSavedSearch/index.ts',
+      table
+    );
+    const deleteSavedSearchLambda = this.createLambda(
+      'deleteSavedSearch',
+      'backend/lambdas/deleteSavedSearch/index.ts',
+      table
+    );
     const postCommentLambda = this.createLambda('postComment', 'backend/lambdas/postComment/index.ts', table);
     const linkCoachAthleteLambda = this.createLambda(
       'linkCoachAthlete',
@@ -174,6 +194,10 @@ export class RollModelStack extends cdk.Stack {
       { name: 'getEntry', fn: getEntryLambda },
       { name: 'updateEntry', fn: updateEntryLambda },
       { name: 'deleteEntry', fn: deleteEntryLambda },
+      { name: 'listSavedSearches', fn: listSavedSearchesLambda },
+      { name: 'createSavedSearch', fn: createSavedSearchLambda },
+      { name: 'updateSavedSearch', fn: updateSavedSearchLambda },
+      { name: 'deleteSavedSearch', fn: deleteSavedSearchLambda },
       { name: 'postComment', fn: postCommentLambda },
       { name: 'linkCoachAthlete', fn: linkCoachAthleteLambda },
       { name: 'revokeCoachLink', fn: revokeCoachLinkLambda },
@@ -306,6 +330,24 @@ export class RollModelStack extends cdk.Stack {
     entryComments.addCorsPreflight({
       allowOrigins: apigateway.Cors.ALL_ORIGINS,
       allowMethods: ['POST', 'OPTIONS'],
+      allowHeaders: ['Content-Type', 'Authorization']
+    });
+
+    const savedSearches = api.root.addResource('saved-searches');
+    savedSearches.addMethod('GET', new apigateway.LambdaIntegration(listSavedSearchesLambda), methodOptions);
+    savedSearches.addMethod('POST', new apigateway.LambdaIntegration(createSavedSearchLambda), methodOptions);
+    savedSearches.addCorsPreflight({
+      allowOrigins: apigateway.Cors.ALL_ORIGINS,
+      allowMethods: ['GET', 'POST', 'OPTIONS'],
+      allowHeaders: ['Content-Type', 'Authorization']
+    });
+
+    const savedSearchById = savedSearches.addResource('{savedSearchId}');
+    savedSearchById.addMethod('PUT', new apigateway.LambdaIntegration(updateSavedSearchLambda), methodOptions);
+    savedSearchById.addMethod('DELETE', new apigateway.LambdaIntegration(deleteSavedSearchLambda), methodOptions);
+    savedSearchById.addCorsPreflight({
+      allowOrigins: apigateway.Cors.ALL_ORIGINS,
+      allowMethods: ['PUT', 'DELETE', 'OPTIONS'],
       allowHeaders: ['Content-Type', 'Authorization']
     });
 

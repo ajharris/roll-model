@@ -83,3 +83,36 @@ export interface SignupRequestPayload {
   notes?: string;
   intendedRole?: string;
 }
+
+export type SavedEntrySearchSortBy = 'createdAt' | 'intensity';
+export type SavedEntrySearchSortDirection = 'asc' | 'desc';
+
+export interface SavedEntrySearch {
+  id: string;
+  userId?: string;
+  name: string;
+  query: string;
+  tag: string;
+  giOrNoGi: '' | 'gi' | 'no-gi';
+  minIntensity: string;
+  maxIntensity: string;
+  sortBy: SavedEntrySearchSortBy;
+  sortDirection: SavedEntrySearchSortDirection;
+  isPinned?: boolean;
+  isFavorite?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface SavedEntrySearchUpsertPayload {
+  name: string;
+  query: string;
+  tag: string;
+  giOrNoGi: '' | 'gi' | 'no-gi';
+  minIntensity: string;
+  maxIntensity: string;
+  sortBy: SavedEntrySearchSortBy;
+  sortDirection: SavedEntrySearchSortDirection;
+  isPinned?: boolean;
+  isFavorite?: boolean;
+}

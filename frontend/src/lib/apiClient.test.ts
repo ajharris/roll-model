@@ -191,6 +191,42 @@ describe('apiClient', () => {
     expect(entries[0]?.entryId).toBe('entry-1');
   });
 
+  it('unwraps listSavedSearches payload shape', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        savedSearches: [
+          {
+            id: 'search-1',
+            userId: 'athlete-1',
+            name: 'Open mat guard',
+            query: 'guard',
+            tag: 'open-mat',
+            giOrNoGi: 'no-gi',
+            minIntensity: '',
+            maxIntensity: '',
+            sortBy: 'createdAt',
+            sortDirection: 'desc',
+            createdAt: '2026-02-26T00:00:00.000Z',
+            updatedAt: '2026-02-26T00:00:00.000Z',
+          },
+        ],
+      }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { apiClient } = await import('./apiClient');
+    const searches = await apiClient.listSavedSearches();
+
+    expect(searches).toHaveLength(1);
+    expect(searches[0]?.id).toBe('search-1');
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://api.example.test/saved-searches',
+      expect.objectContaining({ cache: 'no-store' }),
+    );
+  });
+
   it('unwraps createEntry payload shape', async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
@@ -310,6 +346,92 @@ describe('apiClient', () => {
     );
   });
 
+  it('unwraps createSavedSearch payload shape', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 201,
+      json: async () => ({
+        savedSearch: {
+          id: 'search-2',
+          userId: 'athlete-1',
+          name: 'Comp prep',
+          query: '',
+          tag: 'competition',
+          giOrNoGi: 'gi',
+          minIntensity: '7',
+          maxIntensity: '',
+          sortBy: 'intensity',
+          sortDirection: 'desc',
+          isPinned: true,
+          createdAt: '2026-02-26T00:00:00.000Z',
+          updatedAt: '2026-02-26T00:00:00.000Z',
+        },
+      }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { apiClient } = await import('./apiClient');
+    const savedSearch = await apiClient.createSavedSearch({
+      name: 'Comp prep',
+      query: '',
+      tag: 'competition',
+      giOrNoGi: 'gi',
+      minIntensity: '7',
+      maxIntensity: '',
+      sortBy: 'intensity',
+      sortDirection: 'desc',
+      isPinned: true,
+    });
+
+    expect(savedSearch.id).toBe('search-2');
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://api.example.test/saved-searches',
+      expect.objectContaining({ method: 'POST' }),
+    );
+  });
+
+  it('unwraps updateSavedSearch payload shape', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        savedSearch: {
+          id: 'search-3',
+          userId: 'athlete-1',
+          name: 'Updated',
+          query: 'guard',
+          tag: '',
+          giOrNoGi: '',
+          minIntensity: '',
+          maxIntensity: '',
+          sortBy: 'createdAt',
+          sortDirection: 'asc',
+          createdAt: '2026-02-26T00:00:00.000Z',
+          updatedAt: '2026-02-26T01:00:00.000Z',
+        },
+      }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { apiClient } = await import('./apiClient');
+    const savedSearch = await apiClient.updateSavedSearch('search-3', {
+      name: 'Updated',
+      query: 'guard',
+      tag: '',
+      giOrNoGi: '',
+      minIntensity: '',
+      maxIntensity: '',
+      sortBy: 'createdAt',
+      sortDirection: 'asc',
+    });
+
+    expect(savedSearch.id).toBe('search-3');
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://api.example.test/saved-searches/search-3',
+      expect.objectContaining({ method: 'PUT' }),
+    );
+  });
+
   it('calls deleteEntry with DELETE and accepts 204', async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
@@ -323,6 +445,25 @@ describe('apiClient', () => {
 
     expect(fetchMock).toHaveBeenCalledWith(
       'https://api.example.test/entries/entry-11',
+      expect.objectContaining({
+        method: 'DELETE',
+      }),
+    );
+  });
+
+  it('calls deleteSavedSearch with DELETE and accepts 204', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 204,
+      json: async () => ({}),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { apiClient } = await import('./apiClient');
+    await apiClient.deleteSavedSearch('search-4');
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://api.example.test/saved-searches/search-4',
       expect.objectContaining({
         method: 'DELETE',
       }),
