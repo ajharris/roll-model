@@ -132,3 +132,37 @@ export interface AIExtractedUpdates {
   recommendedIntensity?: number;
   followUpActions: string[];
 }
+
+export type SavedEntrySearchSortBy = 'createdAt' | 'intensity';
+export type SavedEntrySearchSortDirection = 'asc' | 'desc';
+export type GiOrNoGiFilter = '' | 'gi' | 'no-gi';
+
+export interface SavedEntrySearch {
+  id: string;
+  userId: string;
+  name: string;
+  query: string;
+  tag: string;
+  giOrNoGi: GiOrNoGiFilter;
+  minIntensity: string;
+  maxIntensity: string;
+  sortBy: SavedEntrySearchSortBy;
+  sortDirection: SavedEntrySearchSortDirection;
+  isPinned?: boolean;
+  isFavorite?: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface UpsertSavedEntrySearchRequest {
+  name: string;
+  query: string;
+  tag: string;
+  giOrNoGi: GiOrNoGiFilter;
+  minIntensity: string;
+  maxIntensity: string;
+  sortBy: SavedEntrySearchSortBy;
+  sortDirection: SavedEntrySearchSortDirection;
+  isPinned?: boolean;
+  isFavorite?: boolean;
+}

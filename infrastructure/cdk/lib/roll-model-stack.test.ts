@@ -83,3 +83,25 @@ describe('RollModelStack observability', () => {
     expect(filterPatterns.some((pattern) => pattern.includes('$.latencyMs'))).toBe(true);
   });
 });
+
+describe('RollModelStack saved searches API', () => {
+  it('provisions saved-search CRUD methods', () => {
+    const app = new cdk.App();
+    const stack = new RollModelStack(app, 'TestRollModelStackSavedSearches');
+    const template = Template.fromStack(stack);
+
+    const methods = Object.values(template.findResources('AWS::ApiGateway::Method'));
+    const nonOptions = methods.filter((resource) => resource.Properties.HttpMethod !== 'OPTIONS');
+    const verbs = nonOptions.map((resource) => resource.Properties.HttpMethod as string);
+
+    expect(verbs.filter((verb) => verb === 'GET').length).toBeGreaterThanOrEqual(1);
+    expect(verbs.filter((verb) => verb === 'POST').length).toBeGreaterThanOrEqual(1);
+    expect(verbs.filter((verb) => verb === 'PUT').length).toBeGreaterThanOrEqual(1);
+    expect(verbs.filter((verb) => verb === 'DELETE').length).toBeGreaterThanOrEqual(1);
+
+    const resources = template.findResources('AWS::ApiGateway::Resource');
+    const pathParts = Object.values(resources).map((resource) => resource.Properties.PathPart as string);
+    expect(pathParts).toContain('saved-searches');
+    expect(pathParts).toContain('{savedSearchId}');
+  });
+});

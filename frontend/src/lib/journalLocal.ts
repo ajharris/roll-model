@@ -1,18 +1,8 @@
 'use client';
 
-import type { Entry, EntryCreatePayload } from '@/types/api';
+import type { Entry, EntryCreatePayload, SavedEntrySearch } from '@/types/api';
 
 export type EntryTemplateId = 'quick-roll' | 'comp-class' | 'drill-day' | 'open-mat';
-
-export interface SavedEntrySearch {
-  id: string;
-  name: string;
-  query: string;
-  tag: string;
-  giOrNoGi: '' | 'gi' | 'no-gi';
-  minIntensity: string;
-  maxIntensity: string;
-}
 
 export interface OfflineCreateQueueItem {
   queueId: string;
@@ -28,7 +18,8 @@ type LocalBackup = {
 };
 
 const ENTRY_DRAFT_PREFIX = 'journal.entryDraft.';
-const SAVED_SEARCHES_KEY = 'journal.savedSearches.v1';
+const SAVED_SEARCHES_KEY = 'journal.savedSearches.v2';
+const SAVED_SEARCHES_LEGACY_KEY = 'journal.savedSearches.v1';
 const OFFLINE_CREATE_QUEUE_KEY = 'journal.offlineCreateQueue.v1';
 
 const canUseStorage = () => typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';
@@ -68,10 +59,13 @@ export const clearEntryDraft = (draftId: string) => {
 };
 
 export const readSavedEntrySearches = (): SavedEntrySearch[] =>
-  readJson<SavedEntrySearch[]>(SAVED_SEARCHES_KEY, []);
+  normalizeSavedEntrySearches([
+    ...readJson<unknown[]>(SAVED_SEARCHES_KEY, []),
+    ...readJson<unknown[]>(SAVED_SEARCHES_LEGACY_KEY, []),
+  ]);
 
 export const writeSavedEntrySearches = (searches: SavedEntrySearch[]) => {
-  writeJson(SAVED_SEARCHES_KEY, searches);
+  writeJson(SAVED_SEARCHES_KEY, normalizeSavedEntrySearches(searches));
 };
 
 export const readOfflineCreateQueue = (): OfflineCreateQueueItem[] =>
@@ -111,7 +105,7 @@ export const restoreLocalJournalBackup = (payload: unknown): { restoredDrafts: n
 
   if (canUseStorage()) {
     Object.entries(drafts).forEach(([draftId, value]) => writeEntryDraft(draftId, value));
-    writeSavedEntrySearches(savedSearches as SavedEntrySearch[]);
+    writeSavedEntrySearches(normalizeSavedEntrySearches(savedSearches));
     writeOfflineCreateQueue(queue as OfflineCreateQueueItem[]);
   }
 
@@ -120,6 +114,48 @@ export const restoreLocalJournalBackup = (payload: unknown): { restoredDrafts: n
     restoredSearches: savedSearches.length,
     restoredQueue: queue.length,
   };
+};
+
+const normalizeSavedEntrySearch = (value: unknown): SavedEntrySearch | null => {
+  if (!value || typeof value !== 'object') return null;
+  const candidate = value as Record<string, unknown>;
+  const id = typeof candidate.id === 'string' && candidate.id.trim() ? candidate.id : '';
+  const name = typeof candidate.name === 'string' && candidate.name.trim() ? candidate.name.trim() : '';
+  if (!id || !name) return null;
+
+  const giOrNoGi = candidate.giOrNoGi === 'gi' || candidate.giOrNoGi === 'no-gi' ? candidate.giOrNoGi : '';
+  const sortBy = candidate.sortBy === 'intensity' ? 'intensity' : 'createdAt';
+  const sortDirection = candidate.sortDirection === 'asc' ? 'asc' : 'desc';
+
+  return {
+    id,
+    name,
+    query: typeof candidate.query === 'string' ? candidate.query : '',
+    tag: typeof candidate.tag === 'string' ? candidate.tag : '',
+    giOrNoGi,
+    minIntensity: typeof candidate.minIntensity === 'string' ? candidate.minIntensity : '',
+    maxIntensity: typeof candidate.maxIntensity === 'string' ? candidate.maxIntensity : '',
+    sortBy,
+    sortDirection,
+    ...(typeof candidate.isPinned === 'boolean' ? { isPinned: candidate.isPinned } : {}),
+    ...(typeof candidate.isFavorite === 'boolean' ? { isFavorite: candidate.isFavorite } : {}),
+  };
+};
+
+const normalizeSavedEntrySearches = (value: unknown): SavedEntrySearch[] => {
+  if (!Array.isArray(value)) return [];
+
+  const seenIds = new Set<string>();
+  const normalized: SavedEntrySearch[] = [];
+
+  value.forEach((item) => {
+    const search = normalizeSavedEntrySearch(item);
+    if (!search || seenIds.has(search.id)) return;
+    seenIds.add(search.id);
+    normalized.push(search);
+  });
+
+  return normalized;
 };
 
 export const entryMatchesSavedSearch = (entry: Entry, search: SavedEntrySearch): boolean => {

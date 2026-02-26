@@ -5,6 +5,8 @@ import type {
   Entry,
   EntryCreatePayload,
   FeedbackPayload,
+  SavedEntrySearch,
+  SavedEntrySearchUpsertPayload,
   SignupRequestPayload,
 } from '@/types/api';
 
@@ -137,6 +139,31 @@ const asEntryObject = (payload: unknown): Entry => {
   return payload as Entry;
 };
 
+const asSavedSearchArray = (payload: unknown): SavedEntrySearch[] => {
+  if (Array.isArray(payload)) {
+    return payload as SavedEntrySearch[];
+  }
+
+  if (
+    payload &&
+    typeof payload === 'object' &&
+    'savedSearches' in payload &&
+    Array.isArray((payload as { savedSearches: unknown }).savedSearches)
+  ) {
+    return (payload as { savedSearches: SavedEntrySearch[] }).savedSearches;
+  }
+
+  return [];
+};
+
+const asSavedSearchObject = (payload: unknown): SavedEntrySearch => {
+  if (payload && typeof payload === 'object' && 'savedSearch' in payload) {
+    return (payload as { savedSearch: SavedEntrySearch }).savedSearch;
+  }
+
+  return payload as SavedEntrySearch;
+};
+
 export const apiClient = {
   getEntries: async () => {
     const result = await request<unknown>('/entries');
@@ -171,6 +198,28 @@ export const apiClient = {
     const result = await request<unknown>(`/athletes/${athleteId}/entries`);
     return asEntryArray(result);
   },
+  listSavedSearches: async () => {
+    const result = await request<unknown>('/saved-searches');
+    return asSavedSearchArray(result);
+  },
+  createSavedSearch: async (payload: SavedEntrySearchUpsertPayload) => {
+    const result = await request<unknown>('/saved-searches', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+    return asSavedSearchObject(result);
+  },
+  updateSavedSearch: async (savedSearchId: string, payload: SavedEntrySearchUpsertPayload) => {
+    const result = await request<unknown>(`/saved-searches/${savedSearchId}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    });
+    return asSavedSearchObject(result);
+  },
+  deleteSavedSearch: (savedSearchId: string) =>
+    request(`/saved-searches/${savedSearchId}`, {
+      method: 'DELETE',
+    }),
   linkCoach: (payload: { coachId: string }) =>
     request('/links/coach', {
       method: 'POST',
