@@ -113,6 +113,32 @@ export interface SignupRequestPayload {
   intendedRole?: string;
 }
 
+export interface RestoreDataPayload {
+  schemaVersion: string;
+  generatedAt: string;
+  full: {
+    athleteId: string;
+    entries: unknown[];
+    comments: unknown[];
+    links: unknown[];
+    aiThreads: unknown[];
+    aiMessages: unknown[];
+  };
+}
+
+export interface RestoreDataResult {
+  restored: boolean;
+  athleteId: string;
+  counts: {
+    entries: number;
+    comments: number;
+    links: number;
+    aiThreads: number;
+    aiMessages: number;
+    itemsWritten: number;
+  };
+}
+
 export type SavedEntrySearchSortBy = EntrySearchSortBy;
 export type SavedEntrySearchSortDirection = EntrySearchSortDirection;
 

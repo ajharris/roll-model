@@ -6,6 +6,7 @@ import type {
   EntryCreatePayload,
   EntrySearchRequest,
   FeedbackPayload,
+  RestoreDataResult,
   SavedEntrySearch,
   SavedEntrySearchUpsertPayload,
   SignupRequestPayload,
@@ -242,7 +243,7 @@ export const apiClient = {
     return response.text();
   },
   restoreData: (payload: unknown) =>
-    request<unknown>('/restore', {
+    request<RestoreDataResult>('/restore', {
       method: 'POST',
       body: JSON.stringify(payload),
     }),
