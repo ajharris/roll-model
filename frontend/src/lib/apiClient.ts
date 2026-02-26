@@ -4,7 +4,9 @@ import type {
   CommentPayload,
   Entry,
   EntryCreatePayload,
+  ExportBackupResponse,
   FeedbackPayload,
+  RestoreDataResponse,
   SavedEntrySearch,
   SavedEntrySearchUpsertPayload,
   SignupRequestPayload,
@@ -41,10 +43,21 @@ const buildAuthHeaders = () => {
   };
 };
 
-const request = async <T>(path: string, init?: RequestInit): Promise<T> => {
+const parseApiErrorMessage = async (response: Response): Promise<string> => {
+  try {
+    const json = (await response.json()) as { message?: string; error?: { message?: string } };
+    return json.message ?? json.error?.message ?? 'Request failed';
+  } catch {
+    return response.statusText || 'Request failed';
+  }
+};
+
+const sendRequest = async (path: string, init?: RequestInit): Promise<Response> => {
   const method = (init?.method ?? 'GET').toUpperCase();
   const headers = new Headers();
-  headers.set('Content-Type', 'application/json');
+  if (init?.body !== undefined) {
+    headers.set('Content-Type', 'application/json');
+  }
 
   for (const [key, value] of Object.entries(buildAuthHeaders())) {
     headers.set(key, value);
@@ -78,13 +91,7 @@ const request = async <T>(path: string, init?: RequestInit): Promise<T> => {
   }
 
   if (!response.ok) {
-    let message = 'Request failed';
-    try {
-      const json = await response.json();
-      message = json.message ?? message;
-    } catch {
-      message = response.statusText || message;
-    }
+    const message = await parseApiErrorMessage(response);
     if (response.status === 401 || response.status === 403) {
       logAuthFailure({
         source: 'apiClient',
@@ -110,8 +117,20 @@ const request = async <T>(path: string, init?: RequestInit): Promise<T> => {
     throw new ApiError(message, response.status);
   }
 
+  return response;
+};
+
+const request = async <T>(path: string, init?: RequestInit): Promise<T> => {
+  const response = await sendRequest(path, init);
+
   if (response.status === 204) return {} as T;
   return response.json() as Promise<T>;
+};
+
+const requestText = async (path: string, init?: RequestInit): Promise<string> => {
+  const response = await sendRequest(path, init);
+  if (response.status === 204) return '';
+  return response.text();
 };
 
 const asEntryArray = (payload: unknown): Entry[] => {
@@ -193,7 +212,18 @@ export const apiClient = {
       method: 'POST',
       body: JSON.stringify(payload),
     }),
-  exportData: () => request<unknown>('/export'),
+  exportData: (options?: { mode?: 'full' | 'tidy' }) => {
+    const params = new URLSearchParams();
+    if (options?.mode) params.set('mode', options.mode);
+    const suffix = params.toString();
+    return request<ExportBackupResponse>(suffix ? `/export?${suffix}` : '/export');
+  },
+  exportEntriesCsv: () => requestText('/export?format=csv'),
+  restoreData: (payload: unknown) =>
+    request<RestoreDataResponse>('/restore', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
   getAthleteEntries: async (athleteId: string) => {
     const result = await request<unknown>(`/athletes/${athleteId}/entries`);
     return asEntryArray(result);

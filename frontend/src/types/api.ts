@@ -53,6 +53,26 @@ export interface EntryCreatePayload {
   mediaAttachments?: MediaAttachment[];
 }
 
+export interface ExportBackupResponse {
+  schemaVersion: string;
+  generatedAt: string;
+  full?: unknown;
+  tidy?: unknown;
+}
+
+export interface RestoreDataResponse {
+  restored: boolean;
+  athleteId: string;
+  counts: {
+    entries: number;
+    comments: number;
+    links: number;
+    aiThreads: number;
+    aiMessages: number;
+    itemsWritten: number;
+  };
+}
+
 export interface ChatMessage {
   id: string;
   role: 'user' | 'assistant';
