@@ -135,6 +135,27 @@ const normalizeSavedEntrySearch = (value: unknown): SavedEntrySearch | null => {
     giOrNoGi,
     minIntensity: typeof candidate.minIntensity === 'string' ? candidate.minIntensity : '',
     maxIntensity: typeof candidate.maxIntensity === 'string' ? candidate.maxIntensity : '',
+    ...(typeof candidate.dateFrom === 'string' && candidate.dateFrom.trim()
+      ? { dateFrom: candidate.dateFrom.trim() }
+      : {}),
+    ...(typeof candidate.dateTo === 'string' && candidate.dateTo.trim()
+      ? { dateTo: candidate.dateTo.trim() }
+      : {}),
+    ...(typeof candidate.position === 'string' && candidate.position.trim()
+      ? { position: candidate.position.trim() }
+      : {}),
+    ...(typeof candidate.partner === 'string' && candidate.partner.trim()
+      ? { partner: candidate.partner.trim() }
+      : {}),
+    ...(typeof candidate.technique === 'string' && candidate.technique.trim()
+      ? { technique: candidate.technique.trim() }
+      : {}),
+    ...(typeof candidate.outcome === 'string' && candidate.outcome.trim()
+      ? { outcome: candidate.outcome.trim() }
+      : {}),
+    ...(typeof candidate.classType === 'string' && candidate.classType.trim()
+      ? { classType: candidate.classType.trim() }
+      : {}),
     sortBy,
     sortDirection,
     ...(typeof candidate.isPinned === 'boolean' ? { isPinned: candidate.isPinned } : {}),
@@ -159,8 +180,12 @@ const normalizeSavedEntrySearches = (value: unknown): SavedEntrySearch[] => {
 };
 
 export const entryMatchesSavedSearch = (entry: Entry, search: SavedEntrySearch): boolean => {
+  const entryTs = Date.parse(entry.createdAt);
+  const fromTs = search.dateFrom ? Date.parse(search.dateFrom) : Number.NaN;
+  const toTs = search.dateTo ? Date.parse(search.dateTo) : Number.NaN;
   const q = search.query.trim().toLowerCase();
   const text = [
+    entry.createdAt,
     entry.sections.shared,
     entry.sections.private ?? '',
     ...(entry.sessionMetrics.tags ?? []),
@@ -176,6 +201,16 @@ export const entryMatchesSavedSearch = (entry: Entry, search: SavedEntrySearch):
     .toLowerCase();
 
   if (q && !text.includes(q)) return false;
+  if (search.dateFrom && Number.isFinite(fromTs) && Number.isFinite(entryTs) && entryTs < fromTs) return false;
+  if (search.dateTo && Number.isFinite(toTs) && Number.isFinite(entryTs)) {
+    const inclusiveUpperBound = search.dateTo.length === 10 ? toTs + 86_399_999 : toTs;
+    if (entryTs > inclusiveUpperBound) return false;
+  }
+  if (search.position && !text.includes(search.position.trim().toLowerCase())) return false;
+  if (search.partner && !text.includes(search.partner.trim().toLowerCase())) return false;
+  if (search.technique && !text.includes(search.technique.trim().toLowerCase())) return false;
+  if (search.outcome && !text.includes(search.outcome.trim().toLowerCase())) return false;
+  if (search.classType && !text.includes(search.classType.trim().toLowerCase())) return false;
   if (search.tag && !(entry.sessionMetrics.tags ?? []).includes(search.tag)) return false;
   if (search.giOrNoGi && entry.sessionMetrics.giOrNoGi !== search.giOrNoGi) return false;
 

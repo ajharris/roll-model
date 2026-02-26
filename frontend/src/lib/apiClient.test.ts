@@ -544,4 +544,52 @@ describe('apiClient', () => {
 
     expect(entries).toEqual([]);
   });
+
+  it('serializes combined entry search query parameters', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ entries: [] }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { apiClient } = await import('./apiClient');
+    await apiClient.getEntries({
+      query: 'knee shield guard',
+      dateFrom: '2026-02-01',
+      dateTo: '2026-02-29',
+      position: 'half guard',
+      partner: 'Alex',
+      technique: 'knee shield',
+      outcome: 'win by sweep',
+      classType: 'open mat',
+      tag: 'open-mat',
+      giOrNoGi: 'no-gi',
+      minIntensity: '6',
+      maxIntensity: '8',
+      sortBy: 'createdAt',
+      sortDirection: 'desc',
+      limit: '25',
+    });
+
+    const calledUrl = String(fetchMock.mock.calls[0]?.[0]);
+    const url = new URL(calledUrl);
+
+    expect(url.pathname).toBe('/entries');
+    expect(url.searchParams.get('q')).toBe('knee shield guard');
+    expect(url.searchParams.get('dateFrom')).toBe('2026-02-01');
+    expect(url.searchParams.get('dateTo')).toBe('2026-02-29');
+    expect(url.searchParams.get('position')).toBe('half guard');
+    expect(url.searchParams.get('partner')).toBe('Alex');
+    expect(url.searchParams.get('technique')).toBe('knee shield');
+    expect(url.searchParams.get('outcome')).toBe('win by sweep');
+    expect(url.searchParams.get('classType')).toBe('open mat');
+    expect(url.searchParams.get('tag')).toBe('open-mat');
+    expect(url.searchParams.get('giOrNoGi')).toBe('no-gi');
+    expect(url.searchParams.get('minIntensity')).toBe('6');
+    expect(url.searchParams.get('maxIntensity')).toBe('8');
+    expect(url.searchParams.get('sortBy')).toBe('createdAt');
+    expect(url.searchParams.get('sortDirection')).toBe('desc');
+    expect(url.searchParams.get('limit')).toBe('25');
+  });
 });

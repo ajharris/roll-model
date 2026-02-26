@@ -4,6 +4,7 @@ import type {
   CommentPayload,
   Entry,
   EntryCreatePayload,
+  EntrySearchRequest,
   FeedbackPayload,
   SavedEntrySearch,
   SavedEntrySearchUpsertPayload,
@@ -31,6 +32,37 @@ export const configureApiClient = (tokenGetter: TokenGetter) => {
 
 const joinUrl = (base: string, path: string) =>
   `${base.replace(/\/+$/, '')}/${path.replace(/^\/+/, '')}`;
+
+const withQueryString = (path: string, query?: EntrySearchRequest) => {
+  if (!query) return path;
+
+  const params = new URLSearchParams();
+  const append = (key: string, value: string | undefined) => {
+    if (typeof value !== 'string') return;
+    const trimmed = value.trim();
+    if (!trimmed) return;
+    params.set(key, trimmed);
+  };
+
+  append('q', query.query);
+  append('dateFrom', query.dateFrom);
+  append('dateTo', query.dateTo);
+  append('position', query.position);
+  append('partner', query.partner);
+  append('technique', query.technique);
+  append('outcome', query.outcome);
+  append('classType', query.classType);
+  append('tag', query.tag);
+  append('giOrNoGi', query.giOrNoGi);
+  append('minIntensity', query.minIntensity);
+  append('maxIntensity', query.maxIntensity);
+  append('sortBy', query.sortBy);
+  append('sortDirection', query.sortDirection);
+  append('limit', query.limit);
+
+  const qs = params.toString();
+  return qs ? `${path}?${qs}` : path;
+};
 
 const buildAuthHeaders = () => {
   const token = getToken();
@@ -165,8 +197,8 @@ const asSavedSearchObject = (payload: unknown): SavedEntrySearch => {
 };
 
 export const apiClient = {
-  getEntries: async () => {
-    const result = await request<unknown>('/entries');
+  getEntries: async (query?: EntrySearchRequest) => {
+    const result = await request<unknown>(withQueryString('/entries', query));
     return asEntryArray(result);
   },
   getEntry: async (entryId: string) => {
@@ -194,8 +226,8 @@ export const apiClient = {
       body: JSON.stringify(payload),
     }),
   exportData: () => request<unknown>('/export'),
-  getAthleteEntries: async (athleteId: string) => {
-    const result = await request<unknown>(`/athletes/${athleteId}/entries`);
+  getAthleteEntries: async (athleteId: string, query?: EntrySearchRequest) => {
+    const result = await request<unknown>(withQueryString(`/athletes/${athleteId}/entries`, query));
     return asEntryArray(result);
   },
   listSavedSearches: async () => {

@@ -11,7 +11,7 @@ import {
   writeSavedEntrySearches,
 } from '@/lib/journalLocal';
 import { flushOfflineCreateQueue } from '@/lib/journalQueue';
-import type { Entry, SavedEntrySearch, SavedEntrySearchUpsertPayload } from '@/types/api';
+import type { Entry, EntrySearchRequest, SavedEntrySearch, SavedEntrySearchUpsertPayload } from '@/types/api';
 
 const defaultQuickAdd = {
   shared: '',
@@ -34,6 +34,13 @@ export default function EntriesPage() {
   const [giOrNoGiFilter, setGiOrNoGiFilter] = useState<'' | 'gi' | 'no-gi'>('');
   const [minIntensity, setMinIntensity] = useState('');
   const [maxIntensity, setMaxIntensity] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [positionFilter, setPositionFilter] = useState('');
+  const [partnerFilter, setPartnerFilter] = useState('');
+  const [techniqueFilter, setTechniqueFilter] = useState('');
+  const [outcomeFilter, setOutcomeFilter] = useState('');
+  const [classTypeFilter, setClassTypeFilter] = useState('');
   const [sortBy, setSortBy] = useState<SearchSortBy>(DEFAULT_SORT_BY);
   const [sortDirection, setSortDirection] = useState<SearchSortDirection>(DEFAULT_SORT_DIRECTION);
   const [savedSearches, setSavedSearches] = useState<SavedEntrySearch[]>([]);
@@ -44,6 +51,23 @@ export default function EntriesPage() {
   const [savedSearchStatus, setSavedSearchStatus] = useState('');
   const [quickAdd, setQuickAdd] = useState(defaultQuickAdd);
   const [quickAddStatus, setQuickAddStatus] = useState('');
+
+  const buildEntrySearchRequest = (): EntrySearchRequest => ({
+    ...(query.trim() ? { query: query.trim() } : {}),
+    ...(tagFilter ? { tag: tagFilter } : {}),
+    ...(giOrNoGiFilter ? { giOrNoGi: giOrNoGiFilter } : {}),
+    ...(minIntensity.trim() ? { minIntensity: minIntensity.trim() } : {}),
+    ...(maxIntensity.trim() ? { maxIntensity: maxIntensity.trim() } : {}),
+    ...(dateFrom ? { dateFrom } : {}),
+    ...(dateTo ? { dateTo } : {}),
+    ...(positionFilter.trim() ? { position: positionFilter.trim() } : {}),
+    ...(partnerFilter.trim() ? { partner: partnerFilter.trim() } : {}),
+    ...(techniqueFilter.trim() ? { technique: techniqueFilter.trim() } : {}),
+    ...(outcomeFilter.trim() ? { outcome: outcomeFilter.trim() } : {}),
+    ...(classTypeFilter.trim() ? { classType: classTypeFilter.trim() } : {}),
+    sortBy,
+    sortDirection,
+  });
 
   useEffect(() => {
     setLoading(true);
@@ -60,6 +84,15 @@ export default function EntriesPage() {
       .catch(() => setError('Could not load entries.'))
       .finally(() => setLoading(false));
   }, []);
+
+  const runApiSearch = async () => {
+    setSavedSearchStatus('');
+    try {
+      setEntries(await apiClient.getEntries(buildEntrySearchRequest()));
+    } catch {
+      setSavedSearchStatus('API search failed. Showing local filtered results from loaded entries.');
+    }
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -117,6 +150,13 @@ export default function EntriesPage() {
       giOrNoGi: giOrNoGiFilter,
       minIntensity,
       maxIntensity,
+      ...(dateFrom ? { dateFrom } : {}),
+      ...(dateTo ? { dateTo } : {}),
+      ...(positionFilter.trim() ? { position: positionFilter.trim() } : {}),
+      ...(partnerFilter.trim() ? { partner: partnerFilter.trim() } : {}),
+      ...(techniqueFilter.trim() ? { technique: techniqueFilter.trim() } : {}),
+      ...(outcomeFilter.trim() ? { outcome: outcomeFilter.trim() } : {}),
+      ...(classTypeFilter.trim() ? { classType: classTypeFilter.trim() } : {}),
       sortBy,
       sortDirection,
     };
@@ -132,7 +172,23 @@ export default function EntriesPage() {
     });
 
     return filtered;
-  }, [entries, giOrNoGiFilter, maxIntensity, minIntensity, query, sortBy, sortDirection, tagFilter]);
+  }, [
+    classTypeFilter,
+    dateFrom,
+    dateTo,
+    entries,
+    giOrNoGiFilter,
+    maxIntensity,
+    minIntensity,
+    outcomeFilter,
+    partnerFilter,
+    positionFilter,
+    query,
+    sortBy,
+    sortDirection,
+    tagFilter,
+    techniqueFilter,
+  ]);
 
   const persistSavedSearches = (next: SavedEntrySearch[]) => {
     setSavedSearches(next);
@@ -148,6 +204,13 @@ export default function EntriesPage() {
     giOrNoGi: giOrNoGiFilter,
     minIntensity,
     maxIntensity,
+    ...(dateFrom ? { dateFrom } : {}),
+    ...(dateTo ? { dateTo } : {}),
+    ...(positionFilter.trim() ? { position: positionFilter.trim() } : {}),
+    ...(partnerFilter.trim() ? { partner: partnerFilter.trim() } : {}),
+    ...(techniqueFilter.trim() ? { technique: techniqueFilter.trim() } : {}),
+    ...(outcomeFilter.trim() ? { outcome: outcomeFilter.trim() } : {}),
+    ...(classTypeFilter.trim() ? { classType: classTypeFilter.trim() } : {}),
     sortBy,
     sortDirection,
     ...(overrides?.isPinned !== undefined ? { isPinned: overrides.isPinned } : {}),
@@ -182,6 +245,13 @@ export default function EntriesPage() {
       giOrNoGi: search.giOrNoGi,
       minIntensity: search.minIntensity,
       maxIntensity: search.maxIntensity,
+      ...(search.dateFrom ? { dateFrom: search.dateFrom } : {}),
+      ...(search.dateTo ? { dateTo: search.dateTo } : {}),
+      ...(search.position ? { position: search.position } : {}),
+      ...(search.partner ? { partner: search.partner } : {}),
+      ...(search.technique ? { technique: search.technique } : {}),
+      ...(search.outcome ? { outcome: search.outcome } : {}),
+      ...(search.classType ? { classType: search.classType } : {}),
       sortBy: search.sortBy,
       sortDirection: search.sortDirection,
       ...(search.isPinned !== undefined ? { isPinned: search.isPinned } : {}),
@@ -218,6 +288,13 @@ export default function EntriesPage() {
     setGiOrNoGiFilter(search.giOrNoGi);
     setMinIntensity(search.minIntensity);
     setMaxIntensity(search.maxIntensity);
+    setDateFrom(search.dateFrom ?? '');
+    setDateTo(search.dateTo ?? '');
+    setPositionFilter(search.position ?? '');
+    setPartnerFilter(search.partner ?? '');
+    setTechniqueFilter(search.technique ?? '');
+    setOutcomeFilter(search.outcome ?? '');
+    setClassTypeFilter(search.classType ?? '');
     setSortBy(search.sortBy);
     setSortDirection(search.sortDirection);
   };
@@ -308,6 +385,13 @@ export default function EntriesPage() {
     setGiOrNoGiFilter('');
     setMinIntensity('');
     setMaxIntensity('');
+    setDateFrom('');
+    setDateTo('');
+    setPositionFilter('');
+    setPartnerFilter('');
+    setTechniqueFilter('');
+    setOutcomeFilter('');
+    setClassTypeFilter('');
     setSortBy(DEFAULT_SORT_BY);
     setSortDirection(DEFAULT_SORT_DIRECTION);
   };
@@ -336,7 +420,7 @@ export default function EntriesPage() {
       });
       setQuickAdd(defaultQuickAdd);
       setQuickAddStatus('Saved.');
-      setEntries(await apiClient.getEntries());
+      setEntries(await apiClient.getEntries(buildEntrySearchRequest()));
     } catch {
       setQuickAddStatus('Quick add failed. Use full form or try again.');
     }
@@ -445,6 +529,59 @@ export default function EntriesPage() {
               />
             </div>
             <div>
+              <label htmlFor="search-date-from">Date from</label>
+              <input id="search-date-from" type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} />
+            </div>
+            <div>
+              <label htmlFor="search-date-to">Date to</label>
+              <input id="search-date-to" type="date" value={dateTo} onChange={(event) => setDateTo(event.target.value)} />
+            </div>
+            <div>
+              <label htmlFor="search-position">Position</label>
+              <input
+                id="search-position"
+                value={positionFilter}
+                onChange={(event) => setPositionFilter(event.target.value)}
+                placeholder="guard, half guard, back..."
+              />
+            </div>
+            <div>
+              <label htmlFor="search-partner">Partner</label>
+              <input
+                id="search-partner"
+                value={partnerFilter}
+                onChange={(event) => setPartnerFilter(event.target.value)}
+                placeholder="Alex"
+              />
+            </div>
+            <div>
+              <label htmlFor="search-technique">Technique</label>
+              <input
+                id="search-technique"
+                value={techniqueFilter}
+                onChange={(event) => setTechniqueFilter(event.target.value)}
+                placeholder="knee shield"
+              />
+            </div>
+            <div>
+              <label htmlFor="search-outcome">Outcome</label>
+              <input
+                id="search-outcome"
+                value={outcomeFilter}
+                onChange={(event) => setOutcomeFilter(event.target.value)}
+                placeholder="sweep, win, points..."
+              />
+            </div>
+            <div>
+              <label htmlFor="search-class-type">Class type</label>
+              <input
+                id="search-class-type"
+                value={classTypeFilter}
+                onChange={(event) => setClassTypeFilter(event.target.value)}
+                placeholder="open mat, comp class..."
+              />
+            </div>
+            <div>
               <label htmlFor="search-sort-by">Sort by</label>
               <select
                 id="search-sort-by"
@@ -479,6 +616,9 @@ export default function EntriesPage() {
             </button>
             <button type="button" onClick={() => void updateActiveSavedSearch()} disabled={!activeSavedSearchId}>
               Update saved search
+            </button>
+            <button type="button" onClick={() => void runApiSearch()}>
+              Run API search
             </button>
             <button type="button" onClick={clearSearchFilters}>
               Clear filters

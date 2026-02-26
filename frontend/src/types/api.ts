@@ -53,6 +53,35 @@ export interface EntryCreatePayload {
   mediaAttachments?: MediaAttachment[];
 }
 
+export type EntrySearchSortBy = 'createdAt' | 'intensity';
+export type EntrySearchSortDirection = 'asc' | 'desc';
+
+export interface EntrySearchRequest {
+  query?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  position?: string;
+  partner?: string;
+  technique?: string;
+  outcome?: string;
+  classType?: string;
+  tag?: string;
+  giOrNoGi?: '' | 'gi' | 'no-gi';
+  minIntensity?: string;
+  maxIntensity?: string;
+  sortBy?: EntrySearchSortBy;
+  sortDirection?: EntrySearchSortDirection;
+  limit?: string;
+}
+
+export interface EntrySearchMeta {
+  queryApplied: boolean;
+  scannedCount: number;
+  matchedCount: number;
+  latencyMs: number;
+  latencyTargetMs: number;
+}
+
 export interface ChatMessage {
   id: string;
   role: 'user' | 'assistant';
@@ -84,8 +113,8 @@ export interface SignupRequestPayload {
   intendedRole?: string;
 }
 
-export type SavedEntrySearchSortBy = 'createdAt' | 'intensity';
-export type SavedEntrySearchSortDirection = 'asc' | 'desc';
+export type SavedEntrySearchSortBy = EntrySearchSortBy;
+export type SavedEntrySearchSortDirection = EntrySearchSortDirection;
 
 export interface SavedEntrySearch {
   id: string;
@@ -96,6 +125,13 @@ export interface SavedEntrySearch {
   giOrNoGi: '' | 'gi' | 'no-gi';
   minIntensity: string;
   maxIntensity: string;
+  dateFrom?: string;
+  dateTo?: string;
+  position?: string;
+  partner?: string;
+  technique?: string;
+  outcome?: string;
+  classType?: string;
   sortBy: SavedEntrySearchSortBy;
   sortDirection: SavedEntrySearchSortDirection;
   isPinned?: boolean;
@@ -111,6 +147,13 @@ export interface SavedEntrySearchUpsertPayload {
   giOrNoGi: '' | 'gi' | 'no-gi';
   minIntensity: string;
   maxIntensity: string;
+  dateFrom?: string;
+  dateTo?: string;
+  position?: string;
+  partner?: string;
+  technique?: string;
+  outcome?: string;
+  classType?: string;
   sortBy: SavedEntrySearchSortBy;
   sortDirection: SavedEntrySearchSortDirection;
   isPinned?: boolean;

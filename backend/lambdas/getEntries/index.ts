@@ -4,6 +4,7 @@ import type { APIGatewayProxyHandler } from 'aws-lambda';
 import { getAuthContext, hasRole, requireRole } from '../../shared/auth';
 import { getItem, queryItems } from '../../shared/db';
 import { parseEntryRecord } from '../../shared/entries';
+import { parseEntrySearchRequest, searchEntries } from '../../shared/entrySearch';
 import { isCoachLinkActive } from '../../shared/links';
 import { withRequestLogging } from '../../shared/logger';
 import { ApiError, errorResponse, response } from '../../shared/responses';
@@ -67,8 +68,12 @@ const baseHandler: APIGatewayProxyHandler = async (event) => {
       .filter((item) => item.entityType === 'ENTRY')
       .map((item) => parseEntryRecord(item as Record<string, unknown>));
 
+    const searchRequest = parseEntrySearchRequest(event.queryStringParameters);
+    const searched = searchEntries(entries, searchRequest);
+
     return response(200, {
-      entries: isCoachRequest ? entries.map(sanitizeForCoach) : entries
+      entries: isCoachRequest ? searched.entries.map(sanitizeForCoach) : searched.entries,
+      search: searched.meta,
     });
   } catch (error) {
     return errorResponse(error);
