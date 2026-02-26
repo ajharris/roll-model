@@ -6,9 +6,18 @@ describe('keyword tokenization', () => {
     const entry: Entry = {
       entryId: 'entry-1',
       athleteId: 'athlete-1',
-      schemaVersion: 1,
+      schemaVersion: 3,
       createdAt: '2026-01-01T00:00:00.000Z',
       updatedAt: '2026-01-01T00:00:00.000Z',
+      quickAdd: {
+        time: '2026-01-01T18:00:00.000Z',
+        class: 'Competition class',
+        gym: 'North Academy',
+        partners: ['Alex'],
+        rounds: 6,
+        notes: 'Pressure pass rounds'
+      },
+      tags: ['pass'],
       sections: {
         private: 'The butterfly sweeps felt sharp!',
         shared: 'Worked on passing and pressure from headquarters.'

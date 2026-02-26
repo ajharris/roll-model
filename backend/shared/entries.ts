@@ -1,6 +1,6 @@
 import type { Entry, MediaAttachment, MediaClipNote } from './types';
 
-export const CURRENT_ENTRY_SCHEMA_VERSION = 2;
+export const CURRENT_ENTRY_SCHEMA_VERSION = 3;
 
 type EntryRecordEnvelope = {
   PK: string;
@@ -8,18 +8,31 @@ type EntryRecordEnvelope = {
   entityType: string;
 };
 
-type LegacyEntryV0 = Omit<Entry, 'schemaVersion' | 'rawTechniqueMentions'> & {
+type LegacyEntryV0 = Omit<Entry, 'schemaVersion' | 'rawTechniqueMentions' | 'quickAdd' | 'structured' | 'tags'> & {
+  quickAdd?: unknown;
+  structured?: unknown;
+  tags?: unknown;
   rawTechniqueMentions?: unknown;
   mediaAttachments?: unknown;
   schemaVersion?: undefined;
 };
 
-type VersionedEntryInput = Omit<Entry, 'rawTechniqueMentions'> & {
+type EntryV2 = Omit<Entry, 'rawTechniqueMentions' | 'quickAdd' | 'structured' | 'tags'> & {
+  schemaVersion: 2;
+  quickAdd?: unknown;
+  structured?: unknown;
+  tags?: unknown;
   rawTechniqueMentions?: unknown;
   mediaAttachments?: unknown;
 };
 
-type NormalizableEntryInput = LegacyEntryV0 | VersionedEntryInput;
+type VersionedEntryInput = Omit<Entry, 'rawTechniqueMentions'> & {
+  schemaVersion: number;
+  rawTechniqueMentions?: unknown;
+  mediaAttachments?: unknown;
+};
+
+type NormalizableEntryInput = LegacyEntryV0 | EntryV2 | VersionedEntryInput;
 
 const sanitizeRawTechniqueMentions = (value: unknown): string[] => {
   if (!Array.isArray(value)) {
@@ -27,6 +40,86 @@ const sanitizeRawTechniqueMentions = (value: unknown): string[] => {
   }
 
   return value.filter((mention): mention is string => typeof mention === 'string');
+};
+
+const DEFAULT_QUICK_ADD: Entry['quickAdd'] = {
+  time: '',
+  class: '',
+  gym: '',
+  partners: [],
+  rounds: 0,
+  notes: ''
+};
+
+const ENTRY_TAG_VALUES = new Set([
+  'guard-type',
+  'top',
+  'bottom',
+  'submission',
+  'sweep',
+  'pass',
+  'escape',
+  'takedown'
+]);
+
+const sanitizeQuickAdd = (value: unknown, fallback?: Record<string, unknown>): Entry['quickAdd'] => {
+  const record = typeof value === 'object' && value !== null ? (value as Record<string, unknown>) : {};
+
+  const fallbackRecord = fallback ?? {};
+  const fallbackSessionMetrics =
+    typeof fallbackRecord.sessionMetrics === 'object' && fallbackRecord.sessionMetrics !== null
+      ? (fallbackRecord.sessionMetrics as Record<string, unknown>)
+      : null;
+  const fallbackSections =
+    typeof fallbackRecord.sections === 'object' && fallbackRecord.sections !== null
+      ? (fallbackRecord.sections as Record<string, unknown>)
+      : null;
+
+  return {
+    time: typeof record.time === 'string' ? record.time : DEFAULT_QUICK_ADD.time,
+    class: typeof record.class === 'string' ? record.class : DEFAULT_QUICK_ADD.class,
+    gym: typeof record.gym === 'string' ? record.gym : DEFAULT_QUICK_ADD.gym,
+    partners: Array.isArray(record.partners)
+      ? record.partners.filter((partner): partner is string => typeof partner === 'string')
+      : DEFAULT_QUICK_ADD.partners,
+    rounds:
+      typeof record.rounds === 'number'
+        ? record.rounds
+        : typeof fallbackSessionMetrics?.rounds === 'number'
+          ? fallbackSessionMetrics.rounds
+          : DEFAULT_QUICK_ADD.rounds,
+    notes:
+      typeof record.notes === 'string'
+        ? record.notes
+        : typeof fallbackSections?.shared === 'string'
+          ? fallbackSections.shared
+          : DEFAULT_QUICK_ADD.notes
+  };
+};
+
+const sanitizeStructuredFields = (value: unknown): Entry['structured'] => {
+  if (typeof value !== 'object' || value === null) {
+    return undefined;
+  }
+
+  const record = value as Record<string, unknown>;
+  const structured = {
+    ...(typeof record.position === 'string' ? { position: record.position } : {}),
+    ...(typeof record.technique === 'string' ? { technique: record.technique } : {}),
+    ...(typeof record.outcome === 'string' ? { outcome: record.outcome } : {}),
+    ...(typeof record.problem === 'string' ? { problem: record.problem } : {}),
+    ...(typeof record.cue === 'string' ? { cue: record.cue } : {}),
+    ...(typeof record.constraint === 'string' ? { constraint: record.constraint } : {})
+  };
+
+  return Object.keys(structured).length > 0 ? structured : undefined;
+};
+
+const sanitizeEntryTags = (value: unknown, fallbackSessionMetricsTags?: unknown): Entry['tags'] => {
+  const source = Array.isArray(value) ? value : Array.isArray(fallbackSessionMetricsTags) ? fallbackSessionMetricsTags : [];
+  return source.filter(
+    (tag): tag is Entry['tags'][number] => typeof tag === 'string' && ENTRY_TAG_VALUES.has(tag)
+  );
 };
 
 const sanitizeClipNotes = (value: unknown): MediaClipNote[] => {
@@ -69,6 +162,9 @@ export const sanitizeMediaAttachments = (value: unknown): MediaAttachment[] => {
 const migrateLegacyEntryV0 = (legacy: LegacyEntryV0): Entry => ({
   ...legacy,
   schemaVersion: CURRENT_ENTRY_SCHEMA_VERSION,
+  quickAdd: sanitizeQuickAdd((legacy as Record<string, unknown>).quickAdd, legacy as unknown as Record<string, unknown>),
+  structured: sanitizeStructuredFields((legacy as Record<string, unknown>).structured),
+  tags: sanitizeEntryTags((legacy as Record<string, unknown>).tags, legacy.sessionMetrics?.tags),
   rawTechniqueMentions: sanitizeRawTechniqueMentions(legacy.rawTechniqueMentions),
   mediaAttachments: sanitizeMediaAttachments(legacy.mediaAttachments)
 });
@@ -81,17 +177,22 @@ export const withCurrentEntrySchemaVersion = (
 });
 
 export const normalizeEntry = (entry: NormalizableEntryInput): Entry => {
-  if (entry.schemaVersion === undefined) {
+  const schemaVersion = (entry as { schemaVersion?: number }).schemaVersion;
+
+  if (schemaVersion === undefined) {
     return migrateLegacyEntryV0(entry as LegacyEntryV0);
   }
 
-  if (entry.schemaVersion !== CURRENT_ENTRY_SCHEMA_VERSION) {
-    throw new Error(`Unsupported entry schema version: ${String(entry.schemaVersion)}`);
+  if (schemaVersion !== 2 && schemaVersion !== CURRENT_ENTRY_SCHEMA_VERSION) {
+    throw new Error(`Unsupported entry schema version: ${String(schemaVersion)}`);
   }
 
   return {
     ...entry,
     schemaVersion: CURRENT_ENTRY_SCHEMA_VERSION,
+    quickAdd: sanitizeQuickAdd((entry as Record<string, unknown>).quickAdd, entry as unknown as Record<string, unknown>),
+    structured: sanitizeStructuredFields((entry as Record<string, unknown>).structured),
+    tags: sanitizeEntryTags((entry as Record<string, unknown>).tags, entry.sessionMetrics?.tags),
     rawTechniqueMentions: sanitizeRawTechniqueMentions(entry.rawTechniqueMentions),
     mediaAttachments: sanitizeMediaAttachments(entry.mediaAttachments)
   };
