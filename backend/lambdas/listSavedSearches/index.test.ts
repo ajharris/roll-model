@@ -1,5 +1,5 @@
-import type { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 import type { QueryCommandOutput } from '@aws-sdk/lib-dynamodb';
+import type { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 
 import { queryItems } from '../../shared/db';
 
