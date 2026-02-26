@@ -6,7 +6,6 @@ import type {
   EntryCreatePayload,
   EntrySearchRequest,
   FeedbackPayload,
-  RestoreDataResponse,
   SavedEntrySearch,
   SavedEntrySearchUpsertPayload,
   SignupRequestPayload,
@@ -156,12 +155,6 @@ const request = async <T>(path: string, init?: RequestInit): Promise<T> => {
 
   if (response.status === 204) return {} as T;
   return response.json() as Promise<T>;
-};
-
-const requestText = async (path: string, init?: RequestInit): Promise<string> => {
-  const response = await sendRequest(path, init);
-  if (response.status === 204) return '';
-  return response.text();
 };
 
 const asEntryArray = (payload: unknown): Entry[] => {
