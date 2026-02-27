@@ -16,6 +16,10 @@
 - Keyword index (shared)
 - Keyword index (private)
 - Gap priority override
+- Curriculum stage
+- Curriculum skill
+- Curriculum relationship
+- Curriculum progression
 
 ## PK/SK patterns
 - **Coach-athlete link**: `PK = USER#{athleteId}`, `SK = COACH#{coachId}`
@@ -27,6 +31,10 @@
 - **Keyword index (shared)**: `PK = USER#{athleteId}`, `SK = KW#{token}#TS#{createdAt}#ENTRY#{entryId}`
 - **Keyword index (private)**: `PK = USER_PRIVATE#{athleteId}`, `SK = KW#{token}#TS#{createdAt}#ENTRY#{entryId}`
 - **Gap priority override**: `PK = USER#{athleteId}`, `SK = GAP_PRIORITY#{gapId}`
+- **Curriculum stage**: `PK = USER#{athleteId}`, `SK = CURRICULUM_STAGE#{order}#{stageId}`
+- **Curriculum skill**: `PK = USER#{athleteId}`, `SK = CURRICULUM_SKILL#{skillId}`
+- **Curriculum relationship**: `PK = USER#{athleteId}`, `SK = CURRICULUM_REL#FROM#{fromSkillId}#TO#{toSkillId}`
+- **Curriculum progression**: `PK = USER#{athleteId}`, `SK = CURRICULUM_PROGRESS#{skillId}`
 
 ## Attributes
 ### Entry

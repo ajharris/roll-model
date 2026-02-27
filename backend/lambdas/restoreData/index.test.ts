@@ -118,6 +118,9 @@ describe('restoreData handler', () => {
         Items: []
       } as unknown as QueryCommandOutput)
       .mockResolvedValueOnce({
+        Items: []
+      } as unknown as QueryCommandOutput)
+      .mockResolvedValueOnce({
         Items: [
           {
             PK: 'AI_THREAD#thread-1',
@@ -209,6 +212,10 @@ describe('restoreData handler', () => {
         aiThreads: number;
         aiMessages: number;
         weeklyPlans: number;
+        curriculumStages: number;
+        curriculumSkills: number;
+        curriculumRelationships: number;
+        curriculumProgressions: number;
         curriculumGraph: number;
         itemsWritten: number;
       };
@@ -220,6 +227,10 @@ describe('restoreData handler', () => {
     expect(restoreBody.counts.aiThreads).toBe(1);
     expect(restoreBody.counts.aiMessages).toBe(1);
     expect(restoreBody.counts.weeklyPlans).toBe(0);
+    expect(restoreBody.counts.curriculumStages).toBe(0);
+    expect(restoreBody.counts.curriculumSkills).toBe(0);
+    expect(restoreBody.counts.curriculumRelationships).toBe(0);
+    expect(restoreBody.counts.curriculumProgressions).toBe(0);
     expect(restoreBody.counts.curriculumGraph).toBe(0);
     expect(restoreBody.counts.itemsWritten).toBeGreaterThanOrEqual(6);
   });

@@ -101,6 +101,12 @@ describe('exportData handler', () => {
       } as unknown as QueryCommandOutput)
       .mockResolvedValueOnce({
         Items: []
+      } as unknown as QueryCommandOutput)
+      .mockResolvedValueOnce({
+        Items: []
+      } as unknown as QueryCommandOutput)
+      .mockResolvedValueOnce({
+        Items: []
       } as unknown as QueryCommandOutput);
 
     const result = (await handler(buildEvent(), {} as never, () => undefined)) as APIGatewayProxyResult;
@@ -127,6 +133,9 @@ describe('exportData handler', () => {
 
   it('returns tidy only when mode=tidy', async () => {
     mockQueryItems
+      .mockResolvedValueOnce({
+        Items: []
+      } as unknown as QueryCommandOutput)
       .mockResolvedValueOnce({
         Items: []
       } as unknown as QueryCommandOutput)

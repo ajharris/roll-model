@@ -1,6 +1,19 @@
+import { buildProgressRecord, buildRelationshipRecord, buildSkillRecord, buildStageRecord } from './curriculum';
 import { isValidMediaAttachmentsInput, normalizeEntry } from './entries';
 import { buildKeywordIndexItems, extractEntryTokens } from './keywords';
-import type { AIMessage, AIThread, CoachLink, Comment, CurriculumGraph, Entry, WeeklyPlan } from './types';
+import type {
+  AIMessage,
+  AIThread,
+  CoachLink,
+  Comment,
+  CurriculumGraph,
+  CurriculumStage,
+  Entry,
+  Skill,
+  SkillProgress,
+  SkillRelationship,
+  WeeklyPlan
+} from './types';
 import { parseWeeklyPlanRecord, weeklyPlanMetaPk, weeklyPlanPk, weeklyPlanSk } from './weeklyPlans';
 
 export const CURRENT_BACKUP_SCHEMA_VERSION = '2026-02-27';
@@ -13,6 +26,10 @@ export interface BackupDataset {
   aiThreads: AIThread[];
   aiMessages: AIMessage[];
   weeklyPlans: WeeklyPlan[];
+  curriculumStages: CurriculumStage[];
+  curriculumSkills: Skill[];
+  curriculumRelationships: SkillRelationship[];
+  curriculumProgressions: SkillProgress[];
   curriculumGraph?: CurriculumGraph;
 }
 
@@ -34,6 +51,10 @@ type ParsedBackupEnvelope = {
     aiThreads: unknown[];
     aiMessages: unknown[];
     weeklyPlans: unknown[];
+    curriculumStages: unknown[];
+    curriculumSkills: unknown[];
+    curriculumRelationships: unknown[];
+    curriculumProgressions: unknown[];
     curriculumGraph?: unknown;
   };
 };
@@ -204,6 +225,80 @@ const parseCurriculumGraph = (value: unknown): CurriculumGraph | undefined => {
   return value as unknown as CurriculumGraph;
 };
 
+const parseCurriculumStage = (value: unknown): CurriculumStage => {
+  if (!isRecord(value)) {
+    throw new BackupValidationError('format', 'Backup curriculum stage items must be objects.');
+  }
+  if (
+    typeof value.stageId !== 'string' ||
+    typeof value.name !== 'string' ||
+    typeof value.order !== 'number' ||
+    !Array.isArray(value.milestoneSkills) ||
+    typeof value.updatedAt !== 'string'
+  ) {
+    throw new BackupValidationError('format', 'Backup curriculum stage shape is invalid.');
+  }
+  return value as unknown as CurriculumStage;
+};
+
+const parseCurriculumSkill = (value: unknown): Skill => {
+  if (!isRecord(value)) {
+    throw new BackupValidationError('format', 'Backup curriculum skill items must be objects.');
+  }
+  if (
+    typeof value.skillId !== 'string' ||
+    typeof value.name !== 'string' ||
+    typeof value.category !== 'string' ||
+    typeof value.stageId !== 'string' ||
+    !Array.isArray(value.prerequisites) ||
+    !Array.isArray(value.keyConcepts) ||
+    !Array.isArray(value.commonFailures) ||
+    !Array.isArray(value.drills) ||
+    typeof value.createdAt !== 'string' ||
+    typeof value.updatedAt !== 'string'
+  ) {
+    throw new BackupValidationError('format', 'Backup curriculum skill shape is invalid.');
+  }
+  return value as unknown as Skill;
+};
+
+const parseCurriculumRelationship = (value: unknown): SkillRelationship => {
+  if (!isRecord(value)) {
+    throw new BackupValidationError('format', 'Backup curriculum relationship items must be objects.');
+  }
+  if (
+    typeof value.fromSkillId !== 'string' ||
+    typeof value.toSkillId !== 'string' ||
+    typeof value.relation !== 'string' ||
+    typeof value.createdAt !== 'string' ||
+    typeof value.updatedAt !== 'string'
+  ) {
+    throw new BackupValidationError('format', 'Backup curriculum relationship shape is invalid.');
+  }
+  return value as unknown as SkillRelationship;
+};
+
+const parseCurriculumProgress = (value: unknown): SkillProgress => {
+  if (!isRecord(value)) {
+    throw new BackupValidationError('format', 'Backup curriculum progression items must be objects.');
+  }
+  if (
+    typeof value.athleteId !== 'string' ||
+    typeof value.skillId !== 'string' ||
+    typeof value.state !== 'string' ||
+    typeof value.evidenceCount !== 'number' ||
+    typeof value.confidence !== 'string' ||
+    !Array.isArray(value.rationale) ||
+    !Array.isArray(value.sourceEntryIds) ||
+    !Array.isArray(value.sourceEvidenceIds) ||
+    !Array.isArray(value.suggestedNextSkillIds) ||
+    typeof value.lastEvaluatedAt !== 'string'
+  ) {
+    throw new BackupValidationError('format', 'Backup curriculum progression shape is invalid.');
+  }
+  return value as unknown as SkillProgress;
+};
+
 const parseEnvelope = (raw: unknown): ParsedBackupEnvelope => {
   if (!isRecord(raw)) {
     throw new BackupValidationError('format', 'Backup payload must be a JSON object.');
@@ -241,6 +336,10 @@ const parseEnvelope = (raw: unknown): ParsedBackupEnvelope => {
       aiThreads: requireArray(full.aiThreads, 'full.aiThreads'),
       aiMessages: requireArray(full.aiMessages, 'full.aiMessages'),
       weeklyPlans: Array.isArray(full.weeklyPlans) ? full.weeklyPlans : [],
+      curriculumStages: Array.isArray(full.curriculumStages) ? full.curriculumStages : [],
+      curriculumSkills: Array.isArray(full.curriculumSkills) ? full.curriculumSkills : [],
+      curriculumRelationships: Array.isArray(full.curriculumRelationships) ? full.curriculumRelationships : [],
+      curriculumProgressions: Array.isArray(full.curriculumProgressions) ? full.curriculumProgressions : [],
       curriculumGraph: full.curriculumGraph
     }
   };
@@ -254,6 +353,10 @@ export const parseAndValidateBackup = (raw: unknown): FullBackupEnvelope => {
   const aiThreads = envelope.full.aiThreads.map(parseAIThread);
   const aiMessages = envelope.full.aiMessages.map(parseAIMessage);
   const weeklyPlans = envelope.full.weeklyPlans.map(parseWeeklyPlan);
+  const curriculumStages = envelope.full.curriculumStages.map(parseCurriculumStage);
+  const curriculumSkills = envelope.full.curriculumSkills.map(parseCurriculumSkill);
+  const curriculumRelationships = envelope.full.curriculumRelationships.map(parseCurriculumRelationship);
+  const curriculumProgressions = envelope.full.curriculumProgressions.map(parseCurriculumProgress);
   const curriculumGraph = parseCurriculumGraph(envelope.full.curriculumGraph);
 
   for (const entry of entries) {
@@ -303,6 +406,15 @@ export const parseAndValidateBackup = (raw: unknown): FullBackupEnvelope => {
     }
   }
 
+  for (const progression of curriculumProgressions) {
+    if (progression.athleteId !== envelope.full.athleteId) {
+      throw new BackupValidationError(
+        'format',
+        `Backup curriculum progression athleteId mismatch for skill ${progression.skillId}.`
+      );
+    }
+  }
+
   if (curriculumGraph && curriculumGraph.athleteId !== envelope.full.athleteId) {
     throw new BackupValidationError('format', 'Backup curriculumGraph athleteId mismatch.');
   }
@@ -318,6 +430,10 @@ export const parseAndValidateBackup = (raw: unknown): FullBackupEnvelope => {
       aiThreads,
       aiMessages,
       weeklyPlans,
+      curriculumStages,
+      curriculumSkills,
+      curriculumRelationships,
+      curriculumProgressions,
       ...(curriculumGraph ? { curriculumGraph } : {})
     }
   };
@@ -455,6 +571,19 @@ export const buildRestoreItemsFromBackup = (dataset: BackupDataset): Array<Recor
       createdAt: plan.generatedAt,
       updatedAt: plan.updatedAt
     });
+  }
+
+  for (const stage of dataset.curriculumStages) {
+    items.push(buildStageRecord(dataset.athleteId, stage));
+  }
+  for (const skill of dataset.curriculumSkills) {
+    items.push(buildSkillRecord(dataset.athleteId, skill));
+  }
+  for (const relationship of dataset.curriculumRelationships) {
+    items.push(buildRelationshipRecord(dataset.athleteId, relationship));
+  }
+  for (const progression of dataset.curriculumProgressions) {
+    items.push(buildProgressRecord(progression));
   }
 
   if (dataset.curriculumGraph) {

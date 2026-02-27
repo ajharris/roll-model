@@ -21,6 +21,16 @@ All endpoints require Cognito JWT auth and are fronted by API Gateway REST API (
 - `PUT /gap-insights/priorities`
 - `GET /athletes/{athleteId}/gap-insights`
 - `PUT /athletes/{athleteId}/gap-insights/priorities`
+- `GET /curriculum`
+- `PUT /curriculum/stages`
+- `POST /curriculum/seed`
+- `PUT /curriculum/skills/{skillId}`
+- `DELETE /curriculum/skills/{skillId}`
+- `PUT /curriculum/relationships`
+- `DELETE /curriculum/relationships/{fromSkillId}/{toSkillId}`
+- `POST /curriculum/progress/recompute`
+- `PUT /curriculum/progress/{skillId}/review`
+- `GET /athletes/{athleteId}/curriculum`
 
 ## `POST /entries`
 Create a training entry.

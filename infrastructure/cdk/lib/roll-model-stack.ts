@@ -60,6 +60,12 @@ export class RollModelStack extends cdk.Stack {
       },
       removalPolicy: cdk.RemovalPolicy.RETAIN
     });
+    table.addGlobalSecondaryIndex({
+      indexName: 'GSI1',
+      partitionKey: { name: 'GSI1PK', type: dynamodb.AttributeType.STRING },
+      sortKey: { name: 'GSI1SK', type: dynamodb.AttributeType.STRING },
+      projectionType: dynamodb.ProjectionType.ALL
+    });
 
     const userPool = new cognito.UserPool(this, 'RollModelUserPool', {
       selfSignUpEnabled: true,
@@ -226,6 +232,43 @@ export class RollModelStack extends cdk.Stack {
       'backend/lambdas/updateWeeklyPlan/index.ts',
       table
     );
+    const listCurriculumLambda = this.createLambda('listCurriculum', 'backend/lambdas/listCurriculum/index.ts', table);
+    const upsertCurriculumStagesLambda = this.createLambda(
+      'upsertCurriculumStages',
+      'backend/lambdas/upsertCurriculumStages/index.ts',
+      table
+    );
+    const upsertCurriculumSkillLambda = this.createLambda(
+      'upsertCurriculumSkill',
+      'backend/lambdas/upsertCurriculumSkill/index.ts',
+      table
+    );
+    const deleteCurriculumSkillLambda = this.createLambda(
+      'deleteCurriculumSkill',
+      'backend/lambdas/deleteCurriculumSkill/index.ts',
+      table
+    );
+    const upsertCurriculumRelationshipLambda = this.createLambda(
+      'upsertCurriculumRelationship',
+      'backend/lambdas/upsertCurriculumRelationship/index.ts',
+      table
+    );
+    const deleteCurriculumRelationshipLambda = this.createLambda(
+      'deleteCurriculumRelationship',
+      'backend/lambdas/deleteCurriculumRelationship/index.ts',
+      table
+    );
+    const recomputeCurriculumProgressLambda = this.createLambda(
+      'recomputeCurriculumProgress',
+      'backend/lambdas/recomputeCurriculumProgress/index.ts',
+      table
+    );
+    const reviewCurriculumProgressLambda = this.createLambda(
+      'reviewCurriculumProgress',
+      'backend/lambdas/reviewCurriculumProgress/index.ts',
+      table
+    );
+    const seedCurriculumLambda = this.createLambda('seedCurriculum', 'backend/lambdas/seedCurriculum/index.ts', table);
     const backendLambdas: Array<{ name: string; fn: nodejs.NodejsFunction }> = [
       { name: 'createEntry', fn: createEntryLambda },
       { name: 'getEntries', fn: getEntriesLambda },
@@ -252,7 +295,16 @@ export class RollModelStack extends cdk.Stack {
       { name: 'upsertGapPriorities', fn: upsertGapPrioritiesLambda },
       { name: 'buildWeeklyPlan', fn: buildWeeklyPlanLambda },
       { name: 'listWeeklyPlans', fn: listWeeklyPlansLambda },
-      { name: 'updateWeeklyPlan', fn: updateWeeklyPlanLambda }
+      { name: 'updateWeeklyPlan', fn: updateWeeklyPlanLambda },
+      { name: 'listCurriculum', fn: listCurriculumLambda },
+      { name: 'upsertCurriculumStages', fn: upsertCurriculumStagesLambda },
+      { name: 'upsertCurriculumSkill', fn: upsertCurriculumSkillLambda },
+      { name: 'deleteCurriculumSkill', fn: deleteCurriculumSkillLambda },
+      { name: 'upsertCurriculumRelationship', fn: upsertCurriculumRelationshipLambda },
+      { name: 'deleteCurriculumRelationship', fn: deleteCurriculumRelationshipLambda },
+      { name: 'recomputeCurriculumProgress', fn: recomputeCurriculumProgressLambda },
+      { name: 'reviewCurriculumProgress', fn: reviewCurriculumProgressLambda },
+      { name: 'seedCurriculum', fn: seedCurriculumLambda }
     ];
 
     aiChatLambda.addToRolePolicy(
@@ -492,6 +544,89 @@ export class RollModelStack extends cdk.Stack {
       allowHeaders: ['Content-Type', 'Authorization']
     });
 
+    const curriculum = api.root.addResource('curriculum');
+    curriculum.addMethod('GET', new apigateway.LambdaIntegration(listCurriculumLambda), methodOptions);
+    curriculum.addCorsPreflight({
+      allowOrigins: apigateway.Cors.ALL_ORIGINS,
+      allowMethods: ['GET', 'OPTIONS'],
+      allowHeaders: ['Content-Type', 'Authorization']
+    });
+
+    const curriculumStages = curriculum.addResource('stages');
+    curriculumStages.addMethod('PUT', new apigateway.LambdaIntegration(upsertCurriculumStagesLambda), methodOptions);
+    curriculumStages.addCorsPreflight({
+      allowOrigins: apigateway.Cors.ALL_ORIGINS,
+      allowMethods: ['PUT', 'OPTIONS'],
+      allowHeaders: ['Content-Type', 'Authorization']
+    });
+
+    const curriculumSkills = curriculum.addResource('skills');
+    const curriculumSeed = curriculum.addResource('seed');
+    curriculumSeed.addMethod('POST', new apigateway.LambdaIntegration(seedCurriculumLambda), methodOptions);
+    curriculumSeed.addCorsPreflight({
+      allowOrigins: apigateway.Cors.ALL_ORIGINS,
+      allowMethods: ['POST', 'OPTIONS'],
+      allowHeaders: ['Content-Type', 'Authorization']
+    });
+    const curriculumSkillById = curriculumSkills.addResource('{skillId}');
+    curriculumSkillById.addMethod('PUT', new apigateway.LambdaIntegration(upsertCurriculumSkillLambda), methodOptions);
+    curriculumSkillById.addMethod('DELETE', new apigateway.LambdaIntegration(deleteCurriculumSkillLambda), methodOptions);
+    curriculumSkillById.addCorsPreflight({
+      allowOrigins: apigateway.Cors.ALL_ORIGINS,
+      allowMethods: ['PUT', 'DELETE', 'OPTIONS'],
+      allowHeaders: ['Content-Type', 'Authorization']
+    });
+
+    const curriculumRelationships = curriculum.addResource('relationships');
+    curriculumRelationships.addMethod(
+      'PUT',
+      new apigateway.LambdaIntegration(upsertCurriculumRelationshipLambda),
+      methodOptions
+    );
+    curriculumRelationships.addCorsPreflight({
+      allowOrigins: apigateway.Cors.ALL_ORIGINS,
+      allowMethods: ['PUT', 'OPTIONS'],
+      allowHeaders: ['Content-Type', 'Authorization']
+    });
+    const curriculumRelationshipById = curriculumRelationships
+      .addResource('{fromSkillId}')
+      .addResource('{toSkillId}');
+    curriculumRelationshipById.addMethod(
+      'DELETE',
+      new apigateway.LambdaIntegration(deleteCurriculumRelationshipLambda),
+      methodOptions
+    );
+    curriculumRelationshipById.addCorsPreflight({
+      allowOrigins: apigateway.Cors.ALL_ORIGINS,
+      allowMethods: ['DELETE', 'OPTIONS'],
+      allowHeaders: ['Content-Type', 'Authorization']
+    });
+
+    const curriculumProgress = curriculum.addResource('progress');
+    const curriculumProgressRecompute = curriculumProgress.addResource('recompute');
+    curriculumProgressRecompute.addMethod(
+      'POST',
+      new apigateway.LambdaIntegration(recomputeCurriculumProgressLambda),
+      methodOptions
+    );
+    curriculumProgressRecompute.addCorsPreflight({
+      allowOrigins: apigateway.Cors.ALL_ORIGINS,
+      allowMethods: ['POST', 'OPTIONS'],
+      allowHeaders: ['Content-Type', 'Authorization']
+    });
+    const curriculumProgressBySkill = curriculumProgress.addResource('{skillId}');
+    const curriculumProgressReview = curriculumProgressBySkill.addResource('review');
+    curriculumProgressReview.addMethod(
+      'PUT',
+      new apigateway.LambdaIntegration(reviewCurriculumProgressLambda),
+      methodOptions
+    );
+    curriculumProgressReview.addCorsPreflight({
+      allowOrigins: apigateway.Cors.ALL_ORIGINS,
+      allowMethods: ['PUT', 'OPTIONS'],
+      allowHeaders: ['Content-Type', 'Authorization']
+    });
+
     const athletes = api.root.addResource('athletes');
     const athleteById = athletes.addResource('{athleteId}');
     const athleteEntries = athleteById.addResource('entries');
@@ -562,6 +697,94 @@ export class RollModelStack extends cdk.Stack {
     const athleteWeeklyPlanById = athleteWeeklyPlans.addResource('{planId}');
     athleteWeeklyPlanById.addMethod('PUT', new apigateway.LambdaIntegration(updateWeeklyPlanLambda), methodOptions);
     athleteWeeklyPlanById.addCorsPreflight({
+      allowOrigins: apigateway.Cors.ALL_ORIGINS,
+      allowMethods: ['PUT', 'OPTIONS'],
+      allowHeaders: ['Content-Type', 'Authorization']
+    });
+
+    const athleteCurriculum = athleteById.addResource('curriculum');
+    athleteCurriculum.addMethod('GET', new apigateway.LambdaIntegration(listCurriculumLambda), methodOptions);
+    athleteCurriculum.addCorsPreflight({
+      allowOrigins: apigateway.Cors.ALL_ORIGINS,
+      allowMethods: ['GET', 'OPTIONS'],
+      allowHeaders: ['Content-Type', 'Authorization']
+    });
+
+    const athleteCurriculumStages = athleteCurriculum.addResource('stages');
+    athleteCurriculumStages.addMethod('PUT', new apigateway.LambdaIntegration(upsertCurriculumStagesLambda), methodOptions);
+    athleteCurriculumStages.addCorsPreflight({
+      allowOrigins: apigateway.Cors.ALL_ORIGINS,
+      allowMethods: ['PUT', 'OPTIONS'],
+      allowHeaders: ['Content-Type', 'Authorization']
+    });
+
+    const athleteCurriculumSeed = athleteCurriculum.addResource('seed');
+    athleteCurriculumSeed.addMethod('POST', new apigateway.LambdaIntegration(seedCurriculumLambda), methodOptions);
+    athleteCurriculumSeed.addCorsPreflight({
+      allowOrigins: apigateway.Cors.ALL_ORIGINS,
+      allowMethods: ['POST', 'OPTIONS'],
+      allowHeaders: ['Content-Type', 'Authorization']
+    });
+
+    const athleteCurriculumSkillById = athleteCurriculum.addResource('skills').addResource('{skillId}');
+    athleteCurriculumSkillById.addMethod('PUT', new apigateway.LambdaIntegration(upsertCurriculumSkillLambda), methodOptions);
+    athleteCurriculumSkillById.addMethod(
+      'DELETE',
+      new apigateway.LambdaIntegration(deleteCurriculumSkillLambda),
+      methodOptions
+    );
+    athleteCurriculumSkillById.addCorsPreflight({
+      allowOrigins: apigateway.Cors.ALL_ORIGINS,
+      allowMethods: ['PUT', 'DELETE', 'OPTIONS'],
+      allowHeaders: ['Content-Type', 'Authorization']
+    });
+
+    const athleteCurriculumRelationships = athleteCurriculum.addResource('relationships');
+    athleteCurriculumRelationships.addMethod(
+      'PUT',
+      new apigateway.LambdaIntegration(upsertCurriculumRelationshipLambda),
+      methodOptions
+    );
+    athleteCurriculumRelationships.addCorsPreflight({
+      allowOrigins: apigateway.Cors.ALL_ORIGINS,
+      allowMethods: ['PUT', 'OPTIONS'],
+      allowHeaders: ['Content-Type', 'Authorization']
+    });
+    const athleteCurriculumRelationshipById = athleteCurriculumRelationships
+      .addResource('{fromSkillId}')
+      .addResource('{toSkillId}');
+    athleteCurriculumRelationshipById.addMethod(
+      'DELETE',
+      new apigateway.LambdaIntegration(deleteCurriculumRelationshipLambda),
+      methodOptions
+    );
+    athleteCurriculumRelationshipById.addCorsPreflight({
+      allowOrigins: apigateway.Cors.ALL_ORIGINS,
+      allowMethods: ['DELETE', 'OPTIONS'],
+      allowHeaders: ['Content-Type', 'Authorization']
+    });
+
+    const athleteCurriculumProgress = athleteCurriculum.addResource('progress');
+    const athleteCurriculumProgressRecompute = athleteCurriculumProgress.addResource('recompute');
+    athleteCurriculumProgressRecompute.addMethod(
+      'POST',
+      new apigateway.LambdaIntegration(recomputeCurriculumProgressLambda),
+      methodOptions
+    );
+    athleteCurriculumProgressRecompute.addCorsPreflight({
+      allowOrigins: apigateway.Cors.ALL_ORIGINS,
+      allowMethods: ['POST', 'OPTIONS'],
+      allowHeaders: ['Content-Type', 'Authorization']
+    });
+    const athleteCurriculumProgressReview = athleteCurriculumProgress
+      .addResource('{skillId}')
+      .addResource('review');
+    athleteCurriculumProgressReview.addMethod(
+      'PUT',
+      new apigateway.LambdaIntegration(reviewCurriculumProgressLambda),
+      methodOptions
+    );
+    athleteCurriculumProgressReview.addCorsPreflight({
       allowOrigins: apigateway.Cors.ALL_ORIGINS,
       allowMethods: ['PUT', 'OPTIONS'],
       allowHeaders: ['Content-Type', 'Authorization']
