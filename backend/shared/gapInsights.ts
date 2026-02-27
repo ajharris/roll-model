@@ -69,14 +69,15 @@ const parsePositiveInt = (
   min: number,
   max: number,
 ): number => {
+  const fieldName = String(field);
   if (!raw) return fallback;
   if (!/^\d+$/.test(raw.trim())) {
-    invalid(`${field} must be an integer between ${min} and ${max}.`);
+    invalid(`${fieldName} must be an integer between ${min} and ${max}.`);
   }
 
   const parsed = Number.parseInt(raw.trim(), 10);
   if (!Number.isFinite(parsed) || parsed < min || parsed > max) {
-    invalid(`${field} must be an integer between ${min} and ${max}.`);
+    invalid(`${fieldName} must be an integer between ${min} and ${max}.`);
   }
 
   return parsed;

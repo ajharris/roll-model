@@ -201,6 +201,16 @@ export class RollModelStack extends cdk.Stack {
       'backend/lambdas/submitFeedback/index.ts',
       table
     );
+    const getGapInsightsLambda = this.createLambda(
+      'getGapInsights',
+      'backend/lambdas/getGapInsights/index.ts',
+      table
+    );
+    const upsertGapPrioritiesLambda = this.createLambda(
+      'upsertGapPriorities',
+      'backend/lambdas/upsertGapPriorities/index.ts',
+      table
+    );
     const buildWeeklyPlanLambda = this.createLambda(
       'buildWeeklyPlan',
       'backend/lambdas/buildWeeklyPlan/index.ts',
@@ -238,6 +248,8 @@ export class RollModelStack extends cdk.Stack {
       { name: 'reviewCheckoff', fn: reviewCheckoffLambda },
       { name: 'getEntryCheckoffEvidence', fn: getEntryCheckoffEvidenceLambda },
       { name: 'submitFeedback', fn: submitFeedbackLambda },
+      { name: 'getGapInsights', fn: getGapInsightsLambda },
+      { name: 'upsertGapPriorities', fn: upsertGapPrioritiesLambda },
       { name: 'buildWeeklyPlan', fn: buildWeeklyPlanLambda },
       { name: 'listWeeklyPlans', fn: listWeeklyPlansLambda },
       { name: 'updateWeeklyPlan', fn: updateWeeklyPlanLambda }

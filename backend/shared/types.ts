@@ -281,6 +281,94 @@ export interface Checkoff {
   coachReviewedBy?: string;
 }
 
+export type GapInsightType = 'stale_skill' | 'not_training' | 'repeated_failure';
+export type GapInsightImpact = 'high' | 'medium' | 'low';
+export type GapPriorityStatus = 'accepted' | 'watch' | 'dismissed';
+
+export interface GapPriorityOverride {
+  gapId: string;
+  status: GapPriorityStatus;
+  manualPriority?: number;
+  note?: string;
+  updatedAt: string;
+  updatedBy: string;
+  updatedByRole: 'athlete' | 'coach';
+}
+
+export interface UpsertGapPriorityInput {
+  gapId: string;
+  status: GapPriorityStatus;
+  manualPriority?: number;
+  note?: string;
+}
+
+export interface UpsertGapPrioritiesRequest {
+  priorities: UpsertGapPriorityInput[];
+}
+
+export interface GapInsightSourceLink {
+  entryId: string;
+  createdAt: string;
+  evidenceId?: string;
+  checkoffId?: string;
+  skillId?: string;
+  position?: string;
+  excerpt?: string;
+}
+
+export interface GapInsightItem {
+  gapId: string;
+  type: GapInsightType;
+  title: string;
+  summary: string;
+  score: number;
+  impact: GapInsightImpact;
+  reasons: string[];
+  nextSteps: string[];
+  sourceLinks: GapInsightSourceLink[];
+  skillId?: string;
+  daysSinceLastSeen?: number;
+  position?: string;
+  repeatCount?: number;
+  failureExamples?: string[];
+  priority?: GapPriorityOverride;
+}
+
+export interface GapInsightsThresholds {
+  staleDays: number;
+  lookbackDays: number;
+  repeatFailureWindowDays: number;
+  repeatFailureMinCount: number;
+  topN: number;
+}
+
+export interface GapInsightsReport {
+  athleteId: string;
+  generatedAt: string;
+  thresholds: GapInsightsThresholds;
+  summary: {
+    totalGaps: number;
+    staleSkillCount: number;
+    repeatedFailureCount: number;
+    notTrainingCount: number;
+  };
+  sections: {
+    notTraining: GapInsightItem[];
+    staleSkills: GapInsightItem[];
+    repeatedFailures: GapInsightItem[];
+  };
+  ranked: GapInsightItem[];
+  weeklyFocus: {
+    headline: string;
+    items: Array<{
+      gapId: string;
+      title: string;
+      reason: string;
+      nextStep: string;
+    }>;
+  };
+}
+
 export interface AIExtractedUpdates {
   summary: string;
   actionPack: ActionPack;
