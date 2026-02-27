@@ -10,7 +10,7 @@ import { MediaAttachmentsInput } from '@/components/MediaAttachmentsInput';
 import { Protected } from '@/components/Protected';
 import { apiClient } from '@/lib/apiClient';
 import { clearEntryDraft, readEntryDraft, writeEntryDraft } from '@/lib/journalLocal';
-import type { Entry, MediaAttachment } from '@/types/api';
+import type { CheckoffEvidence, Entry, MediaAttachment } from '@/types/api';
 
 type EntryEditDraft = {
   shared: string;
@@ -68,6 +68,7 @@ export default function EntryDetailPage() {
   const [mediaAttachments, setMediaAttachments] = useState<MediaAttachment[]>([]);
   const [status, setStatus] = useState('');
   const [draftState, setDraftState] = useState<'idle' | 'saved'>('idle');
+  const [checkoffEvidence, setCheckoffEvidence] = useState<CheckoffEvidence[]>([]);
   const canEdit = Boolean(entry) && !isLoading;
 
   useEffect(() => {
@@ -75,9 +76,9 @@ export default function EntryDetailPage() {
     setIsLoading(true);
     setStatus('');
 
-    void apiClient
-      .getEntry(entryId)
-      .then((loadedEntry) => {
+    void (async () => {
+      try {
+        const loadedEntry = await apiClient.getEntry(entryId);
         if (cancelled) return;
         setEntry(loadedEntry);
 
@@ -93,30 +94,33 @@ export default function EntryDetailPage() {
           setTechniques(draft.techniques ?? loadedEntry.rawTechniqueMentions);
           setMediaAttachments(draft.mediaAttachments ?? (loadedEntry.mediaAttachments ?? []));
           setStatus('Draft restored.');
-          return;
+        } else {
+          setShared(loadedEntry.sections.shared);
+          setPrivateText(loadedEntry.sections.private ?? '');
+          setDurationMinutes(loadedEntry.sessionMetrics.durationMinutes);
+          setIntensity(loadedEntry.sessionMetrics.intensity);
+          setRounds(loadedEntry.sessionMetrics.rounds);
+          setGiOrNoGi(loadedEntry.sessionMetrics.giOrNoGi);
+          setTags(loadedEntry.sessionMetrics.tags);
+          setTechniques(loadedEntry.rawTechniqueMentions);
+          setMediaAttachments(loadedEntry.mediaAttachments ?? []);
         }
 
-        setShared(loadedEntry.sections.shared);
-        setPrivateText(loadedEntry.sections.private ?? '');
-        setDurationMinutes(loadedEntry.sessionMetrics.durationMinutes);
-        setIntensity(loadedEntry.sessionMetrics.intensity);
-        setRounds(loadedEntry.sessionMetrics.rounds);
-        setGiOrNoGi(loadedEntry.sessionMetrics.giOrNoGi);
-        setTags(loadedEntry.sessionMetrics.tags);
-        setTechniques(loadedEntry.rawTechniqueMentions);
-        setMediaAttachments(loadedEntry.mediaAttachments ?? []);
-      })
-      .catch(() => {
+        const evidence = await apiClient.getEntryCheckoffEvidence(entryId);
+        if (!cancelled) {
+          setCheckoffEvidence(evidence);
+        }
+      } catch {
         if (!cancelled) {
           setEntry(null);
           setStatus('Could not load entry.');
         }
-      })
-      .finally(() => {
+      } finally {
         if (!cancelled) {
           setIsLoading(false);
         }
-      });
+      }
+    })();
 
     return () => {
       cancelled = true;
@@ -226,6 +230,26 @@ export default function EntryDetailPage() {
               <strong>Fallback guidance:</strong> {entry.actionPackFinal.actionPack.fallbackDecisionGuidance || 'none'}
             </p>
             <p className="small">Finalized at {new Date(entry.actionPackFinal.finalizedAt).toLocaleString()}</p>
+          </div>
+        )}
+        {checkoffEvidence.length > 0 && (
+          <div className="panel">
+            <h3>Checkoff evidence from this entry</h3>
+            {checkoffEvidence.map((item) => (
+              <div key={item.evidenceId} className="small" style={{ marginBottom: '0.5rem' }}>
+                <strong>{item.skillId}</strong> • {item.evidenceType} • {item.mappingStatus}
+                <br />
+                Evidence: {item.statement}
+                <br />
+                Confidence: {item.confidence}
+                {item.sourceOutcomeField ? (
+                  <>
+                    <br />
+                    Source outcome: {item.sourceOutcomeField}
+                  </>
+                ) : null}
+              </div>
+            ))}
           </div>
         )}
         <form onSubmit={save}>

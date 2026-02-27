@@ -19,6 +19,7 @@ const {
     createEntry: vi.fn(),
     chat: vi.fn(),
     updateEntry: vi.fn(),
+    upsertEntryCheckoffEvidence: vi.fn(),
   },
   flushOfflineCreateQueueMock: vi.fn(),
   readEntryDraftMock: vi.fn(),
@@ -80,6 +81,7 @@ describe('NewEntryPage phase 1 flow', () => {
     apiClientMock.createEntry.mockReset();
     apiClientMock.chat.mockReset();
     apiClientMock.updateEntry.mockReset();
+    apiClientMock.upsertEntryCheckoffEvidence.mockReset();
     flushOfflineCreateQueueMock.mockReset();
     readEntryDraftMock.mockReset();
     writeEntryDraftMock.mockReset();
@@ -116,6 +118,11 @@ describe('NewEntryPage phase 1 flow', () => {
       },
     });
     apiClientMock.updateEntry.mockResolvedValue({});
+    apiClientMock.upsertEntryCheckoffEvidence.mockResolvedValue({
+      checkoffs: [],
+      evidence: [],
+      pendingConfirmationCount: 0,
+    });
   });
 
   it('applies drill-session template defaults', async () => {
@@ -155,6 +162,7 @@ describe('NewEntryPage phase 1 flow', () => {
     await user.click(screen.getByRole('button', { name: 'Finalize shared feedback' }));
 
     await waitFor(() => expect(apiClientMock.updateEntry).toHaveBeenCalledTimes(2));
+    expect(apiClientMock.upsertEntryCheckoffEvidence).toHaveBeenCalledTimes(1);
 
     const finalCallPayload = apiClientMock.updateEntry.mock.calls[1]?.[1];
     expect(finalCallPayload.actionPackFinal.actionPack.oneFocus).toBe('Pummel first');

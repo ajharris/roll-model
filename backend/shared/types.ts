@@ -236,6 +236,51 @@ export interface FinalizedActionPack {
   finalizedAt: string;
 }
 
+export type CheckoffStatus = 'pending' | 'earned' | 'superseded' | 'revalidated';
+export type CheckoffEvidenceType =
+  | 'hit-in-live-roll'
+  | 'hit-on-equal-or-better-partner'
+  | 'demonstrate-clean-reps'
+  | 'explain-counters-and-recounters';
+export type CheckoffEvidenceSource = 'gpt-structured' | 'manual' | 'coach-review';
+export type CheckoffEvidenceMappingStatus = 'pending_confirmation' | 'confirmed' | 'rejected';
+export type EvidenceQuality = 'insufficient' | 'adequate' | 'strong';
+
+export interface CheckoffEvidence {
+  evidenceId: string;
+  checkoffId: string;
+  athleteId: string;
+  skillId: string;
+  entryId: string;
+  evidenceType: CheckoffEvidenceType;
+  source: CheckoffEvidenceSource;
+  statement: string;
+  confidence: ConfidenceLevel;
+  mappingStatus: CheckoffEvidenceMappingStatus;
+  sourceOutcomeField?: ActionPackFieldKey;
+  quality?: EvidenceQuality;
+  coachNote?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Checkoff {
+  checkoffId: string;
+  athleteId: string;
+  skillId: string;
+  evidenceType: CheckoffEvidenceType;
+  status: CheckoffStatus;
+  minEvidenceRequired: number;
+  confirmedEvidenceCount: number;
+  createdAt: string;
+  updatedAt: string;
+  earnedAt?: string;
+  supersededAt?: string;
+  revalidatedAt?: string;
+  coachReviewedAt?: string;
+  coachReviewedBy?: string;
+}
+
 export interface AIExtractedUpdates {
   summary: string;
   actionPack: ActionPack;

@@ -15,7 +15,9 @@ import {
   type PutCommandInput,
   QueryCommand,
   type QueryCommandInput,
-  type QueryCommandOutput
+  type QueryCommandOutput,
+  UpdateCommand,
+  type UpdateCommandInput
 } from '@aws-sdk/lib-dynamodb';
 
 const createDocumentClient = (): DynamoDBDocumentClient => {
@@ -81,6 +83,15 @@ export const getItem = async (input: Omit<GetCommandInput, 'TableName'>): Promis
 export const deleteItem = async (input: Omit<DeleteCommandInput, 'TableName'>): Promise<void> => {
   await documentClient.send(
     new DeleteCommand({
+      TableName: TABLE_NAME,
+      ...input
+    })
+  );
+};
+
+export const updateItem = async (input: Omit<UpdateCommandInput, 'TableName'>): Promise<void> => {
+  await documentClient.send(
+    new UpdateCommand({
       TableName: TABLE_NAME,
       ...input
     })
