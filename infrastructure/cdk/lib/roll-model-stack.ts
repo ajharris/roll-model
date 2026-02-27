@@ -201,6 +201,12 @@ export class RollModelStack extends cdk.Stack {
       'backend/lambdas/submitFeedback/index.ts',
       table
     );
+    const getGapInsightsLambda = this.createLambda('getGapInsights', 'backend/lambdas/getGapInsights/index.ts', table);
+    const upsertGapPrioritiesLambda = this.createLambda(
+      'upsertGapPriorities',
+      'backend/lambdas/upsertGapPriorities/index.ts',
+      table
+    );
     const backendLambdas: Array<{ name: string; fn: nodejs.NodejsFunction }> = [
       { name: 'createEntry', fn: createEntryLambda },
       { name: 'getEntries', fn: getEntriesLambda },
@@ -222,7 +228,9 @@ export class RollModelStack extends cdk.Stack {
       { name: 'upsertCheckoffEvidence', fn: upsertCheckoffEvidenceLambda },
       { name: 'reviewCheckoff', fn: reviewCheckoffLambda },
       { name: 'getEntryCheckoffEvidence', fn: getEntryCheckoffEvidenceLambda },
-      { name: 'submitFeedback', fn: submitFeedbackLambda }
+      { name: 'submitFeedback', fn: submitFeedbackLambda },
+      { name: 'getGapInsights', fn: getGapInsightsLambda },
+      { name: 'upsertGapPriorities', fn: upsertGapPrioritiesLambda }
     ];
 
     aiChatLambda.addToRolePolicy(
@@ -446,6 +454,22 @@ export class RollModelStack extends cdk.Stack {
       allowHeaders: ['Content-Type', 'Authorization']
     });
 
+    const gapInsights = api.root.addResource('gap-insights');
+    gapInsights.addMethod('GET', new apigateway.LambdaIntegration(getGapInsightsLambda), methodOptions);
+    gapInsights.addCorsPreflight({
+      allowOrigins: apigateway.Cors.ALL_ORIGINS,
+      allowMethods: ['GET', 'OPTIONS'],
+      allowHeaders: ['Content-Type', 'Authorization']
+    });
+
+    const gapInsightsPriorities = gapInsights.addResource('priorities');
+    gapInsightsPriorities.addMethod('PUT', new apigateway.LambdaIntegration(upsertGapPrioritiesLambda), methodOptions);
+    gapInsightsPriorities.addCorsPreflight({
+      allowOrigins: apigateway.Cors.ALL_ORIGINS,
+      allowMethods: ['PUT', 'OPTIONS'],
+      allowHeaders: ['Content-Type', 'Authorization']
+    });
+
     const athletes = api.root.addResource('athletes');
     const athleteById = athletes.addResource('{athleteId}');
     const athleteEntries = athleteById.addResource('entries');
@@ -468,6 +492,22 @@ export class RollModelStack extends cdk.Stack {
     const athleteCheckoffReview = athleteCheckoffById.addResource('review');
     athleteCheckoffReview.addMethod('PUT', new apigateway.LambdaIntegration(reviewCheckoffLambda), methodOptions);
     athleteCheckoffReview.addCorsPreflight({
+      allowOrigins: apigateway.Cors.ALL_ORIGINS,
+      allowMethods: ['PUT', 'OPTIONS'],
+      allowHeaders: ['Content-Type', 'Authorization']
+    });
+
+    const athleteGapInsights = athleteById.addResource('gap-insights');
+    athleteGapInsights.addMethod('GET', new apigateway.LambdaIntegration(getGapInsightsLambda), methodOptions);
+    athleteGapInsights.addCorsPreflight({
+      allowOrigins: apigateway.Cors.ALL_ORIGINS,
+      allowMethods: ['GET', 'OPTIONS'],
+      allowHeaders: ['Content-Type', 'Authorization']
+    });
+
+    const athleteGapInsightsPriorities = athleteGapInsights.addResource('priorities');
+    athleteGapInsightsPriorities.addMethod('PUT', new apigateway.LambdaIntegration(upsertGapPrioritiesLambda), methodOptions);
+    athleteGapInsightsPriorities.addCorsPreflight({
       allowOrigins: apigateway.Cors.ALL_ORIGINS,
       allowMethods: ['PUT', 'OPTIONS'],
       allowHeaders: ['Content-Type', 'Authorization']

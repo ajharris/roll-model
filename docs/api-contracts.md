@@ -17,6 +17,10 @@ All endpoints require Cognito JWT auth and are fronted by API Gateway REST API (
 - `POST /links/coach`
 - `GET /export`
 - `POST /ai/chat`
+- `GET /gap-insights`
+- `PUT /gap-insights/priorities`
+- `GET /athletes/{athleteId}/gap-insights`
+- `PUT /athletes/{athleteId}/gap-insights/priorities`
 
 ## `POST /entries`
 Create a training entry.
@@ -408,6 +412,84 @@ Return a full or tidy export for the authenticated athlete.
       }
     }
   }
+}
+```
+
+## `GET /gap-insights`
+Return gap-analysis insights based on stored structured records.
+- **Role**: `athlete` (or `coach` via `/athletes/{athleteId}/gap-insights` for linked athletes)
+- **Query params (optional)**:
+  - `staleDays` (default `30`)
+  - `lookbackDays` (default `30`)
+  - `repeatFailureWindowDays` (default `30`)
+  - `repeatFailureMinCount` (default `2`)
+  - `topN` (default `10`)
+
+**Response shape (200, abbreviated)**
+```json
+{
+  "report": {
+    "athleteId": "string",
+    "generatedAt": "string",
+    "thresholds": {
+      "staleDays": 30,
+      "lookbackDays": 30,
+      "repeatFailureWindowDays": 30,
+      "repeatFailureMinCount": 2,
+      "topN": 10
+    },
+    "summary": {
+      "totalGaps": 0,
+      "staleSkillCount": 0,
+      "repeatedFailureCount": 0,
+      "notTrainingCount": 0
+    },
+    "sections": {
+      "notTraining": [],
+      "staleSkills": [],
+      "repeatedFailures": []
+    },
+    "ranked": [],
+    "weeklyFocus": {
+      "headline": "string",
+      "items": []
+    }
+  }
+}
+```
+
+## `PUT /gap-insights/priorities`
+Persist athlete/coach priority decisions for gap items.
+- **Role**: `athlete` (or `coach` via `/athletes/{athleteId}/gap-insights/priorities` for linked athletes)
+
+**Request**
+```json
+{
+  "priorities": [
+    {
+      "gapId": "stale-skill:knee-cut",
+      "status": "accepted",
+      "manualPriority": 1,
+      "note": "Make this week 1 focus"
+    }
+  ]
+}
+```
+
+**Response (200)**
+```json
+{
+  "saved": [
+    {
+      "gapId": "stale-skill:knee-cut",
+      "status": "accepted",
+      "manualPriority": 1,
+      "note": "Make this week 1 focus",
+      "updatedAt": "string",
+      "updatedBy": "string",
+      "updatedByRole": "athlete"
+    }
+  ]
 }
 ```
 

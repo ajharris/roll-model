@@ -15,6 +15,7 @@
 - AI message
 - Keyword index (shared)
 - Keyword index (private)
+- Gap priority override
 
 ## PK/SK patterns
 - **Coach-athlete link**: `PK = USER#{athleteId}`, `SK = COACH#{coachId}`
@@ -25,6 +26,7 @@
 - **AI message**: `PK = AI_THREAD#{threadId}`, `SK = MSG#{ISODate}#{messageId}`
 - **Keyword index (shared)**: `PK = USER#{athleteId}`, `SK = KW#{token}#TS#{createdAt}#ENTRY#{entryId}`
 - **Keyword index (private)**: `PK = USER_PRIVATE#{athleteId}`, `SK = KW#{token}#TS#{createdAt}#ENTRY#{entryId}`
+- **Gap priority override**: `PK = USER#{athleteId}`, `SK = GAP_PRIORITY#{gapId}`
 
 ## Attributes
 ### Entry
@@ -50,6 +52,11 @@
 
 ### Keyword index
 - `entryId`, `createdAt`, `visibilityScope`
+
+### Gap priority override
+- `gapId`, `status` (`accepted|watch|dismissed`), `manualPriority?`, `note?`
+- `updatedAt`, `updatedBy`, `updatedByRole` (`athlete|coach`)
+- `createdAt`
 
 ## Example items
 ### Entry
