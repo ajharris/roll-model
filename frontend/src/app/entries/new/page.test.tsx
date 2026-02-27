@@ -9,11 +9,13 @@ const pushMock = vi.fn();
 
 const {
   apiClientMock,
-  flushOfflineCreateQueueMock,
+  flushOfflineMutationQueueMock,
+  retryFailedOfflineMutationsMock,
   readEntryDraftMock,
   writeEntryDraftMock,
   clearEntryDraftMock,
   enqueueOfflineCreateMock,
+  getOfflineMutationQueueCountsMock,
 } = vi.hoisted(() => ({
   apiClientMock: {
     createEntry: vi.fn(),
@@ -21,11 +23,13 @@ const {
     updateEntry: vi.fn(),
     upsertEntryCheckoffEvidence: vi.fn(),
   },
-  flushOfflineCreateQueueMock: vi.fn(),
+  flushOfflineMutationQueueMock: vi.fn(),
+  retryFailedOfflineMutationsMock: vi.fn(),
   readEntryDraftMock: vi.fn(),
   writeEntryDraftMock: vi.fn(),
   clearEntryDraftMock: vi.fn(),
   enqueueOfflineCreateMock: vi.fn(),
+  getOfflineMutationQueueCountsMock: vi.fn(),
 }));
 
 vi.mock('next/navigation', () => ({
@@ -41,7 +45,8 @@ vi.mock('@/lib/apiClient', () => ({
 }));
 
 vi.mock('@/lib/journalQueue', () => ({
-  flushOfflineCreateQueue: () => flushOfflineCreateQueueMock(),
+  flushOfflineMutationQueue: () => flushOfflineMutationQueueMock(),
+  retryFailedOfflineMutations: () => retryFailedOfflineMutationsMock(),
 }));
 
 vi.mock('@/lib/journalLocal', () => ({
@@ -71,6 +76,7 @@ vi.mock('@/lib/journalLocal', () => ({
   },
   clearEntryDraft: (...args: unknown[]) => clearEntryDraftMock(...args),
   enqueueOfflineCreate: (...args: unknown[]) => enqueueOfflineCreateMock(...args),
+  getOfflineMutationQueueCounts: () => getOfflineMutationQueueCountsMock(),
   readEntryDraft: () => readEntryDraftMock(),
   writeEntryDraft: (...args: unknown[]) => writeEntryDraftMock(...args),
 }));
@@ -87,9 +93,26 @@ describe('NewEntryPage phase 1 flow', () => {
     writeEntryDraftMock.mockReset();
     clearEntryDraftMock.mockReset();
     enqueueOfflineCreateMock.mockReset();
+    getOfflineMutationQueueCountsMock.mockReset();
 
     readEntryDraftMock.mockReturnValue(null);
-    flushOfflineCreateQueueMock.mockResolvedValue(0);
+    flushOfflineMutationQueueMock.mockResolvedValue({
+      processed: 0,
+      succeeded: 0,
+      failed: 0,
+      conflicts: 0,
+      remainingPending: 0,
+      remainingFailed: 0,
+    });
+    retryFailedOfflineMutationsMock.mockResolvedValue({
+      processed: 0,
+      succeeded: 0,
+      failed: 0,
+      conflicts: 0,
+      remainingPending: 0,
+      remainingFailed: 0,
+    });
+    getOfflineMutationQueueCountsMock.mockReturnValue({ pending: 0, failed: 0, total: 0 });
     apiClientMock.createEntry.mockResolvedValue({
       entryId: 'entry-1',
       athleteId: 'athlete-1',

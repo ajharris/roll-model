@@ -12,10 +12,11 @@ import {
   applyEntryTemplate,
   clearEntryDraft,
   enqueueOfflineCreate,
+  getOfflineMutationQueueCounts,
   readEntryDraft,
   writeEntryDraft,
 } from '@/lib/journalLocal';
-import { flushOfflineCreateQueue } from '@/lib/journalQueue';
+import { flushOfflineMutationQueue, retryFailedOfflineMutations } from '@/lib/journalQueue';
 import type {
   ActionPack,
   ActionPackConfidenceFlag,
@@ -223,13 +224,18 @@ export default function NewEntryPage() {
   const [templateId, setTemplateId] = useState<EntryTemplateId>(DEFAULT_TEMPLATE);
   const [status, setStatus] = useState('');
   const [draftState, setDraftState] = useState<'idle' | 'saved'>('idle');
-  const [queuedCount, setQueuedCount] = useState(0);
+  const [syncCounts, setSyncCounts] = useState({ pending: 0, failed: 0, total: 0 });
   const [gptStatus, setGptStatus] = useState('');
   const [createdEntry, setCreatedEntry] = useState<Entry | null>(null);
   const [actionPack, setActionPack] = useState<ActionPack | null>(null);
   const [coachReviewRequired, setCoachReviewRequired] = useState(false);
   const [coachReviewNotes, setCoachReviewNotes] = useState('');
   const router = useRouter();
+  const syncStateLabel = syncCounts.failed > 0 ? 'failed' : syncCounts.pending > 0 ? 'pending' : 'synced';
+
+  const refreshQueueCounts = () => {
+    setSyncCounts(getOfflineMutationQueueCounts());
+  };
 
   useEffect(() => {
     const draft = readEntryDraft<DraftShape>(NEW_ENTRY_DRAFT_KEY);
@@ -260,11 +266,13 @@ export default function NewEntryPage() {
       setTechniques(next.rawTechniqueMentions ?? []);
     }
 
+    refreshQueueCounts();
+
     const flush = async () => {
-      const flushed = await flushOfflineCreateQueue();
-      if (flushed > 0) {
-        setQueuedCount(0);
-        setStatus(`Synced ${flushed} queued entr${flushed === 1 ? 'y' : 'ies'}.`);
+      const result = await flushOfflineMutationQueue();
+      refreshQueueCounts();
+      if (result.succeeded > 0) {
+        setStatus(`Synced ${result.succeeded} queued entr${result.succeeded === 1 ? 'y' : 'ies'}.`);
       }
     };
 
@@ -272,8 +280,13 @@ export default function NewEntryPage() {
     const onOnline = () => {
       void flush();
     };
+    const onStorage = () => refreshQueueCounts();
     window.addEventListener('online', onOnline);
-    return () => window.removeEventListener('online', onOnline);
+    window.addEventListener('storage', onStorage);
+    return () => {
+      window.removeEventListener('online', onOnline);
+      window.removeEventListener('storage', onStorage);
+    };
   }, []);
 
   useEffect(() => {
@@ -342,12 +355,26 @@ export default function NewEntryPage() {
       const offline = typeof navigator !== 'undefined' && navigator.onLine === false;
       if (offline) {
         enqueueOfflineCreate(payload);
-        setQueuedCount((count) => count + 1);
+        refreshQueueCounts();
         setStatus('Offline: entry queued and will sync when you reconnect.');
         return;
       }
       setStatus('Save failed.');
     }
+  };
+
+  const retryFailedSync = async () => {
+    const result = await retryFailedOfflineMutations();
+    refreshQueueCounts();
+    if (result.succeeded > 0) {
+      setStatus(`Retried sync: ${result.succeeded} entr${result.succeeded === 1 ? 'y' : 'ies'} synced.`);
+      return;
+    }
+    if (result.remainingFailed > 0) {
+      setStatus('Some queued items still failed. Open the entry and save again to resolve conflicts.');
+      return;
+    }
+    setStatus('Nothing to retry.');
   };
 
   const saveAndRunGpt = async () => {
@@ -470,8 +497,15 @@ export default function NewEntryPage() {
             </button>
           </div>
           <p className="small">
-            Draft: {draftState === 'saved' ? 'autosaved' : 'editing'} {queuedCount > 0 ? `• queued ${queuedCount}` : ''}
+            Draft: {draftState === 'saved' ? 'autosaved' : 'editing'} • Sync: {syncStateLabel}
+            {syncCounts.pending > 0 ? ` (${syncCounts.pending} pending)` : ''}
+            {syncCounts.failed > 0 ? ` (${syncCounts.failed} failed)` : ''}
           </p>
+          {syncCounts.failed > 0 && (
+            <button type="button" onClick={retryFailedSync}>
+              Retry failed sync
+            </button>
+          )}
         </div>
 
         <form onSubmit={submit}>

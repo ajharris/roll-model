@@ -1,5 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import React, { type ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -53,19 +52,20 @@ describe('ForgotPasswordPage', () => {
   });
 
   it('sends a reset email request and confirms a new password', async () => {
-    const user = userEvent.setup();
     render(<ForgotPasswordPage />);
 
-    await user.type(screen.getByLabelText('Email or username'), 'athlete@example.com');
-    await user.click(screen.getByRole('button', { name: 'Send reset email' }));
+    fireEvent.change(screen.getByLabelText('Email or username'), {
+      target: { value: 'athlete@example.com' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Send reset email' }));
 
     await waitFor(() => {
       expect(screen.getByText(/Reset instructions were sent to the email on file/)).toBeInTheDocument();
     });
 
-    await user.type(screen.getByLabelText('Verification code'), '123456');
-    await user.type(screen.getByLabelText('New password'), 'NewPassword123!');
-    await user.click(screen.getByRole('button', { name: 'Set new password' }));
+    fireEvent.change(screen.getByLabelText('Verification code'), { target: { value: '123456' } });
+    fireEvent.change(screen.getByLabelText('New password'), { target: { value: 'NewPassword123!' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Set new password' }));
 
     await waitFor(() => {
       expect(screen.getByText('Password updated. Return to sign in with your new password.')).toBeInTheDocument();
