@@ -1,6 +1,7 @@
 import type { GetCommandOutput } from '@aws-sdk/lib-dynamodb';
 import type { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 
+import { buildActionPackDeleteKeys, buildActionPackIndexItems } from '../../shared/actionPackIndex';
 import { batchWriteItems, deleteItem, getItem, putItem } from '../../shared/db';
 import { CURRENT_ENTRY_SCHEMA_VERSION } from '../../shared/entries';
 import { buildKeywordIndexItems, extractEntryTokens } from '../../shared/keywords';
@@ -10,6 +11,7 @@ import { handler } from './index';
 
 jest.mock('../../shared/db');
 jest.mock('../../shared/keywords');
+jest.mock('../../shared/actionPackIndex');
 jest.mock('../../shared/techniques', () => ({
   ...jest.requireActual('../../shared/techniques'),
   upsertTechniqueCandidates: jest.fn()
@@ -21,6 +23,8 @@ const mockDeleteItem = jest.mocked(deleteItem);
 const mockBatchWriteItems = jest.mocked(batchWriteItems);
 const mockExtractEntryTokens = jest.mocked(extractEntryTokens);
 const mockBuildKeywordIndexItems = jest.mocked(buildKeywordIndexItems);
+const mockBuildActionPackDeleteKeys = jest.mocked(buildActionPackDeleteKeys);
+const mockBuildActionPackIndexItems = jest.mocked(buildActionPackIndexItems);
 const mockUpsertTechniqueCandidates = jest.mocked(upsertTechniqueCandidates);
 
 const buildEvent = (role: 'athlete' | 'coach'): APIGatewayProxyEvent =>
@@ -55,12 +59,16 @@ describe('updateEntry handler', () => {
     mockBatchWriteItems.mockReset();
     mockExtractEntryTokens.mockReset();
     mockBuildKeywordIndexItems.mockReset();
+    mockBuildActionPackDeleteKeys.mockReset();
+    mockBuildActionPackIndexItems.mockReset();
     mockUpsertTechniqueCandidates.mockReset();
 
     mockPutItem.mockResolvedValue();
     mockDeleteItem.mockResolvedValue();
     mockBatchWriteItems.mockResolvedValue();
     mockBuildKeywordIndexItems.mockReturnValue([]);
+    mockBuildActionPackDeleteKeys.mockReturnValue([]);
+    mockBuildActionPackIndexItems.mockReturnValue([]);
     mockUpsertTechniqueCandidates.mockResolvedValue();
   });
 
@@ -293,5 +301,77 @@ describe('updateEntry handler', () => {
         })
       })
     );
+  });
+
+  it('rewrites action-pack index rows on update', async () => {
+    mockGetItem
+      .mockResolvedValueOnce({
+        Item: {
+          PK: 'ENTRY#entry-1',
+          SK: 'META',
+          athleteId: 'athlete-1',
+          createdAt: '2024-01-01T00:00:00.000Z'
+        }
+      } as unknown as GetCommandOutput)
+      .mockResolvedValueOnce({
+        Item: {
+          PK: 'USER#athlete-1',
+          SK: 'ENTRY#2024-01-01T00:00:00.000Z#entry-1',
+          entityType: 'ENTRY',
+          entryId: 'entry-1',
+          athleteId: 'athlete-1',
+          createdAt: '2024-01-01T00:00:00.000Z',
+          updatedAt: '2024-01-01T00:00:00.000Z',
+          sections: { shared: 'old shared', private: 'old private' },
+          sessionMetrics: {
+            durationMinutes: 60,
+            intensity: 5,
+            rounds: 6,
+            giOrNoGi: 'gi',
+            tags: ['guard']
+          },
+          rawTechniqueMentions: []
+        }
+      } as unknown as GetCommandOutput);
+
+    mockExtractEntryTokens
+      .mockReturnValueOnce([])
+      .mockReturnValueOnce([])
+      .mockReturnValueOnce([])
+      .mockReturnValueOnce([]);
+    mockBuildKeywordIndexItems.mockReturnValue([]);
+    mockBuildActionPackDeleteKeys.mockReturnValue([{ PK: 'USER#athlete-1', SK: 'APF#old' }] as never);
+    mockBuildActionPackIndexItems.mockReturnValue([{ id: 'apf-new' }] as never);
+
+    const event = buildEvent('athlete');
+    event.body = JSON.stringify({
+      sections: { shared: 'new shared', private: 'new private' },
+      sessionMetrics: {
+        durationMinutes: 45,
+        intensity: 7,
+        rounds: 4,
+        giOrNoGi: 'no-gi',
+        tags: ['mount']
+      },
+      rawTechniqueMentions: ['Armbar'],
+      actionPackFinal: {
+        actionPack: {
+          wins: ['Recovered guard'],
+          leaks: ['Late underhook'],
+          oneFocus: 'Pummel first',
+          drills: ['Pummel x20'],
+          positionalRequests: ['Half guard bottom'],
+          fallbackDecisionGuidance: 'Recover knee shield.',
+          confidenceFlags: [{ field: 'leaks', confidence: 'low' }]
+        },
+        finalizedAt: '2026-02-26T00:00:00.000Z'
+      }
+    });
+
+    const result = (await handler(event, {} as never, () => undefined)) as APIGatewayProxyResult;
+
+    expect(result.statusCode).toBe(200);
+    expect(mockDeleteItem).toHaveBeenCalledWith({ Key: { PK: 'USER#athlete-1', SK: 'APF#old' } });
+    expect(mockBatchWriteItems).toHaveBeenCalledWith([{ id: 'apf-new' }]);
   });
 });

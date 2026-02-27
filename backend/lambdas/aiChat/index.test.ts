@@ -130,8 +130,16 @@ describe('aiChat handler', () => {
       text: 'Assistant reply',
       extracted_updates: {
         summary: 'Summary',
-        detectedTopics: ['guard'],
-        followUpActions: ['review notes']
+        actionPack: {
+          wins: ['Maintained frames'],
+          leaks: ['Late hip switch'],
+          oneFocus: 'Early hip switch on knee cut',
+          drills: ['Hip-switch reps x20'],
+          positionalRequests: ['Start from knee-cut HQ'],
+          fallbackDecisionGuidance: 'If knee line is lost, reset to shin shield.',
+          confidenceFlags: [{ field: 'leaks', confidence: 'low', note: 'Could also be cardio pacing.' }],
+        },
+        suggestedFollowUpQuestions: ['What cue helped your first frame?']
       },
       suggested_prompts: ['Ask about intensity']
     });
@@ -186,12 +194,17 @@ describe('aiChat handler', () => {
     const body = JSON.parse(result.body) as {
       threadId: string;
       assistant_text: string;
-      extracted_updates: { summary: string; detectedTopics: string[]; followUpActions: string[] };
+      extracted_updates: {
+        summary: string;
+        actionPack: { wins: string[]; leaks: string[]; oneFocus: string };
+        suggestedFollowUpQuestions: string[];
+      };
       suggested_prompts: string[];
     };
     expect(body.threadId).toBe('thread-1');
     expect(typeof body.assistant_text).toBe('string');
     expect(body.extracted_updates.summary).toBe('Summary');
+    expect(body.extracted_updates.actionPack.oneFocus).toBe('Early hip switch on knee cut');
     expect(Array.isArray(body.suggested_prompts)).toBe(true);
 
     const callArgs = mockCallOpenAI.mock.calls[0]?.[0] ?? [];

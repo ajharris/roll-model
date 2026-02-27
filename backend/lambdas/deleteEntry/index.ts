@@ -1,6 +1,7 @@
 import type { APIGatewayProxyHandler } from 'aws-lambda';
 
 
+import { buildActionPackDeleteKeys } from '../../shared/actionPackIndex';
 import { getAuthContext, requireRole } from '../../shared/auth';
 import { deleteItem, getItem, queryItems } from '../../shared/db';
 import { extractEntryTokens } from '../../shared/keywords';
@@ -120,6 +121,9 @@ const baseHandler: APIGatewayProxyHandler = async (event) => {
     }
 
     for (const key of buildKeywordDeleteKeys(entry)) {
+      await deleteItem({ Key: key });
+    }
+    for (const key of buildActionPackDeleteKeys(entry)) {
       await deleteItem({ Key: key });
     }
 

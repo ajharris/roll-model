@@ -1,7 +1,7 @@
 import { GetParameterCommand, SSMClient } from '@aws-sdk/client-ssm';
 
 import { ApiError } from './responses';
-import type { AIExtractedUpdates } from './types';
+import type { AIExtractedUpdates, ConfidenceLevel } from './types';
 
 const ssmClient = new SSMClient({});
 const PARAMETER_NAME = '/roll-model/openai_api_key';
@@ -24,16 +24,39 @@ export const isAIExtractedUpdates = (value: unknown): value is AIExtractedUpdate
   }
 
   const maybe = value as Partial<AIExtractedUpdates>;
-  const recommendedOk =
-    maybe.recommendedIntensity === undefined || typeof maybe.recommendedIntensity === 'number';
+  const actionPack = maybe.actionPack as AIExtractedUpdates['actionPack'] | undefined;
+  const coachReview = maybe.coachReview as AIExtractedUpdates['coachReview'] | undefined;
 
   return (
     typeof maybe.summary === 'string' &&
-    Array.isArray(maybe.detectedTopics) &&
-    maybe.detectedTopics.every((topic) => typeof topic === 'string') &&
-    recommendedOk &&
-    Array.isArray(maybe.followUpActions) &&
-    maybe.followUpActions.every((action) => typeof action === 'string')
+    !!actionPack &&
+    Array.isArray(actionPack.wins) &&
+    actionPack.wins.every((item) => typeof item === 'string') &&
+    Array.isArray(actionPack.leaks) &&
+    actionPack.leaks.every((item) => typeof item === 'string') &&
+    typeof actionPack.oneFocus === 'string' &&
+    Array.isArray(actionPack.drills) &&
+    actionPack.drills.every((item) => typeof item === 'string') &&
+    Array.isArray(actionPack.positionalRequests) &&
+    actionPack.positionalRequests.every((item) => typeof item === 'string') &&
+    typeof actionPack.fallbackDecisionGuidance === 'string' &&
+    Array.isArray(actionPack.confidenceFlags) &&
+    actionPack.confidenceFlags.every((flag) => {
+      const confidence = flag?.confidence as ConfidenceLevel | undefined;
+      return (
+        !!flag &&
+        typeof flag.field === 'string' &&
+        (confidence === 'high' || confidence === 'medium' || confidence === 'low') &&
+        (flag.note === undefined || typeof flag.note === 'string')
+      );
+    }) &&
+    (coachReview === undefined ||
+      (typeof coachReview === 'object' &&
+        typeof coachReview.requiresReview === 'boolean' &&
+        (coachReview.coachNotes === undefined || typeof coachReview.coachNotes === 'string') &&
+        (coachReview.reviewedAt === undefined || typeof coachReview.reviewedAt === 'string'))) &&
+    Array.isArray(maybe.suggestedFollowUpQuestions) &&
+    maybe.suggestedFollowUpQuestions.every((item) => typeof item === 'string')
   );
 };
 

@@ -28,3 +28,22 @@ button.button-danger:hover {
 .thread-list { max-height: 500px; overflow:auto; }
 .messages { min-height: 320px; border:1px solid #d3d7dd; padding:8px; border-radius:8px; }
 .small { font-size:12px; color:#596579; }
+.mobile-compose { padding-bottom: 84px; }
+.thumb-actions {
+  position: sticky;
+  bottom: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  padding: 10px 0;
+  background: linear-gradient(180deg, rgba(246,247,248,0) 0%, rgba(246,247,248,0.95) 28%, rgba(246,247,248,1) 100%);
+}
+.thumb-actions button {
+  min-height: 46px;
+}
+@media (max-width: 720px) {
+  .layout { padding: 10px; }
+  .thumb-actions {
+    grid-template-columns: 1fr;
+  }
+}

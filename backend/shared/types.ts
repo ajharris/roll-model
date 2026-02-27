@@ -39,6 +39,9 @@ export interface Entry {
   sessionMetrics: SessionMetrics;
   rawTechniqueMentions: string[];
   mediaAttachments?: MediaAttachment[];
+  templateId?: EntryTemplateId;
+  actionPackDraft?: ActionPack;
+  actionPackFinal?: FinalizedActionPack;
 }
 
 export interface Comment {
@@ -66,6 +69,9 @@ export interface CreateEntryRequest {
   sessionMetrics: SessionMetrics;
   rawTechniqueMentions?: string[];
   mediaAttachments?: MediaAttachment[];
+  templateId?: EntryTemplateId;
+  actionPackDraft?: ActionPack;
+  actionPackFinal?: FinalizedActionPack;
 }
 
 export type UpdateEntryRequest = CreateEntryRequest;
@@ -89,6 +95,9 @@ export interface EntrySearchRequest {
   sortBy?: EntrySearchSortBy;
   sortDirection?: EntrySearchSortDirection;
   limit?: string;
+  actionPackField?: ActionPackFieldKey;
+  actionPackToken?: string;
+  actionPackMinConfidence?: ConfidenceLevel;
 }
 
 export interface EntrySearchMeta {
@@ -155,11 +164,51 @@ export interface AIChatRequest {
   context?: AIChatContext;
 }
 
+export type EntryTemplateId = 'class-notes' | 'open-mat-rounds' | 'drill-session';
+
+export type ActionPackFieldKey =
+  | 'wins'
+  | 'leaks'
+  | 'oneFocus'
+  | 'drills'
+  | 'positionalRequests'
+  | 'fallbackDecisionGuidance';
+
+export type ConfidenceLevel = 'high' | 'medium' | 'low';
+
+export interface ActionPackConfidenceFlag {
+  field: ActionPackFieldKey;
+  confidence: ConfidenceLevel;
+  note?: string;
+}
+
+export interface ActionPack {
+  wins: string[];
+  leaks: string[];
+  oneFocus: string;
+  drills: string[];
+  positionalRequests: string[];
+  fallbackDecisionGuidance: string;
+  confidenceFlags: ActionPackConfidenceFlag[];
+}
+
+export interface CoachReviewState {
+  requiresReview: boolean;
+  coachNotes?: string;
+  reviewedAt?: string;
+}
+
+export interface FinalizedActionPack {
+  actionPack: ActionPack;
+  coachReview?: CoachReviewState;
+  finalizedAt: string;
+}
+
 export interface AIExtractedUpdates {
   summary: string;
-  detectedTopics: string[];
-  recommendedIntensity?: number;
-  followUpActions: string[];
+  actionPack: ActionPack;
+  coachReview?: CoachReviewState;
+  suggestedFollowUpQuestions: string[];
 }
 
 export type SavedEntrySearchSortBy = 'createdAt' | 'intensity';

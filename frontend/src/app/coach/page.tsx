@@ -62,6 +62,23 @@ export default function CoachPage() {
               <div className="panel">
                 <h3>Shared notes</h3>
                 <p>{selected.sections.shared}</p>
+                {selected.actionPackFinal?.actionPack && (
+                  <>
+                    <h4>Finalized feedback history</h4>
+                    <p>
+                      <strong>One focus:</strong> {selected.actionPackFinal.actionPack.oneFocus || 'none'}
+                    </p>
+                    <p className="small">
+                      Wins: {selected.actionPackFinal.actionPack.wins.join(' | ') || 'none'}
+                    </p>
+                    <p className="small">
+                      Leaks: {selected.actionPackFinal.actionPack.leaks.join(' | ') || 'none'}
+                    </p>
+                    <p className="small">
+                      Finalized: {new Date(selected.actionPackFinal.finalizedAt).toLocaleString()}
+                    </p>
+                  </>
+                )}
                 <h4>Comment</h4>
                 <textarea value={comment} onChange={(e) => setComment(e.target.value)} />
                 <button onClick={post}>Post comment</button>

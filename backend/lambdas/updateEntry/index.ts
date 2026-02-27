@@ -1,6 +1,7 @@
 import type { APIGatewayProxyEvent, APIGatewayProxyHandler } from 'aws-lambda';
 
 
+import { buildActionPackDeleteKeys, buildActionPackIndexItems } from '../../shared/actionPackIndex';
 import { getAuthContext, requireRole } from '../../shared/auth';
 import { batchWriteItems, deleteItem, getItem, putItem } from '../../shared/db';
 import { parseEntryRecord, sanitizeMediaAttachments, withCurrentEntrySchemaVersion } from '../../shared/entries';
@@ -9,6 +10,20 @@ import { withRequestLogging } from '../../shared/logger';
 import { ApiError, errorResponse, response } from '../../shared/responses';
 import { sanitizeTechniqueMentions, upsertTechniqueCandidates } from '../../shared/techniques';
 import type { CreateEntryRequest, Entry } from '../../shared/types';
+
+const isActionPackLike = (value: unknown): boolean => {
+  if (!value || typeof value !== 'object') return false;
+  const maybe = value as Record<string, unknown>;
+  return (
+    Array.isArray(maybe.wins) &&
+    Array.isArray(maybe.leaks) &&
+    typeof maybe.oneFocus === 'string' &&
+    Array.isArray(maybe.drills) &&
+    Array.isArray(maybe.positionalRequests) &&
+    typeof maybe.fallbackDecisionGuidance === 'string' &&
+    Array.isArray(maybe.confidenceFlags)
+  );
+};
 
 const parseBody = (event: APIGatewayProxyEvent): CreateEntryRequest => {
   if (!event.body) {
@@ -24,6 +39,19 @@ const parseBody = (event: APIGatewayProxyEvent): CreateEntryRequest => {
     parsed.mediaAttachments === undefined ||
     (Array.isArray(parsed.mediaAttachments) &&
       parsed.mediaAttachments.every((attachment) => typeof attachment === 'object' && attachment !== null));
+  const templateValid =
+    parsed.templateId === undefined ||
+    parsed.templateId === 'class-notes' ||
+    parsed.templateId === 'open-mat-rounds' ||
+    parsed.templateId === 'drill-session';
+  const actionPackDraftValid =
+    parsed.actionPackDraft === undefined || isActionPackLike(parsed.actionPackDraft);
+  const actionPackFinalValid =
+    parsed.actionPackFinal === undefined ||
+    (typeof parsed.actionPackFinal === 'object' &&
+      parsed.actionPackFinal !== null &&
+      typeof parsed.actionPackFinal.finalizedAt === 'string' &&
+      isActionPackLike((parsed.actionPackFinal as { actionPack?: unknown }).actionPack));
 
   if (
     !parsed.sections ||
@@ -38,7 +66,10 @@ const parseBody = (event: APIGatewayProxyEvent): CreateEntryRequest => {
     (parsed.rawTechniqueMentions !== undefined &&
       (!Array.isArray(parsed.rawTechniqueMentions) ||
         parsed.rawTechniqueMentions.some((mention) => typeof mention !== 'string'))) ||
-    !mediaAttachmentsValid
+    !mediaAttachmentsValid ||
+    !templateValid ||
+    !actionPackDraftValid ||
+    !actionPackFinalValid
   ) {
     throw new ApiError({
       code: 'INVALID_REQUEST',
@@ -140,6 +171,9 @@ const baseHandler: APIGatewayProxyHandler = async (event) => {
       sessionMetrics: payload.sessionMetrics,
       rawTechniqueMentions: sanitizeTechniqueMentions(payload.rawTechniqueMentions),
       mediaAttachments: sanitizeMediaAttachments(payload.mediaAttachments),
+      templateId: payload.templateId,
+      actionPackDraft: payload.actionPackDraft,
+      actionPackFinal: payload.actionPackFinal,
       updatedAt: nowIso
     });
 
@@ -194,6 +228,15 @@ const baseHandler: APIGatewayProxyHandler = async (event) => {
 
     if (newKeywordItems.length > 0) {
       await batchWriteItems(newKeywordItems);
+    }
+
+    for (const key of buildActionPackDeleteKeys(existingEntry)) {
+      await deleteItem({ Key: key });
+    }
+
+    const actionPackItems = buildActionPackIndexItems(updatedEntry);
+    if (actionPackItems.length > 0) {
+      await batchWriteItems(actionPackItems);
     }
 
     await upsertTechniqueCandidates(updatedEntry.rawTechniqueMentions, updatedEntry.entryId, nowIso);

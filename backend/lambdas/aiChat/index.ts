@@ -191,7 +191,7 @@ const buildSystemPrompt = (): string =>
   [
     'You are Roll Model AI, a scientific, coach-like, practical grappling training assistant.',
     'You must respond as strict JSON only with this exact shape:',
-    '{"text": string, "extracted_updates": {"summary": string, "detectedTopics": string[], "recommendedIntensity"?: number, "followUpActions": string[]}, "suggested_prompts": string[] }',
+    '{"text": string, "extracted_updates": {"summary": string, "actionPack": {"wins": string[], "leaks": string[], "oneFocus": string, "drills": string[], "positionalRequests": string[], "fallbackDecisionGuidance": string, "confidenceFlags": [{"field": "wins"|"leaks"|"oneFocus"|"drills"|"positionalRequests"|"fallbackDecisionGuidance", "confidence": "high"|"medium"|"low", "note"?: string}]}, "coachReview"?: {"requiresReview": boolean, "coachNotes"?: string, "reviewedAt"?: string}, "suggestedFollowUpQuestions": string[]}, "suggested_prompts": string[] }',
     'Do not include markdown. Do not include additional keys.'
   ].join(' ');
 

@@ -1,6 +1,7 @@
 import type { GetCommandOutput, QueryCommandOutput } from '@aws-sdk/lib-dynamodb';
 import type { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 
+import { buildActionPackDeleteKeys } from '../../shared/actionPackIndex';
 import { deleteItem, getItem, queryItems } from '../../shared/db';
 import { extractEntryTokens } from '../../shared/keywords';
 
@@ -8,11 +9,13 @@ import { handler } from './index';
 
 jest.mock('../../shared/db');
 jest.mock('../../shared/keywords');
+jest.mock('../../shared/actionPackIndex');
 
 const mockDeleteItem = jest.mocked(deleteItem);
 const mockGetItem = jest.mocked(getItem);
 const mockQueryItems = jest.mocked(queryItems);
 const mockExtractEntryTokens = jest.mocked(extractEntryTokens);
+const mockBuildActionPackDeleteKeys = jest.mocked(buildActionPackDeleteKeys);
 
 const buildEvent = (role: 'athlete' | 'coach'): APIGatewayProxyEvent =>
   ({
@@ -33,8 +36,10 @@ describe('deleteEntry handler', () => {
     mockGetItem.mockReset();
     mockQueryItems.mockReset();
     mockExtractEntryTokens.mockReset();
+    mockBuildActionPackDeleteKeys.mockReset();
 
     mockDeleteItem.mockResolvedValue();
+    mockBuildActionPackDeleteKeys.mockReturnValue([]);
   });
 
   it('deletes entry, comments, and keyword index rows', async () => {
@@ -81,6 +86,46 @@ describe('deleteEntry handler', () => {
 
     expect(result.statusCode).toBe(204);
     expect(mockDeleteItem).toHaveBeenCalledTimes(6);
+  });
+
+  it('deletes action-pack index rows when present', async () => {
+    mockGetItem
+      .mockResolvedValueOnce({
+        Item: {
+          PK: 'ENTRY#entry-1',
+          SK: 'META',
+          athleteId: 'athlete-1',
+          createdAt: '2024-01-01T00:00:00.000Z'
+        }
+      } as unknown as GetCommandOutput)
+      .mockResolvedValueOnce({
+        Item: {
+          PK: 'USER#athlete-1',
+          SK: 'ENTRY#2024-01-01T00:00:00.000Z#entry-1',
+          entityType: 'ENTRY',
+          entryId: 'entry-1',
+          athleteId: 'athlete-1',
+          createdAt: '2024-01-01T00:00:00.000Z',
+          updatedAt: '2024-01-01T00:00:00.000Z',
+          sections: { shared: 'shared', private: 'private' },
+          sessionMetrics: {
+            durationMinutes: 60,
+            intensity: 6,
+            rounds: 5,
+            giOrNoGi: 'gi',
+            tags: ['guard']
+          },
+          rawTechniqueMentions: []
+        }
+      } as unknown as GetCommandOutput);
+    mockQueryItems.mockResolvedValueOnce({ Items: [] } as unknown as QueryCommandOutput);
+    mockExtractEntryTokens.mockReturnValueOnce([]).mockReturnValueOnce([]);
+    mockBuildActionPackDeleteKeys.mockReturnValueOnce([{ PK: 'USER#athlete-1', SK: 'APF#old' }] as never);
+
+    const result = (await handler(buildEvent('athlete'), {} as never, () => undefined)) as APIGatewayProxyResult;
+
+    expect(result.statusCode).toBe(204);
+    expect(mockDeleteItem).toHaveBeenCalledWith({ Key: { PK: 'USER#athlete-1', SK: 'APF#old' } });
   });
 
   it('rejects coach access', async () => {

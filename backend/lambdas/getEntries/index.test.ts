@@ -1,14 +1,17 @@
 import type { GetCommandOutput, QueryCommandOutput } from '@aws-sdk/lib-dynamodb';
 import type { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 
+import { queryActionPackAthleteEntries } from '../../shared/actionPackIndex';
 import { getItem, queryItems } from '../../shared/db';
 
 import { handler } from './index';
 
 jest.mock('../../shared/db');
+jest.mock('../../shared/actionPackIndex');
 
 const mockGetItem = jest.mocked(getItem);
 const mockQueryItems = jest.mocked(queryItems);
+const mockQueryActionPackAthleteEntries = jest.mocked(queryActionPackAthleteEntries);
 
 const buildEvent = (
   role: 'athlete' | 'coach',
@@ -34,6 +37,7 @@ describe('getEntries handler auth', () => {
   beforeEach(() => {
     mockGetItem.mockReset();
     mockQueryItems.mockReset();
+    mockQueryActionPackAthleteEntries.mockReset();
   });
 
   it('returns shared-only sections for coach', async () => {
@@ -285,5 +289,74 @@ describe('getEntries handler auth', () => {
     expect(body.entries.length).toBe(100);
     expect(body.search.latencyTargetMs).toBe(75);
     expect(body.search.latencyMs).toBeLessThan(500);
+  });
+
+  it('supports indexed action-pack retrieval for athlete queries', async () => {
+    mockQueryActionPackAthleteEntries.mockResolvedValueOnce([
+      {
+        entryId: 'entry-ap-1',
+        athleteId: 'athlete-1',
+        createdAt: '2026-02-25T10:00:00.000Z',
+        updatedAt: '2026-02-25T10:00:00.000Z',
+        schemaVersion: 2,
+        sections: { shared: 'shared', private: 'private' },
+        sessionMetrics: {
+          durationMinutes: 60,
+          intensity: 7,
+          rounds: 5,
+          giOrNoGi: 'gi',
+          tags: ['class-notes']
+        },
+        rawTechniqueMentions: [],
+        actionPackFinal: {
+          actionPack: {
+            wins: ['Recovered guard'],
+            leaks: ['Late underhook'],
+            oneFocus: 'Pummel first',
+            drills: ['Pummel x20'],
+            positionalRequests: ['Half guard bottom'],
+            fallbackDecisionGuidance: 'Recover knee shield.',
+            confidenceFlags: [{ field: 'leaks', confidence: 'low' }]
+          },
+          finalizedAt: '2026-02-25T10:05:00.000Z'
+        }
+      }
+    ] as never);
+
+    const result = (await handler(
+      buildEvent('athlete', undefined, undefined, {
+        actionPackField: 'leaks',
+        actionPackToken: 'underhook',
+        actionPackMinConfidence: 'low'
+      }),
+      {} as never,
+      () => undefined,
+    )) as APIGatewayProxyResult;
+
+    expect(result.statusCode).toBe(200);
+    expect(mockQueryActionPackAthleteEntries).toHaveBeenCalledWith(
+      expect.objectContaining({
+        athleteId: 'athlete-1',
+        field: 'leaks',
+        token: 'underhook',
+        minConfidence: 'low'
+      })
+    );
+    const body = JSON.parse(result.body) as { entries: Array<{ entryId: string }> };
+    expect(body.entries.map((entry) => entry.entryId)).toEqual(['entry-ap-1']);
+    expect(mockQueryItems).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when action-pack query params are incomplete', async () => {
+    const result = (await handler(
+      buildEvent('athlete', undefined, undefined, {
+        actionPackField: 'leaks'
+      }),
+      {} as never,
+      () => undefined,
+    )) as APIGatewayProxyResult;
+
+    expect(result.statusCode).toBe(400);
+    expect(mockQueryActionPackAthleteEntries).not.toHaveBeenCalled();
   });
 });

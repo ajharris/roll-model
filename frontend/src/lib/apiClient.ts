@@ -1,6 +1,7 @@
 import { logAuthFailure, logNetworkFailure } from '@/lib/clientErrorLogging';
 import { frontendConfig } from '@/lib/config';
 import type {
+  AIExtractedUpdates,
   CommentPayload,
   Entry,
   EntryCreatePayload,
@@ -60,6 +61,9 @@ const withQueryString = (path: string, query?: EntrySearchRequest) => {
   append('sortBy', query.sortBy);
   append('sortDirection', query.sortDirection);
   append('limit', query.limit);
+  append('actionPackField', query.actionPackField);
+  append('actionPackToken', query.actionPackToken);
+  append('actionPackMinConfidence', query.actionPackMinConfidence);
 
   const qs = params.toString();
   return qs ? `${path}?${qs}` : path;
@@ -283,11 +287,14 @@ export const apiClient = {
       method: 'DELETE',
       body: JSON.stringify(payload),
     }),
-  chat: (payload: { threadId?: string; message: string; context?: string }) =>
-    request<{ assistant_text: string; suggested_prompts?: string[] }>('/ai/chat', {
+  chat: (payload: { threadId?: string; message: string; context?: Record<string, unknown> }) =>
+    request<{ assistant_text: string; extracted_updates?: AIExtractedUpdates; suggested_prompts?: string[] }>(
+      '/ai/chat',
+      {
       method: 'POST',
       body: JSON.stringify(payload),
-    }),
+      },
+    ),
   requestSignup: (payload: SignupRequestPayload) =>
     request('/signup-requests', {
       method: 'POST',

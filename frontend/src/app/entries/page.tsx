@@ -701,6 +701,20 @@ export default function EntriesPage() {
               </p>
               <p>Tags: {entry.sessionMetrics.tags.join(', ') || 'none'}</p>
               <p>{entry.sections.shared.slice(0, 140)}</p>
+              {entry.actionPackFinal?.actionPack && (
+                <div className="panel">
+                  <p>
+                    <strong>Finalized focus:</strong> {entry.actionPackFinal.actionPack.oneFocus || 'none'}
+                  </p>
+                  <p className="small">
+                    Wins: {entry.actionPackFinal.actionPack.wins.slice(0, 2).join(' | ') || 'none'} • Leaks:{' '}
+                    {entry.actionPackFinal.actionPack.leaks.slice(0, 2).join(' | ') || 'none'}
+                  </p>
+                  <p className="small">
+                    Finalized: {new Date(entry.actionPackFinal.finalizedAt).toLocaleString()}
+                  </p>
+                </div>
+              )}
               {entry.mediaAttachments && entry.mediaAttachments.length > 0 && (
                 <p className="small">
                   Media: {entry.mediaAttachments.length} • Clip notes:{' '}
