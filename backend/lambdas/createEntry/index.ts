@@ -1,6 +1,7 @@
 import type { APIGatewayProxyHandler } from 'aws-lambda';
 import { v4 as uuidv4 } from 'uuid';
 
+import { buildActionPackIndexItems } from '../../shared/actionPackIndex';
 import { getAuthContext, requireRole } from '../../shared/auth';
 import { batchWriteItems, putItem } from '../../shared/db';
 import { sanitizeMediaAttachments, withCurrentEntrySchemaVersion } from '../../shared/entries';
@@ -10,6 +11,8 @@ import { withRequestLogging } from '../../shared/logger';
 import { errorResponse, response } from '../../shared/responses';
 import { sanitizeTechniqueMentions, upsertTechniqueCandidates } from '../../shared/techniques';
 import type { CreateEntryRequest, Entry } from '../../shared/types';
+
+
 
 export const buildEntry = (
   athleteId: string,
@@ -28,7 +31,10 @@ export const buildEntry = (
     sections: input.sections,
     sessionMetrics: input.sessionMetrics,
     rawTechniqueMentions: sanitizeTechniqueMentions(input.rawTechniqueMentions),
-    mediaAttachments: sanitizeMediaAttachments(input.mediaAttachments)
+    mediaAttachments: sanitizeMediaAttachments(input.mediaAttachments),
+    templateId: input.templateId,
+    actionPackDraft: input.actionPackDraft,
+    actionPackFinal: input.actionPackFinal
   });
 
 const baseHandler: APIGatewayProxyHandler = async (event) => {
@@ -65,6 +71,11 @@ const baseHandler: APIGatewayProxyHandler = async (event) => {
 
     if (keywordItems.length > 0) {
       await batchWriteItems(keywordItems);
+    }
+
+    const actionPackItems = buildActionPackIndexItems(entry);
+    if (actionPackItems.length > 0) {
+      await batchWriteItems(actionPackItems);
     }
 
     await upsertTechniqueCandidates(entry.rawTechniqueMentions, entry.entryId, nowIso);

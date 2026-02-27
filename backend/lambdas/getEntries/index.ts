@@ -1,6 +1,7 @@
 import type { APIGatewayProxyHandler } from 'aws-lambda';
 
 
+import { queryActionPackAthleteEntries } from '../../shared/actionPackIndex';
 import { getAuthContext, hasRole, requireRole } from '../../shared/auth';
 import { getItem, queryItems } from '../../shared/db';
 import { parseEntryRecord } from '../../shared/entries';
@@ -16,6 +17,9 @@ const sanitizeForCoach = (entry: Entry): Omit<Entry, 'sections'> & { sections: {
     shared: entry.sections.shared
   }
 });
+
+const hasActionPackIndexParams = (searchRequest: ReturnType<typeof parseEntrySearchRequest>): boolean =>
+  Boolean(searchRequest.actionPackField || searchRequest.actionPackToken || searchRequest.actionPackMinConfidence);
 
 const baseHandler: APIGatewayProxyHandler = async (event) => {
   try {
@@ -55,20 +59,34 @@ const baseHandler: APIGatewayProxyHandler = async (event) => {
       }
     }
 
-    const queryResult = await queryItems({
-      KeyConditionExpression: 'PK = :pk AND begins_with(SK, :entryPrefix)',
-      ExpressionAttributeValues: {
-        ':pk': `USER#${athleteId}`,
-        ':entryPrefix': 'ENTRY#'
-      },
-      ScanIndexForward: false
-    });
-
-    const entries = (queryResult.Items ?? [])
-      .filter((item) => item.entityType === 'ENTRY')
-      .map((item) => parseEntryRecord(item as Record<string, unknown>));
-
     const searchRequest = parseEntrySearchRequest(event.queryStringParameters);
+    if (hasActionPackIndexParams(searchRequest) && (!searchRequest.actionPackField || !searchRequest.actionPackToken)) {
+      throw new ApiError({
+        code: 'INVALID_REQUEST',
+        message: 'actionPackField and actionPackToken are required together.',
+        statusCode: 400
+      });
+    }
+
+    const entries = searchRequest.actionPackField && searchRequest.actionPackToken
+      ? await queryActionPackAthleteEntries({
+          athleteId,
+          field: searchRequest.actionPackField,
+          token: searchRequest.actionPackToken,
+          minConfidence: searchRequest.actionPackMinConfidence
+        })
+      : (
+          await queryItems({
+            KeyConditionExpression: 'PK = :pk AND begins_with(SK, :entryPrefix)',
+            ExpressionAttributeValues: {
+              ':pk': `USER#${athleteId}`,
+              ':entryPrefix': 'ENTRY#'
+            },
+            ScanIndexForward: false
+          })
+        ).Items?.filter((item) => item.entityType === 'ENTRY')
+          .map((item) => parseEntryRecord(item as Record<string, unknown>)) ?? [];
+
     const searched = searchEntries(entries, searchRequest);
 
     return response(200, {

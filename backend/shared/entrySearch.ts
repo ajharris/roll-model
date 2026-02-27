@@ -1,10 +1,11 @@
+import { normalizeToken as normalizeKeywordToken, tokenizeText } from './keywords';
 import type { Entry, EntrySearchMeta, EntrySearchRequest } from './types';
 
 export const ENTRY_SEARCH_LATENCY_TARGET_MS = 75;
 
 const normalizeText = (value: string | undefined): string => (value ?? '').trim().toLowerCase();
 
-const normalizeToken = (value: string | undefined): string =>
+const normalizeSearchToken = (value: string | undefined): string =>
   normalizeText(value).replace(/\s+/g, ' ');
 
 const countOccurrences = (haystack: string, needle: string): number => {
@@ -22,7 +23,7 @@ const countOccurrences = (haystack: string, needle: string): number => {
 };
 
 const tokenize = (value: string): string[] =>
-  normalizeToken(value)
+  normalizeSearchToken(value)
     .split(/[\s,.;:/\\()[\]{}'"`!?+-]+/)
     .map((token) => token.trim())
     .filter(Boolean);
@@ -102,13 +103,47 @@ const matchesStructuredFilters = (entry: Entry, request: EntrySearchRequest): bo
 };
 
 const matchesTextFilter = (index: SearchIndex, value: string | undefined): boolean => {
-  const token = normalizeToken(value);
+  const token = normalizeSearchToken(value);
   if (!token) return true;
   return index.all.includes(token);
 };
 
+const confidenceRank = (value: EntrySearchRequest['actionPackMinConfidence'] | 'high' | 'medium' | 'low'): number => {
+  if (value === 'high') return 3;
+  if (value === 'medium') return 2;
+  return 1;
+};
+
+const matchesActionPackFilters = (entry: Entry, request: EntrySearchRequest): boolean => {
+  const field = request.actionPackField;
+  const token = (() => {
+    const fromTokenizer = tokenizeText(request.actionPackToken ?? '').map((item) => normalizeKeywordToken(item))[0];
+    return fromTokenizer ?? normalizeKeywordToken(request.actionPackToken ?? '');
+  })();
+  if (!field && !token && !request.actionPackMinConfidence) return true;
+
+  const actionPack = entry.actionPackFinal?.actionPack;
+  if (!actionPack || !field || !token) return false;
+
+  const source = actionPack[field];
+  const text = Array.isArray(source) ? source.join(' ') : source;
+  if (!normalizeText(text).includes(token)) {
+    return false;
+  }
+
+  if (request.actionPackMinConfidence) {
+    const flag = actionPack.confidenceFlags.find((item) => item.field === field);
+    const actual = flag?.confidence ?? 'medium';
+    if (confidenceRank(actual) < confidenceRank(request.actionPackMinConfidence)) {
+      return false;
+    }
+  }
+
+  return true;
+};
+
 const scoreTextQuery = (index: SearchIndex, query: string): number => {
-  const q = normalizeToken(query);
+  const q = normalizeSearchToken(query);
   if (!q) return 0;
 
   const tokens = tokenize(q);
@@ -139,7 +174,7 @@ const matchesPhase1JournalFilters = (index: SearchIndex, request: EntrySearchReq
   if (!matchesTextFilter(index, request.outcome)) return false;
 
   if (request.classType) {
-    const classType = normalizeToken(request.classType);
+    const classType = normalizeSearchToken(request.classType);
     if (!index.all.includes(classType)) return false;
   }
 
@@ -149,7 +184,7 @@ const matchesPhase1JournalFilters = (index: SearchIndex, request: EntrySearchReq
 const compareEntries = (a: Entry, b: Entry, request: EntrySearchRequest, scoreA: number, scoreB: number): number => {
   const sortDirection = request.sortDirection === 'asc' ? 1 : -1;
   const sortBy = request.sortBy === 'intensity' ? 'intensity' : 'createdAt';
-  const hasTextQuery = normalizeToken(request.query).length > 0;
+  const hasTextQuery = normalizeSearchToken(request.query).length > 0;
 
   if (hasTextQuery && scoreA !== scoreB) {
     return scoreB - scoreA;
@@ -197,8 +232,9 @@ export const searchEntries = (
     .filter(({ entry, index, score }) => {
       if (!matchesStructuredFilters(entry, request)) return false;
       if (!matchesPhase1JournalFilters(index, request)) return false;
+      if (!matchesActionPackFilters(entry, request)) return false;
 
-      const q = normalizeToken(request.query);
+      const q = normalizeSearchToken(request.query);
       if (!q) return true;
       return score > 0;
     });
@@ -209,7 +245,7 @@ export const searchEntries = (
   const results = (limit ? scored.slice(0, limit) : scored).map((item) => item.entry);
   const latencyMs = Math.round((nowMs() - startedAt) * 100) / 100;
   const queryApplied = Boolean(
-    normalizeToken(request.query) ||
+    normalizeSearchToken(request.query) ||
       request.dateFrom ||
       request.dateTo ||
       request.position ||
@@ -220,7 +256,10 @@ export const searchEntries = (
       request.tag ||
       request.giOrNoGi ||
       request.minIntensity ||
-      request.maxIntensity,
+      request.maxIntensity ||
+      request.actionPackField ||
+      request.actionPackToken ||
+      request.actionPackMinConfidence,
   );
 
   return {
@@ -250,6 +289,21 @@ export const parseEntrySearchRequest = (
   const sortBy = params.sortBy === 'intensity' ? 'intensity' : params.sortBy === 'createdAt' ? 'createdAt' : undefined;
   const sortDirection =
     params.sortDirection === 'asc' ? 'asc' : params.sortDirection === 'desc' ? 'desc' : undefined;
+  const actionPackField =
+    params.actionPackField === 'wins' ||
+    params.actionPackField === 'leaks' ||
+    params.actionPackField === 'oneFocus' ||
+    params.actionPackField === 'drills' ||
+    params.actionPackField === 'positionalRequests' ||
+    params.actionPackField === 'fallbackDecisionGuidance'
+      ? params.actionPackField
+      : undefined;
+  const actionPackMinConfidence =
+    params.actionPackMinConfidence === 'high' ||
+    params.actionPackMinConfidence === 'medium' ||
+    params.actionPackMinConfidence === 'low'
+      ? params.actionPackMinConfidence
+      : undefined;
 
   return {
     query: pickString(params.q ?? params.query),
@@ -267,5 +321,8 @@ export const parseEntrySearchRequest = (
     sortBy,
     sortDirection,
     limit: pickString(params.limit),
+    actionPackField,
+    actionPackToken: pickString(params.actionPackToken),
+    actionPackMinConfidence,
   };
 };

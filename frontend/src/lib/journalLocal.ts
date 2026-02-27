@@ -1,8 +1,6 @@
 'use client';
 
-import type { Entry, EntryCreatePayload, SavedEntrySearch } from '@/types/api';
-
-export type EntryTemplateId = 'quick-roll' | 'comp-class' | 'drill-day' | 'open-mat';
+import type { Entry, EntryCreatePayload, EntryTemplateId, SavedEntrySearch } from '@/types/api';
 
 export interface OfflineCreateQueueItem {
   queueId: string;
@@ -224,29 +222,26 @@ export const entryMatchesSavedSearch = (entry: Entry, search: SavedEntrySearch):
 
 export const applyEntryTemplate = (templateId: EntryTemplateId): Partial<EntryCreatePayload> => {
   switch (templateId) {
-    case 'quick-roll':
+    case 'class-notes':
       return {
-        sections: { shared: 'What happened in one round?', private: '' },
-        sessionMetrics: { durationMinutes: 30, intensity: 7, rounds: 4, giOrNoGi: 'no-gi', tags: ['live'] },
+        sections: { shared: 'Class notes: key wins, leaks, and one focus for next session.', private: '' },
+        sessionMetrics: { durationMinutes: 60, intensity: 6, rounds: 4, giOrNoGi: 'gi', tags: ['class-notes'] },
         rawTechniqueMentions: [],
+        templateId: 'class-notes',
       };
-    case 'comp-class':
+    case 'open-mat-rounds':
       return {
-        sections: { shared: 'Competition class focus + outcomes', private: '' },
-        sessionMetrics: { durationMinutes: 75, intensity: 8, rounds: 6, giOrNoGi: 'gi', tags: ['competition'] },
+        sections: { shared: 'Open mat rounds: experiments, outcomes, and decision points.', private: '' },
+        sessionMetrics: { durationMinutes: 75, intensity: 7, rounds: 7, giOrNoGi: 'no-gi', tags: ['open-mat'] },
         rawTechniqueMentions: [],
+        templateId: 'open-mat-rounds',
       };
-    case 'drill-day':
+    case 'drill-session':
       return {
-        sections: { shared: 'Drilling focus and reps', private: '' },
-        sessionMetrics: { durationMinutes: 60, intensity: 4, rounds: 0, giOrNoGi: 'gi', tags: ['drilling'] },
+        sections: { shared: 'Drill session: reps completed, constraints, and transfer to live rounds.', private: '' },
+        sessionMetrics: { durationMinutes: 50, intensity: 4, rounds: 0, giOrNoGi: 'gi', tags: ['drilling'] },
         rawTechniqueMentions: [],
-      };
-    case 'open-mat':
-      return {
-        sections: { shared: 'Open mat experiments and constraints', private: '' },
-        sessionMetrics: { durationMinutes: 90, intensity: 6, rounds: 8, giOrNoGi: 'no-gi', tags: ['open-mat'] },
-        rawTechniqueMentions: [],
+        templateId: 'drill-session',
       };
     default:
       return {};

@@ -204,6 +204,30 @@ export default function EntryDetailPage() {
             Created: {new Date(entry.createdAt).toLocaleString()} • Draft: {draftState === 'saved' ? 'autosaved' : 'editing'}
           </p>
         )}
+        {entry?.actionPackFinal?.actionPack && (
+          <div className="panel">
+            <h3>Finalized action pack</h3>
+            <p>
+              <strong>One focus:</strong> {entry.actionPackFinal.actionPack.oneFocus || 'none'}
+            </p>
+            <p>
+              <strong>Wins:</strong> {entry.actionPackFinal.actionPack.wins.join(' | ') || 'none'}
+            </p>
+            <p>
+              <strong>Leaks:</strong> {entry.actionPackFinal.actionPack.leaks.join(' | ') || 'none'}
+            </p>
+            <p>
+              <strong>Drills:</strong> {entry.actionPackFinal.actionPack.drills.join(' | ') || 'none'}
+            </p>
+            <p>
+              <strong>Positional requests:</strong> {entry.actionPackFinal.actionPack.positionalRequests.join(' | ') || 'none'}
+            </p>
+            <p>
+              <strong>Fallback guidance:</strong> {entry.actionPackFinal.actionPack.fallbackDecisionGuidance || 'none'}
+            </p>
+            <p className="small">Finalized at {new Date(entry.actionPackFinal.finalizedAt).toLocaleString()}</p>
+          </div>
+        )}
         <form onSubmit={save}>
           <label htmlFor="shared-notes">Shared notes</label>
           <textarea

@@ -1,5 +1,6 @@
 import type { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 
+import { buildActionPackIndexItems } from '../../shared/actionPackIndex';
 import { batchWriteItems, putItem } from '../../shared/db';
 import { CURRENT_ENTRY_SCHEMA_VERSION } from '../../shared/entries';
 import { buildKeywordIndexItems, extractEntryTokens } from '../../shared/keywords';
@@ -9,6 +10,7 @@ import { handler } from './index';
 
 jest.mock('../../shared/db');
 jest.mock('../../shared/keywords');
+jest.mock('../../shared/actionPackIndex');
 jest.mock('../../shared/techniques', () => ({
   ...jest.requireActual('../../shared/techniques'),
   upsertTechniqueCandidates: jest.fn()
@@ -18,6 +20,7 @@ const mockPutItem = jest.mocked(putItem);
 const mockBatchWriteItems = jest.mocked(batchWriteItems);
 const mockExtractEntryTokens = jest.mocked(extractEntryTokens);
 const mockBuildKeywordIndexItems = jest.mocked(buildKeywordIndexItems);
+const mockBuildActionPackIndexItems = jest.mocked(buildActionPackIndexItems);
 const mockUpsertTechniqueCandidates = jest.mocked(upsertTechniqueCandidates);
 
 const buildEvent = (role: 'athlete' | 'coach', bodyOverride?: Record<string, unknown>): APIGatewayProxyEvent =>
@@ -63,6 +66,8 @@ describe('createEntry handler auth', () => {
     mockBatchWriteItems.mockResolvedValue();
     mockExtractEntryTokens.mockReset();
     mockBuildKeywordIndexItems.mockReturnValue([]);
+    mockBuildActionPackIndexItems.mockReset();
+    mockBuildActionPackIndexItems.mockReturnValue([]);
   });
 
   it('allows athlete tokens', async () => {
@@ -138,7 +143,11 @@ describe('createEntry handler auth', () => {
     expect(body.error.code).toBe('FORBIDDEN');
   });
 
-  it('rejects malformed payloads with clear validation message', async () => {
+  it('writes action-pack index rows when finalized action pack is provided', async () => {
+    mockExtractEntryTokens.mockReturnValueOnce(['guard']).mockReturnValueOnce(['guard']);
+    mockBuildKeywordIndexItems.mockReturnValue([]);
+    mockBuildActionPackIndexItems.mockReturnValueOnce([{ id: 'apf-item' }] as never);
+
     const event = buildEvent('athlete');
     event.body = JSON.stringify({
       quickAdd: {
@@ -149,7 +158,7 @@ describe('createEntry handler auth', () => {
         rounds: 6,
         notes: 'shared notes'
       },
-      tags: ['unknown-tag'],
+      tags: ['guard-type', 'pass'],
       sections: { private: 'private notes', shared: 'shared notes' },
       sessionMetrics: {
         durationMinutes: 60,
@@ -157,13 +166,25 @@ describe('createEntry handler auth', () => {
         rounds: 6,
         giOrNoGi: 'gi',
         tags: ['guard']
+      },
+      rawTechniqueMentions: ['Knee Slice'],
+      actionPackFinal: {
+        actionPack: {
+          wins: ['Recovered guard'],
+          leaks: ['Late underhook'],
+          oneFocus: 'Pummel first',
+          drills: ['Pummel x20'],
+          positionalRequests: ['Half guard bottom'],
+          fallbackDecisionGuidance: 'Recover knee shield.',
+          confidenceFlags: [{ field: 'leaks', confidence: 'low' }]
+        },
+        finalizedAt: '2026-02-26T00:00:00.000Z'
       }
     });
 
     const result = (await handler(event, {} as never, () => undefined)) as APIGatewayProxyResult;
 
-    expect(result.statusCode).toBe(400);
-    const body = JSON.parse(result.body) as { error: { message: string } };
-    expect(body.error.message).toContain('tags contains unsupported value');
+    expect(result.statusCode).toBe(201);
+    expect(mockBatchWriteItems).toHaveBeenCalledWith([{ id: 'apf-item' }]);
   });
 });

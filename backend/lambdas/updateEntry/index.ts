@@ -1,5 +1,6 @@
 import type { APIGatewayProxyHandler } from 'aws-lambda';
 
+import { buildActionPackDeleteKeys, buildActionPackIndexItems } from '../../shared/actionPackIndex';
 import { getAuthContext, requireRole } from '../../shared/auth';
 import { batchWriteItems, deleteItem, getItem, putItem } from '../../shared/db';
 import { parseEntryRecord, sanitizeMediaAttachments, withCurrentEntrySchemaVersion } from '../../shared/entries';
@@ -103,6 +104,9 @@ const baseHandler: APIGatewayProxyHandler = async (event) => {
       sessionMetrics: payload.sessionMetrics,
       rawTechniqueMentions: sanitizeTechniqueMentions(payload.rawTechniqueMentions),
       mediaAttachments: sanitizeMediaAttachments(payload.mediaAttachments),
+      templateId: payload.templateId,
+      actionPackDraft: payload.actionPackDraft,
+      actionPackFinal: payload.actionPackFinal,
       updatedAt: nowIso
     });
 
@@ -157,6 +161,15 @@ const baseHandler: APIGatewayProxyHandler = async (event) => {
 
     if (newKeywordItems.length > 0) {
       await batchWriteItems(newKeywordItems);
+    }
+
+    for (const key of buildActionPackDeleteKeys(existingEntry)) {
+      await deleteItem({ Key: key });
+    }
+
+    const actionPackItems = buildActionPackIndexItems(updatedEntry);
+    if (actionPackItems.length > 0) {
+      await batchWriteItems(actionPackItems);
     }
 
     await upsertTechniqueCandidates(updatedEntry.rawTechniqueMentions, updatedEntry.entryId, nowIso);
