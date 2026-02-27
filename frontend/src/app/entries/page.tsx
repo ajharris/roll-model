@@ -10,7 +10,7 @@ import {
   readSavedEntrySearches,
   writeSavedEntrySearches,
 } from '@/lib/journalLocal';
-import { flushOfflineCreateQueue } from '@/lib/journalQueue';
+import { flushOfflineMutationQueue } from '@/lib/journalQueue';
 import type { Entry, EntrySearchRequest, SavedEntrySearch, SavedEntrySearchUpsertPayload } from '@/types/api';
 
 const defaultQuickAdd = {
@@ -75,8 +75,8 @@ export default function EntriesPage() {
       .getEntries()
       .then(async (loaded) => {
         setEntries(loaded);
-        const flushed = await flushOfflineCreateQueue();
-        if (flushed > 0) {
+        const result = await flushOfflineMutationQueue();
+        if (result.succeeded > 0) {
           const reloaded = await apiClient.getEntries();
           setEntries(reloaded);
         }

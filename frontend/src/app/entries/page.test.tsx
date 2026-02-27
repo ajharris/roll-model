@@ -7,7 +7,7 @@ import EntriesPage from './page';
 
 import type * as JournalLocalModule from '@/lib/journalLocal';
 
-const { apiClientMock, flushOfflineCreateQueueMock, readSavedEntrySearchesMock, writeSavedEntrySearchesMock } =
+const { apiClientMock, flushOfflineMutationQueueMock, readSavedEntrySearchesMock, writeSavedEntrySearchesMock } =
   vi.hoisted(() => ({
     apiClientMock: {
       getEntries: vi.fn(),
@@ -17,7 +17,7 @@ const { apiClientMock, flushOfflineCreateQueueMock, readSavedEntrySearchesMock, 
       deleteSavedSearch: vi.fn(),
       createEntry: vi.fn(),
     },
-    flushOfflineCreateQueueMock: vi.fn(),
+    flushOfflineMutationQueueMock: vi.fn(),
     readSavedEntrySearchesMock: vi.fn(),
     writeSavedEntrySearchesMock: vi.fn(),
   }));
@@ -35,7 +35,7 @@ vi.mock('@/lib/apiClient', () => ({
 }));
 
 vi.mock('@/lib/journalQueue', () => ({
-  flushOfflineCreateQueue: () => flushOfflineCreateQueueMock(),
+  flushOfflineMutationQueue: () => flushOfflineMutationQueueMock(),
 }));
 
 vi.mock('@/lib/journalLocal', async () => {
@@ -75,13 +75,20 @@ describe('EntriesPage search UI', () => {
     apiClientMock.updateSavedSearch.mockReset();
     apiClientMock.deleteSavedSearch.mockReset();
     apiClientMock.createEntry.mockReset();
-    flushOfflineCreateQueueMock.mockReset();
+    flushOfflineMutationQueueMock.mockReset();
     readSavedEntrySearchesMock.mockReset();
     writeSavedEntrySearchesMock.mockReset();
 
     apiClientMock.getEntries.mockResolvedValue(sampleEntries);
     apiClientMock.listSavedSearches.mockResolvedValue([]);
-    flushOfflineCreateQueueMock.mockResolvedValue(0);
+    flushOfflineMutationQueueMock.mockResolvedValue({
+      processed: 0,
+      succeeded: 0,
+      failed: 0,
+      conflicts: 0,
+      remainingPending: 0,
+      remainingFailed: 0,
+    });
     readSavedEntrySearchesMock.mockReturnValue([]);
   });
 
