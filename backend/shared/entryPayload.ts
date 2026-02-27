@@ -1,5 +1,6 @@
 import type { APIGatewayProxyEvent } from 'aws-lambda';
 
+import { isValidMediaAttachmentsInput } from './entries';
 import { ApiError } from './responses';
 import type { CreateEntryRequest, EntryStructuredFields, EntryTag } from './types';
 
@@ -124,11 +125,7 @@ export const parseEntryPayload = (event: APIGatewayProxyEvent): CreateEntryReque
     invalid('Entry payload is invalid: rawTechniqueMentions must be an array of strings.');
   }
 
-  if (
-    payload.mediaAttachments !== undefined &&
-    (!Array.isArray(payload.mediaAttachments) ||
-      payload.mediaAttachments.some((attachment) => typeof attachment !== 'object' || attachment === null))
-  ) {
+  if (!isValidMediaAttachmentsInput(payload.mediaAttachments)) {
     invalid('Entry payload is invalid: mediaAttachments must be an array of objects.');
   }
 

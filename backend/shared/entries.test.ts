@@ -1,4 +1,12 @@
-import { CURRENT_ENTRY_SCHEMA_VERSION, normalizeEntry, parseEntryRecord, withCurrentEntrySchemaVersion } from './entries';
+import {
+  CURRENT_ENTRY_SCHEMA_VERSION,
+  isValidClipTimestamp,
+  isValidMediaAttachmentsInput,
+  isValidMediaUrl,
+  normalizeEntry,
+  parseEntryRecord,
+  withCurrentEntrySchemaVersion
+} from './entries';
 
 describe('entry schema versioning', () => {
   it('stamps the current schema version for new entries', () => {
@@ -84,5 +92,51 @@ describe('entry schema versioning', () => {
     expect(entry.schemaVersion).toBe(CURRENT_ENTRY_SCHEMA_VERSION);
     expect(entry).not.toHaveProperty('PK');
     expect(entry).not.toHaveProperty('SK');
+  });
+
+  it('validates media urls and clip timestamps', () => {
+    expect(isValidMediaUrl('https://example.com/video')).toBe(true);
+    expect(isValidMediaUrl('ftp://example.com/video')).toBe(false);
+    expect(isValidClipTimestamp('0:32')).toBe(true);
+    expect(isValidClipTimestamp('1:02:03')).toBe(true);
+    expect(isValidClipTimestamp('00:3')).toBe(false);
+  });
+
+  it('accepts ordered timestamped clip notes and rejects malformed media payloads', () => {
+    expect(
+      isValidMediaAttachmentsInput([
+        {
+          mediaId: 'media-1',
+          title: 'Round 1',
+          url: 'https://example.com/video',
+          clipNotes: [
+            { clipId: 'clip-1', timestamp: '0:32', text: 'Frame was late' },
+            { clipId: 'clip-2', timestamp: '1:18', text: 'Hip escape timing improved' }
+          ]
+        }
+      ])
+    ).toBe(true);
+
+    expect(
+      isValidMediaAttachmentsInput([
+        {
+          mediaId: 'media-1',
+          title: 'Round 1',
+          url: 'example.com/video',
+          clipNotes: [{ clipId: 'clip-1', timestamp: '0:32', text: 'Frame was late' }]
+        }
+      ])
+    ).toBe(false);
+
+    expect(
+      isValidMediaAttachmentsInput([
+        {
+          mediaId: 'media-1',
+          title: 'Round 1',
+          url: 'https://example.com/video',
+          clipNotes: [{ clipId: 'clip-1', timestamp: '32', text: 'Frame was late' }]
+        }
+      ])
+    ).toBe(false);
   });
 });

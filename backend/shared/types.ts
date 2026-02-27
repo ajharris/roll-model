@@ -43,10 +43,8 @@ export interface EntrySections {
 
 export interface MediaClipNote {
   clipId: string;
-  label: string;
-  note: string;
-  startSeconds?: number;
-  endSeconds?: number;
+  timestamp: string;
+  text: string;
 }
 
 export interface MediaAttachment {

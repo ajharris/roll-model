@@ -23,7 +23,7 @@ const mockExtractEntryTokens = jest.mocked(extractEntryTokens);
 const mockBuildKeywordIndexItems = jest.mocked(buildKeywordIndexItems);
 const mockUpsertTechniqueCandidates = jest.mocked(upsertTechniqueCandidates);
 
-const buildEvent = (role: 'athlete' | 'coach'): APIGatewayProxyEvent =>
+const buildEvent = (role: 'athlete' | 'coach', bodyOverride?: Record<string, unknown>): APIGatewayProxyEvent =>
   ({
     pathParameters: { entryId: 'entry-1' },
     body: JSON.stringify({
@@ -48,7 +48,8 @@ const buildEvent = (role: 'athlete' | 'coach'): APIGatewayProxyEvent =>
         giOrNoGi: 'no-gi',
         tags: ['mount']
       },
-      rawTechniqueMentions: ['Armbar']
+      rawTechniqueMentions: ['Armbar'],
+      ...bodyOverride
     }),
     requestContext: {
       authorizer: {
@@ -182,6 +183,26 @@ describe('updateEntry handler', () => {
     expect(result.statusCode).toBe(400);
     const body = JSON.parse(result.body) as { error: { message: string } };
     expect(body.error.message).toContain('quickAdd');
+    expect(mockGetItem).not.toHaveBeenCalled();
+  });
+
+  it('rejects invalid media url or timestamp payload', async () => {
+    const result = (await handler(
+      buildEvent('athlete', {
+        mediaAttachments: [
+          {
+            mediaId: 'media-1',
+            title: 'Round 1',
+            url: 'ftp://invalid.example',
+            clipNotes: [{ clipId: 'clip-1', timestamp: '99', text: 'Late frame' }]
+          }
+        ]
+      }),
+      {} as never,
+      () => undefined
+    )) as APIGatewayProxyResult;
+
+    expect(result.statusCode).toBe(400);
     expect(mockGetItem).not.toHaveBeenCalled();
   });
 
