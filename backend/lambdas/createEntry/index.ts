@@ -1,13 +1,14 @@
-import type { APIGatewayProxyEvent, APIGatewayProxyHandler } from 'aws-lambda';
+import type { APIGatewayProxyHandler } from 'aws-lambda';
 import { v4 as uuidv4 } from 'uuid';
 
 import { buildActionPackIndexItems } from '../../shared/actionPackIndex';
 import { getAuthContext, requireRole } from '../../shared/auth';
 import { batchWriteItems, putItem } from '../../shared/db';
 import { sanitizeMediaAttachments, withCurrentEntrySchemaVersion } from '../../shared/entries';
+import { parseEntryPayload } from '../../shared/entryPayload';
 import { buildKeywordIndexItems, extractEntryTokens } from '../../shared/keywords';
 import { withRequestLogging } from '../../shared/logger';
-import { ApiError, errorResponse, response } from '../../shared/responses';
+import { errorResponse, response } from '../../shared/responses';
 import { sanitizeTechniqueMentions, upsertTechniqueCandidates } from '../../shared/techniques';
 import type { CreateEntryRequest, Entry } from '../../shared/types';
 
@@ -92,6 +93,9 @@ export const buildEntry = (
     athleteId,
     createdAt: nowIso,
     updatedAt: nowIso,
+    quickAdd: input.quickAdd,
+    structured: input.structured,
+    tags: input.tags,
     sections: input.sections,
     sessionMetrics: input.sessionMetrics,
     rawTechniqueMentions: sanitizeTechniqueMentions(input.rawTechniqueMentions),
@@ -106,7 +110,7 @@ const baseHandler: APIGatewayProxyHandler = async (event) => {
     const auth = getAuthContext(event);
     requireRole(auth, ['athlete']);
 
-    const payload = parseBody(event);
+    const payload = parseEntryPayload(event);
     const nowIso = new Date().toISOString();
     const entry = buildEntry(auth.userId, payload, nowIso);
 

@@ -8,6 +8,34 @@ export interface SessionMetrics {
   tags: string[];
 }
 
+export interface EntryQuickAdd {
+  time: string;
+  class: string;
+  gym: string;
+  partners: string[];
+  rounds: number;
+  notes: string;
+}
+
+export interface EntryStructuredFields {
+  position?: string;
+  technique?: string;
+  outcome?: string;
+  problem?: string;
+  cue?: string;
+  constraint?: string;
+}
+
+export type EntryTag =
+  | 'guard-type'
+  | 'top'
+  | 'bottom'
+  | 'submission'
+  | 'sweep'
+  | 'pass'
+  | 'escape'
+  | 'takedown';
+
 export interface EntrySections {
   private: string;
   shared: string;
@@ -15,10 +43,8 @@ export interface EntrySections {
 
 export interface MediaClipNote {
   clipId: string;
-  label: string;
-  note: string;
-  startSeconds?: number;
-  endSeconds?: number;
+  timestamp: string;
+  text: string;
 }
 
 export interface MediaAttachment {
@@ -35,6 +61,9 @@ export interface Entry {
   schemaVersion: number;
   createdAt: string;
   updatedAt: string;
+  quickAdd: EntryQuickAdd;
+  structured?: EntryStructuredFields;
+  tags: EntryTag[];
   sections: EntrySections;
   sessionMetrics: SessionMetrics;
   rawTechniqueMentions: string[];
@@ -65,6 +94,9 @@ export interface CoachLink {
 }
 
 export interface CreateEntryRequest {
+  quickAdd: EntryQuickAdd;
+  structured?: EntryStructuredFields;
+  tags: EntryTag[];
   sections: EntrySections;
   sessionMetrics: SessionMetrics;
   rawTechniqueMentions?: string[];

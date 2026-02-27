@@ -192,7 +192,7 @@ export const entryMatchesSavedSearch = (entry: Entry, search: SavedEntrySearch):
       attachment.title,
       attachment.url,
       attachment.notes ?? '',
-      ...attachment.clipNotes.map((clip) => `${clip.label} ${clip.note}`),
+      ...attachment.clipNotes.map((clip) => `${clip.timestamp} ${clip.text}`),
     ]),
   ]
     .join(' ')

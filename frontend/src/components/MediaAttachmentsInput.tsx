@@ -10,10 +10,8 @@ type Props = {
 
 const emptyClip = () => ({
   clipId: crypto.randomUUID(),
-  label: '',
-  note: '',
-  startSeconds: undefined as number | undefined,
-  endSeconds: undefined as number | undefined,
+  timestamp: '',
+  text: '',
 });
 
 const emptyAttachment = (): MediaAttachment => ({
@@ -120,77 +118,32 @@ export const MediaAttachmentsInput = ({ value, onChange, disabled = false }: Pro
               </div>
               <div className="grid">
                 <div>
-                  <label htmlFor={`clip-label-${clip.clipId}`}>Label</label>
+                  <label htmlFor={`clip-timestamp-${clip.clipId}`}>Timestamp</label>
                   <input
-                    id={`clip-label-${clip.clipId}`}
-                    value={clip.label}
+                    id={`clip-timestamp-${clip.clipId}`}
+                    value={clip.timestamp ?? ''}
                     onChange={(event) =>
                       updateAttachment(attachment.mediaId, (current) => ({
                         ...current,
                         clipNotes: current.clipNotes.map((candidate) =>
-                          candidate.clipId === clip.clipId ? { ...candidate, label: event.target.value } : candidate,
+                          candidate.clipId === clip.clipId ? { ...candidate, timestamp: event.target.value } : candidate,
                         ),
                       }))
                     }
                     disabled={disabled}
-                    placeholder="00:42 guard retention"
-                  />
-                </div>
-                <div>
-                  <label htmlFor={`clip-start-${clip.clipId}`}>Start (sec)</label>
-                  <input
-                    id={`clip-start-${clip.clipId}`}
-                    type="number"
-                    value={clip.startSeconds ?? ''}
-                    onChange={(event) =>
-                      updateAttachment(attachment.mediaId, (current) => ({
-                        ...current,
-                        clipNotes: current.clipNotes.map((candidate) =>
-                          candidate.clipId === clip.clipId
-                            ? {
-                                ...candidate,
-                                startSeconds:
-                                  event.target.value === '' ? undefined : Number(event.target.value),
-                              }
-                            : candidate,
-                        ),
-                      }))
-                    }
-                    disabled={disabled}
-                  />
-                </div>
-                <div>
-                  <label htmlFor={`clip-end-${clip.clipId}`}>End (sec)</label>
-                  <input
-                    id={`clip-end-${clip.clipId}`}
-                    type="number"
-                    value={clip.endSeconds ?? ''}
-                    onChange={(event) =>
-                      updateAttachment(attachment.mediaId, (current) => ({
-                        ...current,
-                        clipNotes: current.clipNotes.map((candidate) =>
-                          candidate.clipId === clip.clipId
-                            ? {
-                                ...candidate,
-                                endSeconds: event.target.value === '' ? undefined : Number(event.target.value),
-                              }
-                            : candidate,
-                        ),
-                      }))
-                    }
-                    disabled={disabled}
+                    placeholder="0:32 or 1:02:10"
                   />
                 </div>
               </div>
               <label htmlFor={`clip-note-${clip.clipId}`}>Clip note</label>
               <textarea
                 id={`clip-note-${clip.clipId}`}
-                value={clip.note}
+                value={clip.text ?? ''}
                 onChange={(event) =>
                   updateAttachment(attachment.mediaId, (current) => ({
                     ...current,
                     clipNotes: current.clipNotes.map((candidate) =>
-                      candidate.clipId === clip.clipId ? { ...candidate, note: event.target.value } : candidate,
+                      candidate.clipId === clip.clipId ? { ...candidate, text: event.target.value } : candidate,
                     ),
                   }))
                 }

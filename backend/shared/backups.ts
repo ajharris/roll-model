@@ -1,4 +1,4 @@
-import { normalizeEntry } from './entries';
+import { isValidMediaAttachmentsInput, normalizeEntry } from './entries';
 import { buildKeywordIndexItems, extractEntryTokens } from './keywords';
 import type { AIMessage, AIThread, CoachLink, Comment, Entry } from './types';
 
@@ -156,7 +156,8 @@ const parseEntry = (value: unknown): Entry => {
     !Array.isArray(value.sessionMetrics.tags) ||
     value.sessionMetrics.tags.some((tag) => typeof tag !== 'string') ||
     typeof value.createdAt !== 'string' ||
-    typeof value.updatedAt !== 'string'
+    typeof value.updatedAt !== 'string' ||
+    !isValidMediaAttachmentsInput(value.mediaAttachments)
   ) {
     throw new BackupValidationError('format', 'Backup entry shape is invalid.');
   }

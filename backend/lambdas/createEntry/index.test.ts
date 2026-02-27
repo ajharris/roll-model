@@ -23,9 +23,22 @@ const mockBuildKeywordIndexItems = jest.mocked(buildKeywordIndexItems);
 const mockBuildActionPackIndexItems = jest.mocked(buildActionPackIndexItems);
 const mockUpsertTechniqueCandidates = jest.mocked(upsertTechniqueCandidates);
 
-const buildEvent = (role: 'athlete' | 'coach'): APIGatewayProxyEvent =>
+const buildEvent = (role: 'athlete' | 'coach', bodyOverride?: Record<string, unknown>): APIGatewayProxyEvent =>
   ({
     body: JSON.stringify({
+      quickAdd: {
+        time: '2026-02-26T18:00:00.000Z',
+        class: 'Evening fundamentals',
+        gym: 'North Academy',
+        partners: ['Alex'],
+        rounds: 6,
+        notes: 'shared notes'
+      },
+      structured: {
+        position: 'half guard',
+        technique: 'knee cut'
+      },
+      tags: ['guard-type', 'pass'],
       sections: { private: 'private notes', shared: 'shared notes' },
       sessionMetrics: {
         durationMinutes: 60,
@@ -34,7 +47,8 @@ const buildEvent = (role: 'athlete' | 'coach'): APIGatewayProxyEvent =>
         giOrNoGi: 'gi',
         tags: ['guard']
       },
-      rawTechniqueMentions: ['Knee Slice']
+      rawTechniqueMentions: ['Knee Slice'],
+      ...bodyOverride
     }),
     requestContext: {
       authorizer: {
@@ -73,7 +87,11 @@ describe('createEntry handler auth', () => {
       expect.objectContaining({
         Item: expect.objectContaining({
           entityType: 'ENTRY',
-          schemaVersion: CURRENT_ENTRY_SCHEMA_VERSION
+          schemaVersion: CURRENT_ENTRY_SCHEMA_VERSION,
+          quickAdd: expect.objectContaining({
+            class: 'Evening fundamentals'
+          }),
+          tags: ['guard-type', 'pass']
         })
       })
     );
@@ -95,6 +113,26 @@ describe('createEntry handler auth', () => {
       { visibilityScope: 'private' }
     );
     expect(mockBatchWriteItems).toHaveBeenCalledWith([{ id: 'shared' }, { id: 'private' }]);
+  });
+
+  it('rejects invalid media url and timestamp payloads', async () => {
+    const result = (await handler(
+      buildEvent('athlete', {
+        mediaAttachments: [
+          {
+            mediaId: 'media-1',
+            title: 'Round 1',
+            url: 'not-a-url',
+            clipNotes: [{ clipId: 'clip-1', timestamp: '32', text: 'Late frame' }]
+          }
+        ]
+      }),
+      {} as never,
+      () => undefined
+    )) as APIGatewayProxyResult;
+
+    expect(result.statusCode).toBe(400);
+    expect(mockPutItem).not.toHaveBeenCalled();
   });
 
   it('rejects coach tokens', async () => {

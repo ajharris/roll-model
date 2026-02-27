@@ -60,10 +60,20 @@ const sanitizeAttachments = (attachments: MediaAttachment[]): MediaAttachment[] 
       clipNotes: attachment.clipNotes
         .map((clip) => ({
           ...clip,
-          label: clip.label.trim(),
-          note: clip.note.trim(),
+          timestamp:
+            typeof clip.timestamp === 'string'
+              ? clip.timestamp.trim()
+              : typeof (clip as Partial<{ label: string }>).label === 'string'
+                ? ((clip as Partial<{ label: string }>).label as string).trim()
+                : '',
+          text:
+            typeof clip.text === 'string'
+              ? clip.text.trim()
+              : typeof (clip as Partial<{ note: string }>).note === 'string'
+                ? ((clip as Partial<{ note: string }>).note as string).trim()
+                : '',
         }))
-        .filter((clip) => clip.label && clip.note),
+        .filter((clip) => clip.timestamp && clip.text),
     }))
     .filter((attachment) => attachment.title && attachment.url);
 

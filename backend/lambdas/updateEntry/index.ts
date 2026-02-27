@@ -1,10 +1,10 @@
-import type { APIGatewayProxyEvent, APIGatewayProxyHandler } from 'aws-lambda';
-
+import type { APIGatewayProxyHandler } from 'aws-lambda';
 
 import { buildActionPackDeleteKeys, buildActionPackIndexItems } from '../../shared/actionPackIndex';
 import { getAuthContext, requireRole } from '../../shared/auth';
 import { batchWriteItems, deleteItem, getItem, putItem } from '../../shared/db';
 import { parseEntryRecord, sanitizeMediaAttachments, withCurrentEntrySchemaVersion } from '../../shared/entries';
+import { parseEntryPayload } from '../../shared/entryPayload';
 import { buildKeywordIndexItems, extractEntryTokens } from '../../shared/keywords';
 import { withRequestLogging } from '../../shared/logger';
 import { ApiError, errorResponse, response } from '../../shared/responses';
@@ -120,7 +120,7 @@ const baseHandler: APIGatewayProxyHandler = async (event) => {
     requireRole(auth, ['athlete']);
 
     const entryId = getEntryIdFromPath(event.pathParameters?.entryId);
-    const payload = parseBody(event);
+    const payload = parseEntryPayload(event);
     const nowIso = new Date().toISOString();
 
     const metaResult = await getItem({
@@ -167,6 +167,9 @@ const baseHandler: APIGatewayProxyHandler = async (event) => {
     const existingEntry = parseEntryRecord(existingEntryResult.Item as Record<string, unknown>);
     const updatedEntry: Entry = withCurrentEntrySchemaVersion({
       ...existingEntry,
+      quickAdd: payload.quickAdd,
+      structured: payload.structured,
+      tags: payload.tags,
       sections: payload.sections,
       sessionMetrics: payload.sessionMetrics,
       rawTechniqueMentions: sanitizeTechniqueMentions(payload.rawTechniqueMentions),
