@@ -17,15 +17,6 @@ type LegacyEntryV0 = Omit<Entry, 'schemaVersion' | 'rawTechniqueMentions' | 'qui
   schemaVersion?: undefined;
 };
 
-type EntryV2 = Omit<Entry, 'rawTechniqueMentions' | 'quickAdd' | 'structured' | 'tags'> & {
-  schemaVersion: 2;
-  quickAdd?: unknown;
-  structured?: unknown;
-  tags?: unknown;
-  rawTechniqueMentions?: unknown;
-  mediaAttachments?: unknown;
-};
-
 type VersionedEntryInput = Omit<Entry, 'rawTechniqueMentions'> & {
   schemaVersion: number;
   rawTechniqueMentions?: unknown;

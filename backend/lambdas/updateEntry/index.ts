@@ -1,5 +1,4 @@
-import type { APIGatewayProxyHandler } from 'aws-lambda';
-
+import type { APIGatewayProxyEvent, APIGatewayProxyHandler } from 'aws-lambda';
 
 import { getAuthContext, requireRole } from '../../shared/auth';
 import { batchWriteItems, deleteItem, getItem, putItem } from '../../shared/db';
@@ -91,7 +90,7 @@ const baseHandler: APIGatewayProxyHandler = async (event) => {
     requireRole(auth, ['athlete']);
 
     const entryId = getEntryIdFromPath(event.pathParameters?.entryId);
-    const payload = parseEntryPayload(event);
+    const payload = parseBody(event);
     const nowIso = new Date().toISOString();
 
     const metaResult = await getItem({

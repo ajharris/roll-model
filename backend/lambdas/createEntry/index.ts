@@ -1,4 +1,4 @@
-import type { APIGatewayProxyHandler } from 'aws-lambda';
+import type { APIGatewayProxyEvent, APIGatewayProxyHandler } from 'aws-lambda';
 import { v4 as uuidv4 } from 'uuid';
 
 import { getAuthContext, requireRole } from '../../shared/auth';
@@ -10,7 +10,7 @@ import {
 } from '../../shared/entries';
 import { buildKeywordIndexItems, extractEntryTokens } from '../../shared/keywords';
 import { withRequestLogging } from '../../shared/logger';
-import { errorResponse, response } from '../../shared/responses';
+import { ApiError, errorResponse, response } from '../../shared/responses';
 import { sanitizeTechniqueMentions, upsertTechniqueCandidates } from '../../shared/techniques';
 import type { CreateEntryRequest, Entry } from '../../shared/types';
 
@@ -76,7 +76,7 @@ const baseHandler: APIGatewayProxyHandler = async (event) => {
     const auth = getAuthContext(event);
     requireRole(auth, ['athlete']);
 
-    const payload = parseEntryPayload(event);
+    const payload = parseBody(event);
     const nowIso = new Date().toISOString();
     const entry = buildEntry(auth.userId, payload, nowIso);
 
