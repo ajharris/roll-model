@@ -95,6 +95,12 @@ describe('exportData handler', () => {
       } as unknown as QueryCommandOutput)
       .mockResolvedValueOnce({
         Items: []
+      } as unknown as QueryCommandOutput)
+      .mockResolvedValueOnce({
+        Items: []
+      } as unknown as QueryCommandOutput)
+      .mockResolvedValueOnce({
+        Items: []
       } as unknown as QueryCommandOutput);
 
     const result = (await handler(buildEvent(), {} as never, () => undefined)) as APIGatewayProxyResult;
@@ -110,7 +116,7 @@ describe('exportData handler', () => {
       };
       tidy: { entries: Array<{ entryId: string }>; comments: Array<{ commentId: string }> };
     };
-    expect(body.schemaVersion).toBe('2026-02-19');
+    expect(body.schemaVersion).toBe('2026-02-27');
     expect(body.generatedAt).toBeDefined();
     expect(body.full.athleteId).toBe('athlete-1');
     expect(body.full.entries[0].entryId).toBe('entry-1');
@@ -132,13 +138,16 @@ describe('exportData handler', () => {
       } as unknown as QueryCommandOutput)
       .mockResolvedValueOnce({
         Items: []
+      } as unknown as QueryCommandOutput)
+      .mockResolvedValueOnce({
+        Items: []
       } as unknown as QueryCommandOutput);
 
     const result = (await handler(buildEventWithMode('tidy'), {} as never, () => undefined)) as APIGatewayProxyResult;
 
     expect(result.statusCode).toBe(200);
     const body = JSON.parse(result.body) as { schemaVersion: string; generatedAt: string; tidy?: unknown; full?: unknown };
-    expect(body.schemaVersion).toBe('2026-02-19');
+    expect(body.schemaVersion).toBe('2026-02-27');
     expect(body.generatedAt).toBeDefined();
     expect(body.tidy).toBeDefined();
     expect(body.full).toBeUndefined();

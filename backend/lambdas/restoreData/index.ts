@@ -74,6 +74,8 @@ const baseHandler: APIGatewayProxyHandler = async (event) => {
         links: backup.full.links.length,
         aiThreads: backup.full.aiThreads.length,
         aiMessages: backup.full.aiMessages.length,
+        weeklyPlans: backup.full.weeklyPlans.length,
+        curriculumGraph: backup.full.curriculumGraph ? 1 : 0,
         itemsWritten: items.length
       }
     });

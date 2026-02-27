@@ -335,3 +335,89 @@ export interface UpsertSavedEntrySearchRequest {
   isPinned?: boolean;
   isFavorite?: boolean;
 }
+
+export type WeeklyPlanStatus = 'draft' | 'active' | 'completed';
+export type WeeklyPlanItemStatus = 'pending' | 'done' | 'skipped';
+export type WeeklyPlanSourceType = 'entry-action-pack' | 'checkoff' | 'curriculum-graph' | 'weekly-plan';
+export type WeeklyPlanSelectionType =
+  | 'primary-skill'
+  | 'supporting-concept'
+  | 'conditioning-constraint'
+  | 'drill'
+  | 'positional-round'
+  | 'training-constraint';
+
+export interface WeeklyPlanReference {
+  sourceType: WeeklyPlanSourceType;
+  sourceId: string;
+  createdAt?: string;
+  summary: string;
+}
+
+export interface WeeklyPlanExplainabilityItem {
+  selectionType: WeeklyPlanSelectionType;
+  selectedValue: string;
+  reason: string;
+  references: WeeklyPlanReference[];
+}
+
+export interface WeeklyPlanMenuItem {
+  id: string;
+  label: string;
+  status: WeeklyPlanItemStatus;
+  completedAt?: string;
+  coachNote?: string;
+}
+
+export interface WeeklyPlanCompletion {
+  completedAt?: string;
+  outcomeNotes?: string;
+}
+
+export interface WeeklyPlanCoachReview {
+  reviewedBy: string;
+  reviewedAt: string;
+  notes?: string;
+}
+
+export interface WeeklyPlan {
+  planId: string;
+  athleteId: string;
+  weekOf: string;
+  generatedAt: string;
+  updatedAt: string;
+  status: WeeklyPlanStatus;
+  primarySkills: string[];
+  supportingConcept: string;
+  conditioningConstraint: string;
+  drills: WeeklyPlanMenuItem[];
+  positionalRounds: WeeklyPlanMenuItem[];
+  constraints: WeeklyPlanMenuItem[];
+  explainability: WeeklyPlanExplainabilityItem[];
+  coachReview?: WeeklyPlanCoachReview;
+  completion?: WeeklyPlanCompletion;
+}
+
+export interface CurriculumGraphNode {
+  skillId: string;
+  label: string;
+  priority: number;
+  supportingConcepts?: string[];
+  conditioningConstraints?: string[];
+}
+
+export interface CurriculumGraphEdge {
+  fromSkillId: string;
+  toSkillId: string;
+  relation: 'supports' | 'prerequisite' | 'counter' | 'transition';
+  weight?: number;
+}
+
+export interface CurriculumGraph {
+  athleteId: string;
+  graphId: string;
+  version: number;
+  updatedAt: string;
+  nodes: CurriculumGraphNode[];
+  edges: CurriculumGraphEdge[];
+}
