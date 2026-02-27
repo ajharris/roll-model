@@ -1,4 +1,4 @@
-import type { Entry, MediaAttachment, MediaClipNote } from './types';
+import type { Entry, EntryQuickAdd, EntryStructuredFields, EntryTag, MediaAttachment, MediaClipNote } from './types';
 
 export const CURRENT_ENTRY_SCHEMA_VERSION = 3;
 
@@ -25,6 +25,24 @@ type VersionedEntryInput = Omit<Entry, 'rawTechniqueMentions'> & {
 
 type NormalizableEntryInput = LegacyEntryV0 | VersionedEntryInput;
 const CLIP_TIMESTAMP_REGEX = /^(?:\d+:[0-5]\d:[0-5]\d|\d+:[0-5]\d)$/;
+const ENTRY_TAG_VALUES = new Set<EntryTag>([
+  'guard-type',
+  'top',
+  'bottom',
+  'submission',
+  'sweep',
+  'pass',
+  'escape',
+  'takedown'
+]);
+const STRUCTURED_FIELDS: Array<keyof EntryStructuredFields> = [
+  'position',
+  'technique',
+  'outcome',
+  'problem',
+  'cue',
+  'constraint'
+];
 
 const sanitizeRawTechniqueMentions = (value: unknown): string[] => {
   if (!Array.isArray(value)) {
@@ -35,6 +53,75 @@ const sanitizeRawTechniqueMentions = (value: unknown): string[] => {
 };
 
 const sanitizeString = (value: unknown): string => (typeof value === 'string' ? value.trim() : '');
+const asRecord = (value: unknown): Record<string, unknown> | null =>
+  typeof value === 'object' && value !== null && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
+
+const sanitizeQuickAdd = (value: unknown, fallbackEntry: Record<string, unknown>): EntryQuickAdd => {
+  const quickAdd = asRecord(value);
+  const fallbackSessionMetrics = asRecord(fallbackEntry.sessionMetrics);
+  const fallbackSections = asRecord(fallbackEntry.sections);
+
+  const time = sanitizeString(quickAdd?.time) || sanitizeString(fallbackEntry.createdAt);
+  const className = sanitizeString(quickAdd?.class);
+  const gym = sanitizeString(quickAdd?.gym);
+  const partners = Array.isArray(quickAdd?.partners)
+    ? quickAdd.partners.filter((partner): partner is string => typeof partner === 'string').map((partner) => partner.trim())
+    : [];
+  const rounds =
+    typeof quickAdd?.rounds === 'number' && Number.isFinite(quickAdd.rounds)
+      ? quickAdd.rounds
+      : typeof fallbackSessionMetrics?.rounds === 'number' && Number.isFinite(fallbackSessionMetrics.rounds)
+        ? fallbackSessionMetrics.rounds
+        : 0;
+  const notes = sanitizeString(quickAdd?.notes) || sanitizeString(fallbackSections?.shared);
+
+  return {
+    time,
+    class: className,
+    gym,
+    partners,
+    rounds,
+    notes
+  };
+};
+
+const sanitizeStructuredFields = (value: unknown): EntryStructuredFields | undefined => {
+  const structured = asRecord(value);
+  if (!structured) {
+    return undefined;
+  }
+
+  const sanitized: EntryStructuredFields = {};
+  for (const field of STRUCTURED_FIELDS) {
+    const fieldValue = sanitizeString(structured[field]);
+    if (fieldValue) {
+      sanitized[field] = fieldValue;
+    }
+  }
+
+  return Object.keys(sanitized).length > 0 ? sanitized : undefined;
+};
+
+const sanitizeEntryTags = (value: unknown, fallback: unknown): EntryTag[] => {
+  const input = Array.isArray(value)
+    ? value
+    : Array.isArray(fallback)
+      ? fallback
+      : [];
+
+  const deduped = new Set<EntryTag>();
+  input.forEach((tag) => {
+    if (typeof tag !== 'string') {
+      return;
+    }
+
+    if (ENTRY_TAG_VALUES.has(tag as EntryTag)) {
+      deduped.add(tag as EntryTag);
+    }
+  });
+
+  return [...deduped];
+};
 
 export const isValidMediaUrl = (value: string): boolean => {
   try {
