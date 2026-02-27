@@ -24,6 +24,7 @@ import type {
   Entry,
   EntryCreatePayload,
   EntryTemplateId,
+  CheckoffEvidenceType,
   MediaAttachment,
 } from '@/types/api';
 
@@ -125,6 +126,90 @@ const textToList = (value: string): string[] =>
     .split('\n')
     .map((item) => item.trim())
     .filter(Boolean);
+
+const resolveFieldConfidence = (actionPack: ActionPack, field: ActionPackFieldKey): 'high' | 'medium' | 'low' =>
+  actionPack.confidenceFlags.find((flag) => flag.field === field)?.confidence ?? 'medium';
+
+const buildCheckoffEvidenceFromActionPack = (
+  actionPack: ActionPack,
+  skillIds: string[],
+): Array<{
+  skillId: string;
+  evidenceType: CheckoffEvidenceType;
+  statement: string;
+  confidence: 'high' | 'medium' | 'low';
+  sourceOutcomeField: ActionPackFieldKey;
+  mappingStatus: 'confirmed' | 'pending_confirmation';
+}> => {
+  const normalizedSkills = [...new Set(skillIds.map((value) => value.trim().toLowerCase()).filter(Boolean))];
+  if (normalizedSkills.length === 0) return [];
+
+  const mapMappingStatus = (confidence: 'high' | 'medium' | 'low'): 'confirmed' | 'pending_confirmation' =>
+    confidence === 'low' ? 'pending_confirmation' : 'confirmed';
+
+  const wins = actionPack.wins.find((item) => item.trim());
+  const drills = actionPack.drills.find((item) => item.trim());
+  const positional = actionPack.positionalRequests.find((item) => item.trim());
+  const fallback = actionPack.fallbackDecisionGuidance.trim();
+
+  const output: Array<{
+    skillId: string;
+    evidenceType: CheckoffEvidenceType;
+    statement: string;
+    confidence: 'high' | 'medium' | 'low';
+    sourceOutcomeField: ActionPackFieldKey;
+    mappingStatus: 'confirmed' | 'pending_confirmation';
+  }> = [];
+
+  for (const skillId of normalizedSkills) {
+    if (wins) {
+      const confidence = resolveFieldConfidence(actionPack, 'wins');
+      output.push({
+        skillId,
+        evidenceType: 'hit-in-live-roll',
+        statement: wins,
+        confidence,
+        sourceOutcomeField: 'wins',
+        mappingStatus: mapMappingStatus(confidence),
+      });
+    }
+    if (drills) {
+      const confidence = resolveFieldConfidence(actionPack, 'drills');
+      output.push({
+        skillId,
+        evidenceType: 'demonstrate-clean-reps',
+        statement: drills,
+        confidence,
+        sourceOutcomeField: 'drills',
+        mappingStatus: mapMappingStatus(confidence),
+      });
+    }
+    if (positional) {
+      const confidence = resolveFieldConfidence(actionPack, 'positionalRequests');
+      output.push({
+        skillId,
+        evidenceType: 'hit-on-equal-or-better-partner',
+        statement: positional,
+        confidence,
+        sourceOutcomeField: 'positionalRequests',
+        mappingStatus: mapMappingStatus(confidence),
+      });
+    }
+    if (fallback) {
+      const confidence = resolveFieldConfidence(actionPack, 'fallbackDecisionGuidance');
+      output.push({
+        skillId,
+        evidenceType: 'explain-counters-and-recounters',
+        statement: fallback,
+        confidence,
+        sourceOutcomeField: 'fallbackDecisionGuidance',
+        mappingStatus: mapMappingStatus(confidence),
+      });
+    }
+  }
+
+  return output;
+};
 
 export default function NewEntryPage() {
   const [shared, setShared] = useState('');
@@ -372,8 +457,21 @@ export default function NewEntryPage() {
           finalizedAt: new Date().toISOString(),
         },
       });
+      const derivedEvidence = buildCheckoffEvidenceFromActionPack(
+        actionPack,
+        techniques.length > 0 ? techniques : tags,
+      );
+      if (derivedEvidence.length > 0) {
+        const checkoffResult = await apiClient.upsertEntryCheckoffEvidence(createdEntry.entryId, { evidence: derivedEvidence });
+        if (checkoffResult.pendingConfirmationCount > 0) {
+          setGptStatus(
+            `Finalized. ${checkoffResult.pendingConfirmationCount} low-confidence checkoff mappings are saved as pending confirmation.`,
+          );
+          return;
+        }
+      }
 
-      setGptStatus('Finalized and persisted. This output is now available for curriculum/progress/recommendation loops.');
+      setGptStatus('Finalized and persisted. Checkoff evidence has been mapped from this journal entry.');
     } catch {
       setGptStatus('Finalize failed.');
     }

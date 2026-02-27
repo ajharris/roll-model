@@ -184,6 +184,18 @@ export class RollModelStack extends cdk.Stack {
       'backend/lambdas/requestSignup/index.ts',
       table
     );
+    const listCheckoffsLambda = this.createLambda('listCheckoffs', 'backend/lambdas/listCheckoffs/index.ts', table);
+    const upsertCheckoffEvidenceLambda = this.createLambda(
+      'upsertCheckoffEvidence',
+      'backend/lambdas/upsertCheckoffEvidence/index.ts',
+      table
+    );
+    const reviewCheckoffLambda = this.createLambda('reviewCheckoff', 'backend/lambdas/reviewCheckoff/index.ts', table);
+    const getEntryCheckoffEvidenceLambda = this.createLambda(
+      'getEntryCheckoffEvidence',
+      'backend/lambdas/getEntryCheckoffEvidence/index.ts',
+      table
+    );
     const submitFeedbackLambda = this.createLambda(
       'submitFeedback',
       'backend/lambdas/submitFeedback/index.ts',
@@ -206,6 +218,10 @@ export class RollModelStack extends cdk.Stack {
       { name: 'restoreData', fn: restoreDataLambda },
       { name: 'aiChat', fn: aiChatLambda },
       { name: 'requestSignup', fn: requestSignupLambda },
+      { name: 'listCheckoffs', fn: listCheckoffsLambda },
+      { name: 'upsertCheckoffEvidence', fn: upsertCheckoffEvidenceLambda },
+      { name: 'reviewCheckoff', fn: reviewCheckoffLambda },
+      { name: 'getEntryCheckoffEvidence', fn: getEntryCheckoffEvidenceLambda },
       { name: 'submitFeedback', fn: submitFeedbackLambda }
     ];
 
@@ -335,6 +351,15 @@ export class RollModelStack extends cdk.Stack {
       allowHeaders: ['Content-Type', 'Authorization']
     });
 
+    const entryCheckoffEvidence = entryById.addResource('checkoff-evidence');
+    entryCheckoffEvidence.addMethod('GET', new apigateway.LambdaIntegration(getEntryCheckoffEvidenceLambda), methodOptions);
+    entryCheckoffEvidence.addMethod('POST', new apigateway.LambdaIntegration(upsertCheckoffEvidenceLambda), methodOptions);
+    entryCheckoffEvidence.addCorsPreflight({
+      allowOrigins: apigateway.Cors.ALL_ORIGINS,
+      allowMethods: ['GET', 'POST', 'OPTIONS'],
+      allowHeaders: ['Content-Type', 'Authorization']
+    });
+
     const savedSearches = api.root.addResource('saved-searches');
     savedSearches.addMethod('GET', new apigateway.LambdaIntegration(listSavedSearchesLambda), methodOptions);
     savedSearches.addMethod('POST', new apigateway.LambdaIntegration(createSavedSearchLambda), methodOptions);
@@ -404,6 +429,23 @@ export class RollModelStack extends cdk.Stack {
       allowHeaders: ['Content-Type', 'Authorization']
     });
 
+    const checkoffs = api.root.addResource('checkoffs');
+    checkoffs.addMethod('GET', new apigateway.LambdaIntegration(listCheckoffsLambda), methodOptions);
+    checkoffs.addCorsPreflight({
+      allowOrigins: apigateway.Cors.ALL_ORIGINS,
+      allowMethods: ['GET', 'OPTIONS'],
+      allowHeaders: ['Content-Type', 'Authorization']
+    });
+
+    const checkoffById = checkoffs.addResource('{checkoffId}');
+    const checkoffReview = checkoffById.addResource('review');
+    checkoffReview.addMethod('PUT', new apigateway.LambdaIntegration(reviewCheckoffLambda), methodOptions);
+    checkoffReview.addCorsPreflight({
+      allowOrigins: apigateway.Cors.ALL_ORIGINS,
+      allowMethods: ['PUT', 'OPTIONS'],
+      allowHeaders: ['Content-Type', 'Authorization']
+    });
+
     const athletes = api.root.addResource('athletes');
     const athleteById = athletes.addResource('{athleteId}');
     const athleteEntries = athleteById.addResource('entries');
@@ -411,6 +453,23 @@ export class RollModelStack extends cdk.Stack {
     athleteEntries.addCorsPreflight({
       allowOrigins: apigateway.Cors.ALL_ORIGINS,
       allowMethods: ['GET', 'OPTIONS'],
+      allowHeaders: ['Content-Type', 'Authorization']
+    });
+
+    const athleteCheckoffs = athleteById.addResource('checkoffs');
+    athleteCheckoffs.addMethod('GET', new apigateway.LambdaIntegration(listCheckoffsLambda), methodOptions);
+    athleteCheckoffs.addCorsPreflight({
+      allowOrigins: apigateway.Cors.ALL_ORIGINS,
+      allowMethods: ['GET', 'OPTIONS'],
+      allowHeaders: ['Content-Type', 'Authorization']
+    });
+
+    const athleteCheckoffById = athleteCheckoffs.addResource('{checkoffId}');
+    const athleteCheckoffReview = athleteCheckoffById.addResource('review');
+    athleteCheckoffReview.addMethod('PUT', new apigateway.LambdaIntegration(reviewCheckoffLambda), methodOptions);
+    athleteCheckoffReview.addCorsPreflight({
+      allowOrigins: apigateway.Cors.ALL_ORIGINS,
+      allowMethods: ['PUT', 'OPTIONS'],
       allowHeaders: ['Content-Type', 'Authorization']
     });
 

@@ -2,6 +2,10 @@ import { logAuthFailure, logNetworkFailure } from '@/lib/clientErrorLogging';
 import { frontendConfig } from '@/lib/config';
 import type {
   AIExtractedUpdates,
+  Checkoff,
+  CheckoffEvidence,
+  CheckoffEvidenceMappingStatus,
+  CheckoffEvidenceType,
   CommentPayload,
   Entry,
   EntryCreatePayload,
@@ -212,6 +216,38 @@ const asSavedSearchObject = (payload: unknown): SavedEntrySearch => {
   return payload as SavedEntrySearch;
 };
 
+const asCheckoffArray = (payload: unknown): Checkoff[] => {
+  if (
+    payload &&
+    typeof payload === 'object' &&
+    'checkoffs' in payload &&
+    Array.isArray((payload as { checkoffs: unknown }).checkoffs)
+  ) {
+    return (payload as { checkoffs: Checkoff[] }).checkoffs;
+  }
+
+  if (Array.isArray(payload)) {
+    return payload as Checkoff[];
+  }
+
+  return [];
+};
+
+const asEntryEvidenceArray = (payload: unknown): CheckoffEvidence[] => {
+  if (
+    payload &&
+    typeof payload === 'object' &&
+    'evidence' in payload &&
+    Array.isArray((payload as { evidence: unknown }).evidence)
+  ) {
+    return (payload as { evidence: CheckoffEvidence[] }).evidence;
+  }
+  if (Array.isArray(payload)) {
+    return payload as CheckoffEvidence[];
+  }
+  return [];
+};
+
 export const apiClient = {
   getEntries: async (query?: EntrySearchRequest) => {
     const result = await request<unknown>(withQueryString('/entries', query));
@@ -303,6 +339,51 @@ export const apiClient = {
   submitFeedback: (payload: FeedbackPayload) =>
     request<{ issueNumber: number; issueUrl: string }>('/feedback', {
       method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  upsertEntryCheckoffEvidence: async (
+    entryId: string,
+    payload: {
+      evidence: Array<{
+        skillId: string;
+        evidenceType: CheckoffEvidenceType;
+        statement: string;
+        confidence: 'high' | 'medium' | 'low';
+        sourceOutcomeField?: string;
+        mappingStatus?: CheckoffEvidenceMappingStatus;
+      }>;
+    },
+  ) =>
+    request<{
+      checkoffs: Checkoff[];
+      evidence: CheckoffEvidence[];
+      pendingConfirmationCount: number;
+    }>(`/entries/${entryId}/checkoff-evidence`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  getEntryCheckoffEvidence: async (entryId: string) => {
+    const result = await request<unknown>(`/entries/${entryId}/checkoff-evidence`);
+    return asEntryEvidenceArray(result);
+  },
+  listCheckoffs: async () => {
+    const result = await request<unknown>('/checkoffs');
+    return asCheckoffArray(result);
+  },
+  reviewCheckoff: async (
+    checkoffId: string,
+    payload: {
+      status?: 'pending' | 'earned' | 'superseded' | 'revalidated';
+      evidenceReviews: Array<{
+        evidenceId: string;
+        mappingStatus?: CheckoffEvidenceMappingStatus;
+        quality?: 'insufficient' | 'adequate' | 'strong';
+        coachNote?: string;
+      }>;
+    },
+  ) =>
+    request<{ checkoff: Checkoff; evidence: CheckoffEvidence[] }>(`/checkoffs/${checkoffId}/review`, {
+      method: 'PUT',
       body: JSON.stringify(payload),
     }),
 };

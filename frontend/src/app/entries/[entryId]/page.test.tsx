@@ -10,6 +10,7 @@ const { pushMock, useParamsMock, apiClientMock } = vi.hoisted(() => ({
   useParamsMock: vi.fn(),
   apiClientMock: {
     getEntry: vi.fn(),
+    getEntryCheckoffEvidence: vi.fn(),
     updateEntry: vi.fn(),
     deleteEntry: vi.fn(),
   },
@@ -59,7 +60,9 @@ describe('EntryDetailPage', () => {
     apiClientMock.getEntry.mockReset();
     apiClientMock.updateEntry.mockReset();
     apiClientMock.deleteEntry.mockReset();
+    apiClientMock.getEntryCheckoffEvidence.mockReset();
     apiClientMock.getEntry.mockResolvedValue({ ...baseEntry });
+    apiClientMock.getEntryCheckoffEvidence.mockResolvedValue([]);
     apiClientMock.updateEntry.mockResolvedValue({ ...baseEntry, sections: { ...baseEntry.sections } });
     apiClientMock.deleteEntry.mockResolvedValue({});
     vi.unstubAllGlobals();

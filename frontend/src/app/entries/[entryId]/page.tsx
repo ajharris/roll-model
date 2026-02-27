@@ -9,15 +9,8 @@ import { ChipInput } from '@/components/ChipInput';
 import { MediaAttachmentsInput } from '@/components/MediaAttachmentsInput';
 import { Protected } from '@/components/Protected';
 import { apiClient } from '@/lib/apiClient';
-import {
-  clearEntryDraft,
-  enqueueOfflineUpdate,
-  getOfflineMutationQueueCounts,
-  readEntryDraft,
-  writeEntryDraft,
-} from '@/lib/journalLocal';
-import { flushOfflineMutationQueue, retryFailedOfflineMutations } from '@/lib/journalQueue';
-import type { Entry, MediaAttachment } from '@/types/api';
+import { clearEntryDraft, readEntryDraft, writeEntryDraft } from '@/lib/journalLocal';
+import type { CheckoffEvidence, Entry, MediaAttachment } from '@/types/api';
 
 type EntryEditDraft = {
   shared: string;
@@ -75,43 +68,17 @@ export default function EntryDetailPage() {
   const [mediaAttachments, setMediaAttachments] = useState<MediaAttachment[]>([]);
   const [status, setStatus] = useState('');
   const [draftState, setDraftState] = useState<'idle' | 'saved'>('idle');
-  const [syncCounts, setSyncCounts] = useState({ pending: 0, failed: 0, total: 0 });
+  const [checkoffEvidence, setCheckoffEvidence] = useState<CheckoffEvidence[]>([]);
   const canEdit = Boolean(entry) && !isLoading;
-  const syncStateLabel = syncCounts.failed > 0 ? 'failed' : syncCounts.pending > 0 ? 'pending' : 'synced';
-
-  const refreshQueueCounts = () => {
-    setSyncCounts(getOfflineMutationQueueCounts());
-  };
-
-  useEffect(() => {
-    refreshQueueCounts();
-
-    const flush = async () => {
-      await flushOfflineMutationQueue();
-      refreshQueueCounts();
-    };
-
-    const onOnline = () => {
-      void flush();
-    };
-    const onStorage = () => refreshQueueCounts();
-    void flush();
-    window.addEventListener('online', onOnline);
-    window.addEventListener('storage', onStorage);
-    return () => {
-      window.removeEventListener('online', onOnline);
-      window.removeEventListener('storage', onStorage);
-    };
-  }, []);
 
   useEffect(() => {
     let cancelled = false;
     setIsLoading(true);
     setStatus('');
 
-    void apiClient
-      .getEntry(entryId)
-      .then((loadedEntry) => {
+    void (async () => {
+      try {
+        const loadedEntry = await apiClient.getEntry(entryId);
         if (cancelled) return;
         setEntry(loadedEntry);
 
@@ -127,30 +94,33 @@ export default function EntryDetailPage() {
           setTechniques(draft.techniques ?? loadedEntry.rawTechniqueMentions);
           setMediaAttachments(draft.mediaAttachments ?? (loadedEntry.mediaAttachments ?? []));
           setStatus('Draft restored.');
-          return;
+        } else {
+          setShared(loadedEntry.sections.shared);
+          setPrivateText(loadedEntry.sections.private ?? '');
+          setDurationMinutes(loadedEntry.sessionMetrics.durationMinutes);
+          setIntensity(loadedEntry.sessionMetrics.intensity);
+          setRounds(loadedEntry.sessionMetrics.rounds);
+          setGiOrNoGi(loadedEntry.sessionMetrics.giOrNoGi);
+          setTags(loadedEntry.sessionMetrics.tags);
+          setTechniques(loadedEntry.rawTechniqueMentions);
+          setMediaAttachments(loadedEntry.mediaAttachments ?? []);
         }
 
-        setShared(loadedEntry.sections.shared);
-        setPrivateText(loadedEntry.sections.private ?? '');
-        setDurationMinutes(loadedEntry.sessionMetrics.durationMinutes);
-        setIntensity(loadedEntry.sessionMetrics.intensity);
-        setRounds(loadedEntry.sessionMetrics.rounds);
-        setGiOrNoGi(loadedEntry.sessionMetrics.giOrNoGi);
-        setTags(loadedEntry.sessionMetrics.tags);
-        setTechniques(loadedEntry.rawTechniqueMentions);
-        setMediaAttachments(loadedEntry.mediaAttachments ?? []);
-      })
-      .catch(() => {
+        const evidence = await apiClient.getEntryCheckoffEvidence(entryId);
+        if (!cancelled) {
+          setCheckoffEvidence(evidence);
+        }
+      } catch {
         if (!cancelled) {
           setEntry(null);
           setStatus('Could not load entry.');
         }
-      })
-      .finally(() => {
+      } finally {
         if (!cancelled) {
           setIsLoading(false);
         }
-      });
+      }
+    })();
 
     return () => {
       cancelled = true;
@@ -196,38 +166,10 @@ export default function EntryDetailPage() {
       });
       setEntry(updated);
       clearEntryDraft(draftKey);
-      refreshQueueCounts();
       setStatus('Saved.');
     } catch {
-      const payload = {
-        sections: { shared, private: privateText },
-        sessionMetrics: { durationMinutes, intensity, rounds, giOrNoGi, tags },
-        rawTechniqueMentions: techniques,
-        mediaAttachments: sanitizeAttachments(mediaAttachments),
-      };
-      const offline = typeof navigator !== 'undefined' && navigator.onLine === false;
-      if (offline) {
-        enqueueOfflineUpdate(entryId, payload, entry.updatedAt ?? entry.createdAt);
-        refreshQueueCounts();
-        setStatus('Offline: update queued and will sync when you reconnect.');
-        return;
-      }
       setStatus('Save failed.');
     }
-  };
-
-  const retryFailedSync = async () => {
-    const result = await retryFailedOfflineMutations();
-    refreshQueueCounts();
-    if (result.succeeded > 0) {
-      setStatus(`Retried sync: ${result.succeeded} entr${result.succeeded === 1 ? 'y' : 'ies'} synced.`);
-      return;
-    }
-    if (result.remainingFailed > 0) {
-      setStatus('Queued updates still failed. Open each entry and save again to resolve conflicts.');
-      return;
-    }
-    setStatus('Nothing to retry.');
   };
 
   const remove = async () => {
@@ -263,17 +205,7 @@ export default function EntryDetailPage() {
         {!isLoading && !entry && <p>{status || 'Entry not found.'}</p>}
         {entry && (
           <p className="small">
-            Created: {new Date(entry.createdAt).toLocaleString()} • Draft: {draftState === 'saved' ? 'autosaved' : 'editing'} •
-            {' '}Sync: {syncStateLabel}
-            {syncCounts.pending > 0 ? ` (${syncCounts.pending} pending)` : ''}
-            {syncCounts.failed > 0 ? ` (${syncCounts.failed} failed)` : ''}
-          </p>
-        )}
-        {syncCounts.failed > 0 && (
-          <p className="small">
-            <button type="button" onClick={retryFailedSync}>
-              Retry failed sync
-            </button>
+            Created: {new Date(entry.createdAt).toLocaleString()} • Draft: {draftState === 'saved' ? 'autosaved' : 'editing'}
           </p>
         )}
         {entry?.actionPackFinal?.actionPack && (
@@ -298,6 +230,26 @@ export default function EntryDetailPage() {
               <strong>Fallback guidance:</strong> {entry.actionPackFinal.actionPack.fallbackDecisionGuidance || 'none'}
             </p>
             <p className="small">Finalized at {new Date(entry.actionPackFinal.finalizedAt).toLocaleString()}</p>
+          </div>
+        )}
+        {checkoffEvidence.length > 0 && (
+          <div className="panel">
+            <h3>Checkoff evidence from this entry</h3>
+            {checkoffEvidence.map((item) => (
+              <div key={item.evidenceId} className="small" style={{ marginBottom: '0.5rem' }}>
+                <strong>{item.skillId}</strong> • {item.evidenceType} • {item.mappingStatus}
+                <br />
+                Evidence: {item.statement}
+                <br />
+                Confidence: {item.confidence}
+                {item.sourceOutcomeField ? (
+                  <>
+                    <br />
+                    Source outcome: {item.sourceOutcomeField}
+                  </>
+                ) : null}
+              </div>
+            ))}
           </div>
         )}
         <form onSubmit={save}>
