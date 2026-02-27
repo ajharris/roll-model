@@ -7,7 +7,8 @@ import { queryItems } from '../../shared/db';
 import { parseEntryRecord } from '../../shared/entries';
 import { withRequestLogging } from '../../shared/logger';
 import { ApiError, errorResponse, response } from '../../shared/responses';
-import type { AIMessage, AIThread, CoachLink, Comment } from '../../shared/types';
+import type { AIMessage, AIThread, CoachLink, Comment, CurriculumGraph, WeeklyPlan } from '../../shared/types';
+import { parseWeeklyPlanRecord } from '../../shared/weeklyPlans';
 
 const MODE_VALUES = new Set(['full', 'tidy']);
 const FORMAT_VALUES = new Set(['json', 'csv']);
@@ -95,7 +96,7 @@ const baseHandler: APIGatewayProxyHandler = async (event) => {
       })
     );
 
-    const [linksResult, threadsResult] = await Promise.all([
+    const [linksResult, threadsResult, weeklyPlansResult, curriculumGraphResult] = await Promise.all([
       queryItems({
         KeyConditionExpression: 'PK = :pk AND begins_with(SK, :linkPrefix)',
         ExpressionAttributeValues: {
@@ -108,6 +109,20 @@ const baseHandler: APIGatewayProxyHandler = async (event) => {
         ExpressionAttributeValues: {
           ':pk': `USER#${auth.userId}`,
           ':threadPrefix': 'AI_THREAD#'
+        }
+      }),
+      queryItems({
+        KeyConditionExpression: 'PK = :pk AND begins_with(SK, :weeklyPlanPrefix)',
+        ExpressionAttributeValues: {
+          ':pk': `USER#${auth.userId}`,
+          ':weeklyPlanPrefix': 'WEEKLY_PLAN#'
+        }
+      }),
+      queryItems({
+        KeyConditionExpression: 'PK = :pk AND begins_with(SK, :graphPrefix)',
+        ExpressionAttributeValues: {
+          ':pk': `USER#${auth.userId}`,
+          ':graphPrefix': 'CURRICULUM_GRAPH#'
         }
       })
     ]);
@@ -131,6 +146,13 @@ const baseHandler: APIGatewayProxyHandler = async (event) => {
           entityType: string;
         });
       });
+
+    const weeklyPlans: WeeklyPlan[] = (weeklyPlansResult.Items ?? [])
+      .filter((item) => item.entityType === 'WEEKLY_PLAN')
+      .map((item) => parseWeeklyPlanRecord(item as Record<string, unknown>));
+
+    const curriculumGraph = (curriculumGraphResult.Items ?? [])
+      .find((item) => item.entityType === 'CURRICULUM_GRAPH') as CurriculumGraph | undefined;
 
     const aiMessagesByThreadId = new Map<string, AIMessage[]>();
     await Promise.all(
@@ -166,7 +188,9 @@ const baseHandler: APIGatewayProxyHandler = async (event) => {
       comments,
       links,
       aiThreads,
-      aiMessages
+      aiMessages,
+      weeklyPlans,
+      ...(curriculumGraph ? { curriculumGraph } : {})
     };
 
     const tidyExport = {
@@ -178,6 +202,8 @@ const baseHandler: APIGatewayProxyHandler = async (event) => {
       links,
       aiThreads,
       aiMessages,
+      weeklyPlans,
+      ...(curriculumGraph ? { curriculumGraph } : {}),
       relationships: {
         entryComments: entries.map((entry) => ({
           entryId: entry.entryId,

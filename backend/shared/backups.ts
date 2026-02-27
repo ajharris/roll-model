@@ -1,8 +1,9 @@
 import { isValidMediaAttachmentsInput, normalizeEntry } from './entries';
 import { buildKeywordIndexItems, extractEntryTokens } from './keywords';
-import type { AIMessage, AIThread, CoachLink, Comment, Entry } from './types';
+import type { AIMessage, AIThread, CoachLink, Comment, CurriculumGraph, Entry, WeeklyPlan } from './types';
+import { parseWeeklyPlanRecord, weeklyPlanMetaPk, weeklyPlanPk, weeklyPlanSk } from './weeklyPlans';
 
-export const CURRENT_BACKUP_SCHEMA_VERSION = '2026-02-19';
+export const CURRENT_BACKUP_SCHEMA_VERSION = '2026-02-27';
 
 export interface BackupDataset {
   athleteId: string;
@@ -11,6 +12,8 @@ export interface BackupDataset {
   links: CoachLink[];
   aiThreads: AIThread[];
   aiMessages: AIMessage[];
+  weeklyPlans: WeeklyPlan[];
+  curriculumGraph?: CurriculumGraph;
 }
 
 export interface FullBackupEnvelope {
@@ -30,6 +33,8 @@ type ParsedBackupEnvelope = {
     links: unknown[];
     aiThreads: unknown[];
     aiMessages: unknown[];
+    weeklyPlans: unknown[];
+    curriculumGraph?: unknown;
   };
 };
 
@@ -172,6 +177,33 @@ const parseEntry = (value: unknown): Entry => {
   }
 };
 
+const parseWeeklyPlan = (value: unknown): WeeklyPlan => {
+  if (!isRecord(value)) {
+    throw new BackupValidationError('format', 'Backup weekly plan items must be objects.');
+  }
+  return parseWeeklyPlanRecord(value);
+};
+
+const parseCurriculumGraph = (value: unknown): CurriculumGraph | undefined => {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (!isRecord(value)) {
+    throw new BackupValidationError('format', 'Backup curriculumGraph must be an object.');
+  }
+  if (
+    typeof value.athleteId !== 'string' ||
+    typeof value.graphId !== 'string' ||
+    typeof value.version !== 'number' ||
+    typeof value.updatedAt !== 'string' ||
+    !Array.isArray(value.nodes) ||
+    !Array.isArray(value.edges)
+  ) {
+    throw new BackupValidationError('format', 'Backup curriculumGraph shape is invalid.');
+  }
+  return value as unknown as CurriculumGraph;
+};
+
 const parseEnvelope = (raw: unknown): ParsedBackupEnvelope => {
   if (!isRecord(raw)) {
     throw new BackupValidationError('format', 'Backup payload must be a JSON object.');
@@ -207,7 +239,9 @@ const parseEnvelope = (raw: unknown): ParsedBackupEnvelope => {
       comments: requireArray(full.comments, 'full.comments'),
       links: requireArray(full.links, 'full.links'),
       aiThreads: requireArray(full.aiThreads, 'full.aiThreads'),
-      aiMessages: requireArray(full.aiMessages, 'full.aiMessages')
+      aiMessages: requireArray(full.aiMessages, 'full.aiMessages'),
+      weeklyPlans: Array.isArray(full.weeklyPlans) ? full.weeklyPlans : [],
+      curriculumGraph: full.curriculumGraph
     }
   };
 };
@@ -219,6 +253,8 @@ export const parseAndValidateBackup = (raw: unknown): FullBackupEnvelope => {
   const links = envelope.full.links.map(parseCoachLink);
   const aiThreads = envelope.full.aiThreads.map(parseAIThread);
   const aiMessages = envelope.full.aiMessages.map(parseAIMessage);
+  const weeklyPlans = envelope.full.weeklyPlans.map(parseWeeklyPlan);
+  const curriculumGraph = parseCurriculumGraph(envelope.full.curriculumGraph);
 
   for (const entry of entries) {
     if (entry.athleteId !== envelope.full.athleteId) {
@@ -258,6 +294,19 @@ export const parseAndValidateBackup = (raw: unknown): FullBackupEnvelope => {
     }
   }
 
+  for (const plan of weeklyPlans) {
+    if (plan.athleteId !== envelope.full.athleteId) {
+      throw new BackupValidationError(
+        'format',
+        `Backup weekly plan athleteId mismatch for plan ${plan.planId}.`
+      );
+    }
+  }
+
+  if (curriculumGraph && curriculumGraph.athleteId !== envelope.full.athleteId) {
+    throw new BackupValidationError('format', 'Backup curriculumGraph athleteId mismatch.');
+  }
+
   return {
     schemaVersion: envelope.schemaVersion,
     generatedAt: envelope.generatedAt,
@@ -267,7 +316,9 @@ export const parseAndValidateBackup = (raw: unknown): FullBackupEnvelope => {
       comments,
       links,
       aiThreads,
-      aiMessages
+      aiMessages,
+      weeklyPlans,
+      ...(curriculumGraph ? { curriculumGraph } : {})
     }
   };
 };
@@ -385,6 +436,33 @@ export const buildRestoreItemsFromBackup = (dataset: BackupDataset): Array<Recor
       SK: `MSG#${message.createdAt}#${message.messageId}`,
       entityType: 'AI_MESSAGE',
       ...message
+    });
+  }
+
+  for (const plan of dataset.weeklyPlans) {
+    items.push({
+      PK: weeklyPlanPk(dataset.athleteId),
+      SK: weeklyPlanSk(plan.weekOf, plan.planId),
+      entityType: 'WEEKLY_PLAN',
+      ...plan
+    });
+    items.push({
+      PK: weeklyPlanMetaPk(plan.planId),
+      SK: 'META',
+      entityType: 'WEEKLY_PLAN_META',
+      athleteId: dataset.athleteId,
+      weekOf: plan.weekOf,
+      createdAt: plan.generatedAt,
+      updatedAt: plan.updatedAt
+    });
+  }
+
+  if (dataset.curriculumGraph) {
+    items.push({
+      PK: `USER#${dataset.athleteId}`,
+      SK: 'CURRICULUM_GRAPH#ACTIVE',
+      entityType: 'CURRICULUM_GRAPH',
+      ...dataset.curriculumGraph
     });
   }
 

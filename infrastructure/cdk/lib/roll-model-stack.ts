@@ -201,10 +201,29 @@ export class RollModelStack extends cdk.Stack {
       'backend/lambdas/submitFeedback/index.ts',
       table
     );
-    const getGapInsightsLambda = this.createLambda('getGapInsights', 'backend/lambdas/getGapInsights/index.ts', table);
+    const getGapInsightsLambda = this.createLambda(
+      'getGapInsights',
+      'backend/lambdas/getGapInsights/index.ts',
+      table
+    );
     const upsertGapPrioritiesLambda = this.createLambda(
       'upsertGapPriorities',
       'backend/lambdas/upsertGapPriorities/index.ts',
+      table
+    );
+    const buildWeeklyPlanLambda = this.createLambda(
+      'buildWeeklyPlan',
+      'backend/lambdas/buildWeeklyPlan/index.ts',
+      table
+    );
+    const listWeeklyPlansLambda = this.createLambda(
+      'listWeeklyPlans',
+      'backend/lambdas/listWeeklyPlans/index.ts',
+      table
+    );
+    const updateWeeklyPlanLambda = this.createLambda(
+      'updateWeeklyPlan',
+      'backend/lambdas/updateWeeklyPlan/index.ts',
       table
     );
     const backendLambdas: Array<{ name: string; fn: nodejs.NodejsFunction }> = [
@@ -230,7 +249,10 @@ export class RollModelStack extends cdk.Stack {
       { name: 'getEntryCheckoffEvidence', fn: getEntryCheckoffEvidenceLambda },
       { name: 'submitFeedback', fn: submitFeedbackLambda },
       { name: 'getGapInsights', fn: getGapInsightsLambda },
-      { name: 'upsertGapPriorities', fn: upsertGapPrioritiesLambda }
+      { name: 'upsertGapPriorities', fn: upsertGapPrioritiesLambda },
+      { name: 'buildWeeklyPlan', fn: buildWeeklyPlanLambda },
+      { name: 'listWeeklyPlans', fn: listWeeklyPlansLambda },
+      { name: 'updateWeeklyPlan', fn: updateWeeklyPlanLambda }
     ];
 
     aiChatLambda.addToRolePolicy(
@@ -497,17 +519,49 @@ export class RollModelStack extends cdk.Stack {
       allowHeaders: ['Content-Type', 'Authorization']
     });
 
-    const athleteGapInsights = athleteById.addResource('gap-insights');
-    athleteGapInsights.addMethod('GET', new apigateway.LambdaIntegration(getGapInsightsLambda), methodOptions);
-    athleteGapInsights.addCorsPreflight({
+    const weeklyPlans = api.root.addResource('weekly-plans');
+    weeklyPlans.addMethod('GET', new apigateway.LambdaIntegration(listWeeklyPlansLambda), methodOptions);
+    weeklyPlans.addCorsPreflight({
       allowOrigins: apigateway.Cors.ALL_ORIGINS,
       allowMethods: ['GET', 'OPTIONS'],
       allowHeaders: ['Content-Type', 'Authorization']
     });
 
-    const athleteGapInsightsPriorities = athleteGapInsights.addResource('priorities');
-    athleteGapInsightsPriorities.addMethod('PUT', new apigateway.LambdaIntegration(upsertGapPrioritiesLambda), methodOptions);
-    athleteGapInsightsPriorities.addCorsPreflight({
+    const weeklyPlansBuild = weeklyPlans.addResource('build');
+    weeklyPlansBuild.addMethod('POST', new apigateway.LambdaIntegration(buildWeeklyPlanLambda), methodOptions);
+    weeklyPlansBuild.addCorsPreflight({
+      allowOrigins: apigateway.Cors.ALL_ORIGINS,
+      allowMethods: ['POST', 'OPTIONS'],
+      allowHeaders: ['Content-Type', 'Authorization']
+    });
+
+    const weeklyPlanById = weeklyPlans.addResource('{planId}');
+    weeklyPlanById.addMethod('PUT', new apigateway.LambdaIntegration(updateWeeklyPlanLambda), methodOptions);
+    weeklyPlanById.addCorsPreflight({
+      allowOrigins: apigateway.Cors.ALL_ORIGINS,
+      allowMethods: ['PUT', 'OPTIONS'],
+      allowHeaders: ['Content-Type', 'Authorization']
+    });
+
+    const athleteWeeklyPlans = athleteById.addResource('weekly-plans');
+    athleteWeeklyPlans.addMethod('GET', new apigateway.LambdaIntegration(listWeeklyPlansLambda), methodOptions);
+    athleteWeeklyPlans.addCorsPreflight({
+      allowOrigins: apigateway.Cors.ALL_ORIGINS,
+      allowMethods: ['GET', 'OPTIONS'],
+      allowHeaders: ['Content-Type', 'Authorization']
+    });
+
+    const athleteWeeklyPlansBuild = athleteWeeklyPlans.addResource('build');
+    athleteWeeklyPlansBuild.addMethod('POST', new apigateway.LambdaIntegration(buildWeeklyPlanLambda), methodOptions);
+    athleteWeeklyPlansBuild.addCorsPreflight({
+      allowOrigins: apigateway.Cors.ALL_ORIGINS,
+      allowMethods: ['POST', 'OPTIONS'],
+      allowHeaders: ['Content-Type', 'Authorization']
+    });
+
+    const athleteWeeklyPlanById = athleteWeeklyPlans.addResource('{planId}');
+    athleteWeeklyPlanById.addMethod('PUT', new apigateway.LambdaIntegration(updateWeeklyPlanLambda), methodOptions);
+    athleteWeeklyPlanById.addCorsPreflight({
       allowOrigins: apigateway.Cors.ALL_ORIGINS,
       allowMethods: ['PUT', 'OPTIONS'],
       allowHeaders: ['Content-Type', 'Authorization']

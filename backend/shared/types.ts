@@ -281,6 +281,94 @@ export interface Checkoff {
   coachReviewedBy?: string;
 }
 
+export type GapInsightType = 'stale_skill' | 'not_training' | 'repeated_failure';
+export type GapInsightImpact = 'high' | 'medium' | 'low';
+export type GapPriorityStatus = 'accepted' | 'watch' | 'dismissed';
+
+export interface GapPriorityOverride {
+  gapId: string;
+  status: GapPriorityStatus;
+  manualPriority?: number;
+  note?: string;
+  updatedAt: string;
+  updatedBy: string;
+  updatedByRole: 'athlete' | 'coach';
+}
+
+export interface UpsertGapPriorityInput {
+  gapId: string;
+  status: GapPriorityStatus;
+  manualPriority?: number;
+  note?: string;
+}
+
+export interface UpsertGapPrioritiesRequest {
+  priorities: UpsertGapPriorityInput[];
+}
+
+export interface GapInsightSourceLink {
+  entryId: string;
+  createdAt: string;
+  evidenceId?: string;
+  checkoffId?: string;
+  skillId?: string;
+  position?: string;
+  excerpt?: string;
+}
+
+export interface GapInsightItem {
+  gapId: string;
+  type: GapInsightType;
+  title: string;
+  summary: string;
+  score: number;
+  impact: GapInsightImpact;
+  reasons: string[];
+  nextSteps: string[];
+  sourceLinks: GapInsightSourceLink[];
+  skillId?: string;
+  daysSinceLastSeen?: number;
+  position?: string;
+  repeatCount?: number;
+  failureExamples?: string[];
+  priority?: GapPriorityOverride;
+}
+
+export interface GapInsightsThresholds {
+  staleDays: number;
+  lookbackDays: number;
+  repeatFailureWindowDays: number;
+  repeatFailureMinCount: number;
+  topN: number;
+}
+
+export interface GapInsightsReport {
+  athleteId: string;
+  generatedAt: string;
+  thresholds: GapInsightsThresholds;
+  summary: {
+    totalGaps: number;
+    staleSkillCount: number;
+    repeatedFailureCount: number;
+    notTrainingCount: number;
+  };
+  sections: {
+    notTraining: GapInsightItem[];
+    staleSkills: GapInsightItem[];
+    repeatedFailures: GapInsightItem[];
+  };
+  ranked: GapInsightItem[];
+  weeklyFocus: {
+    headline: string;
+    items: Array<{
+      gapId: string;
+      title: string;
+      reason: string;
+      nextStep: string;
+    }>;
+  };
+}
+
 export interface AIExtractedUpdates {
   summary: string;
   actionPack: ActionPack;
@@ -336,97 +424,88 @@ export interface UpsertSavedEntrySearchRequest {
   isFavorite?: boolean;
 }
 
-export type GapInsightType = 'not_training' | 'stale_skill' | 'repeated_failure';
-export type GapPriorityStatus = 'accepted' | 'watch' | 'dismissed';
+export type WeeklyPlanStatus = 'draft' | 'active' | 'completed';
+export type WeeklyPlanItemStatus = 'pending' | 'done' | 'skipped';
+export type WeeklyPlanSourceType = 'entry-action-pack' | 'checkoff' | 'curriculum-graph' | 'weekly-plan';
+export type WeeklyPlanSelectionType =
+  | 'primary-skill'
+  | 'supporting-concept'
+  | 'conditioning-constraint'
+  | 'drill'
+  | 'positional-round'
+  | 'training-constraint';
 
-export interface GapInsightSourceLink {
-  entryId: string;
-  createdAt: string;
-  evidenceId?: string;
-  checkoffId?: string;
-  skillId?: string;
-  position?: string;
-  excerpt?: string;
-}
-
-export interface GapPriorityOverride {
-  gapId: string;
-  status: GapPriorityStatus;
-  manualPriority?: number;
-  note?: string;
-  updatedAt: string;
-  updatedBy: string;
-  updatedByRole: 'athlete' | 'coach';
-}
-
-export interface GapInsightItem {
-  gapId: string;
-  type: GapInsightType;
-  title: string;
+export interface WeeklyPlanReference {
+  sourceType: WeeklyPlanSourceType;
+  sourceId: string;
+  createdAt?: string;
   summary: string;
-  score: number;
-  impact: 'high' | 'medium' | 'low';
-  reasons: string[];
-  nextSteps: string[];
-  sourceLinks: GapInsightSourceLink[];
-  skillId?: string;
-  position?: string;
-  daysSinceLastSeen?: number;
-  repeatCount?: number;
-  failureExamples?: string[];
-  priority?: GapPriorityOverride;
 }
 
-export interface GapInsightsThresholds {
-  staleDays: number;
-  lookbackDays: number;
-  repeatFailureWindowDays: number;
-  repeatFailureMinCount: number;
-  topN: number;
-}
-
-export interface GapInsightsSummary {
-  totalGaps: number;
-  staleSkillCount: number;
-  repeatedFailureCount: number;
-  notTrainingCount: number;
-}
-
-export interface WeeklyFocusItem {
-  gapId: string;
-  title: string;
+export interface WeeklyPlanExplainabilityItem {
+  selectionType: WeeklyPlanSelectionType;
+  selectedValue: string;
   reason: string;
-  nextStep: string;
+  references: WeeklyPlanReference[];
 }
 
-export interface GapInsightsReport {
+export interface WeeklyPlanMenuItem {
+  id: string;
+  label: string;
+  status: WeeklyPlanItemStatus;
+  completedAt?: string;
+  coachNote?: string;
+}
+
+export interface WeeklyPlanCompletion {
+  completedAt?: string;
+  outcomeNotes?: string;
+}
+
+export interface WeeklyPlanCoachReview {
+  reviewedBy: string;
+  reviewedAt: string;
+  notes?: string;
+}
+
+export interface WeeklyPlan {
+  planId: string;
   athleteId: string;
+  weekOf: string;
   generatedAt: string;
-  thresholds: GapInsightsThresholds;
-  summary: GapInsightsSummary;
-  sections: {
-    notTraining: GapInsightItem[];
-    staleSkills: GapInsightItem[];
-    repeatedFailures: GapInsightItem[];
-  };
-  ranked: GapInsightItem[];
-  weeklyFocus: {
-    headline: string;
-    items: WeeklyFocusItem[];
-  };
+  updatedAt: string;
+  status: WeeklyPlanStatus;
+  primarySkills: string[];
+  supportingConcept: string;
+  conditioningConstraint: string;
+  drills: WeeklyPlanMenuItem[];
+  positionalRounds: WeeklyPlanMenuItem[];
+  constraints: WeeklyPlanMenuItem[];
+  explainability: WeeklyPlanExplainabilityItem[];
+  coachReview?: WeeklyPlanCoachReview;
+  completion?: WeeklyPlanCompletion;
 }
 
-export interface UpsertGapPriorityInput {
-  gapId: string;
-  status: GapPriorityStatus;
-  manualPriority?: number;
-  note?: string;
+export interface CurriculumGraphNode {
+  skillId: string;
+  label: string;
+  priority: number;
+  supportingConcepts?: string[];
+  conditioningConstraints?: string[];
 }
 
-export interface UpsertGapPrioritiesRequest {
-  priorities: UpsertGapPriorityInput[];
+export interface CurriculumGraphEdge {
+  fromSkillId: string;
+  toSkillId: string;
+  relation: 'supports' | 'prerequisite' | 'counter' | 'transition';
+  weight?: number;
 }
 
-export interface UpsertGapPrioritiesResponse {
-  saved: GapPriorityOverride[];
+export interface CurriculumGraph {
+  athleteId: string;
+  graphId: string;
+  version: number;
+  updatedAt: string;
+  nodes: CurriculumGraphNode[];
+  edges: CurriculumGraphEdge[];
 }

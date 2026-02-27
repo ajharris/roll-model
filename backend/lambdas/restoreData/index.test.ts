@@ -112,6 +112,12 @@ describe('restoreData handler', () => {
         ]
       } as unknown as QueryCommandOutput)
       .mockResolvedValueOnce({
+        Items: []
+      } as unknown as QueryCommandOutput)
+      .mockResolvedValueOnce({
+        Items: []
+      } as unknown as QueryCommandOutput)
+      .mockResolvedValueOnce({
         Items: [
           {
             PK: 'AI_THREAD#thread-1',
@@ -138,6 +144,7 @@ describe('restoreData handler', () => {
         links: Array<Record<string, unknown>>;
         aiThreads: Array<Record<string, unknown>>;
         aiMessages: Array<Record<string, unknown>>;
+        weeklyPlans: Array<Record<string, unknown>>;
       };
     };
 
@@ -195,7 +202,16 @@ describe('restoreData handler', () => {
 
     const restoreBody = JSON.parse(restoreResult.body) as {
       restored: boolean;
-      counts: { entries: number; comments: number; links: number; aiThreads: number; aiMessages: number; itemsWritten: number };
+      counts: {
+        entries: number;
+        comments: number;
+        links: number;
+        aiThreads: number;
+        aiMessages: number;
+        weeklyPlans: number;
+        curriculumGraph: number;
+        itemsWritten: number;
+      };
     };
     expect(restoreBody.restored).toBe(true);
     expect(restoreBody.counts.entries).toBe(1);
@@ -203,6 +219,8 @@ describe('restoreData handler', () => {
     expect(restoreBody.counts.links).toBe(1);
     expect(restoreBody.counts.aiThreads).toBe(1);
     expect(restoreBody.counts.aiMessages).toBe(1);
+    expect(restoreBody.counts.weeklyPlans).toBe(0);
+    expect(restoreBody.counts.curriculumGraph).toBe(0);
     expect(restoreBody.counts.itemsWritten).toBeGreaterThanOrEqual(6);
   });
 
@@ -235,7 +253,7 @@ describe('restoreData handler', () => {
 
   it('rejects malformed backup format before writing', async () => {
     const malformedBackup = {
-      schemaVersion: '2026-02-19',
+      schemaVersion: '2026-02-27',
       generatedAt: '2026-02-26T00:00:00.000Z',
       full: {
         athleteId: 'athlete-1',
