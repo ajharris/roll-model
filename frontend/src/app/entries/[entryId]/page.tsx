@@ -9,7 +9,14 @@ import { ChipInput } from '@/components/ChipInput';
 import { MediaAttachmentsInput } from '@/components/MediaAttachmentsInput';
 import { Protected } from '@/components/Protected';
 import { apiClient } from '@/lib/apiClient';
-import { clearEntryDraft, readEntryDraft, writeEntryDraft } from '@/lib/journalLocal';
+import {
+  clearEntryDraft,
+  enqueueOfflineUpdate,
+  getOfflineMutationQueueCounts,
+  readEntryDraft,
+  writeEntryDraft,
+} from '@/lib/journalLocal';
+import { flushOfflineMutationQueue, retryFailedOfflineMutations } from '@/lib/journalQueue';
 import type { Entry, MediaAttachment } from '@/types/api';
 
 type EntryEditDraft = {
@@ -68,7 +75,34 @@ export default function EntryDetailPage() {
   const [mediaAttachments, setMediaAttachments] = useState<MediaAttachment[]>([]);
   const [status, setStatus] = useState('');
   const [draftState, setDraftState] = useState<'idle' | 'saved'>('idle');
+  const [syncCounts, setSyncCounts] = useState({ pending: 0, failed: 0, total: 0 });
   const canEdit = Boolean(entry) && !isLoading;
+  const syncStateLabel = syncCounts.failed > 0 ? 'failed' : syncCounts.pending > 0 ? 'pending' : 'synced';
+
+  const refreshQueueCounts = () => {
+    setSyncCounts(getOfflineMutationQueueCounts());
+  };
+
+  useEffect(() => {
+    refreshQueueCounts();
+
+    const flush = async () => {
+      await flushOfflineMutationQueue();
+      refreshQueueCounts();
+    };
+
+    const onOnline = () => {
+      void flush();
+    };
+    const onStorage = () => refreshQueueCounts();
+    void flush();
+    window.addEventListener('online', onOnline);
+    window.addEventListener('storage', onStorage);
+    return () => {
+      window.removeEventListener('online', onOnline);
+      window.removeEventListener('storage', onStorage);
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -162,10 +196,38 @@ export default function EntryDetailPage() {
       });
       setEntry(updated);
       clearEntryDraft(draftKey);
+      refreshQueueCounts();
       setStatus('Saved.');
     } catch {
+      const payload = {
+        sections: { shared, private: privateText },
+        sessionMetrics: { durationMinutes, intensity, rounds, giOrNoGi, tags },
+        rawTechniqueMentions: techniques,
+        mediaAttachments: sanitizeAttachments(mediaAttachments),
+      };
+      const offline = typeof navigator !== 'undefined' && navigator.onLine === false;
+      if (offline) {
+        enqueueOfflineUpdate(entryId, payload, entry.updatedAt ?? entry.createdAt);
+        refreshQueueCounts();
+        setStatus('Offline: update queued and will sync when you reconnect.');
+        return;
+      }
       setStatus('Save failed.');
     }
+  };
+
+  const retryFailedSync = async () => {
+    const result = await retryFailedOfflineMutations();
+    refreshQueueCounts();
+    if (result.succeeded > 0) {
+      setStatus(`Retried sync: ${result.succeeded} entr${result.succeeded === 1 ? 'y' : 'ies'} synced.`);
+      return;
+    }
+    if (result.remainingFailed > 0) {
+      setStatus('Queued updates still failed. Open each entry and save again to resolve conflicts.');
+      return;
+    }
+    setStatus('Nothing to retry.');
   };
 
   const remove = async () => {
@@ -201,7 +263,17 @@ export default function EntryDetailPage() {
         {!isLoading && !entry && <p>{status || 'Entry not found.'}</p>}
         {entry && (
           <p className="small">
-            Created: {new Date(entry.createdAt).toLocaleString()} • Draft: {draftState === 'saved' ? 'autosaved' : 'editing'}
+            Created: {new Date(entry.createdAt).toLocaleString()} • Draft: {draftState === 'saved' ? 'autosaved' : 'editing'} •
+            {' '}Sync: {syncStateLabel}
+            {syncCounts.pending > 0 ? ` (${syncCounts.pending} pending)` : ''}
+            {syncCounts.failed > 0 ? ` (${syncCounts.failed} failed)` : ''}
+          </p>
+        )}
+        {syncCounts.failed > 0 && (
+          <p className="small">
+            <button type="button" onClick={retryFailedSync}>
+              Retry failed sync
+            </button>
           </p>
         )}
         {entry?.actionPackFinal?.actionPack && (

@@ -1,6 +1,14 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 
-import { entryMatchesSavedSearch, readSavedEntrySearches, writeSavedEntrySearches } from './journalLocal';
+import {
+  enqueueOfflineCreate,
+  enqueueOfflineUpdate,
+  entryMatchesSavedSearch,
+  getOfflineMutationQueueCounts,
+  readOfflineMutationQueue,
+  readSavedEntrySearches,
+  writeSavedEntrySearches,
+} from './journalLocal';
 
 import type { Entry, SavedEntrySearch } from '@/types/api';
 
@@ -111,5 +119,117 @@ describe('journalLocal saved searches', () => {
     };
 
     expect(entryMatchesSavedSearch(entry, search)).toBe(true);
+  });
+});
+
+describe('journalLocal offline queue', () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+  });
+
+  it('migrates legacy create queue entries into the unified mutation queue', () => {
+    window.localStorage.setItem(
+      'journal.offlineCreateQueue.v1',
+      JSON.stringify([
+        {
+          queueId: 'legacy-1',
+          createdAt: '2026-02-27T00:00:00.000Z',
+          payload: {
+            sections: { shared: 's', private: 'p' },
+            sessionMetrics: {
+              durationMinutes: 60,
+              intensity: 6,
+              rounds: 5,
+              giOrNoGi: 'gi',
+              tags: [],
+            },
+            rawTechniqueMentions: [],
+            mediaAttachments: [],
+          },
+        },
+      ]),
+    );
+
+    const queue = readOfflineMutationQueue();
+
+    expect(queue).toHaveLength(1);
+    expect(queue[0]).toMatchObject({
+      queueId: 'legacy-1',
+      mutationType: 'create',
+      status: 'pending',
+      attemptCount: 0,
+    });
+  });
+
+  it('collapses multiple queued updates for the same entry to the latest payload', () => {
+    enqueueOfflineUpdate(
+      'entry-1',
+      {
+        sections: { shared: 'v1', private: '' },
+        sessionMetrics: { durationMinutes: 60, intensity: 6, rounds: 5, giOrNoGi: 'gi', tags: [] },
+        rawTechniqueMentions: [],
+        mediaAttachments: [],
+      },
+      '2026-02-26T10:00:00.000Z',
+    );
+    enqueueOfflineUpdate(
+      'entry-1',
+      {
+        sections: { shared: 'v2', private: '' },
+        sessionMetrics: { durationMinutes: 90, intensity: 7, rounds: 6, giOrNoGi: 'no-gi', tags: ['open-mat'] },
+        rawTechniqueMentions: ['knee cut'],
+        mediaAttachments: [],
+      },
+      '2026-02-26T10:00:00.000Z',
+    );
+
+    const queue = readOfflineMutationQueue();
+    expect(queue).toHaveLength(1);
+    expect(queue[0]).toMatchObject({
+      mutationType: 'update',
+      entryId: 'entry-1',
+      payload: expect.objectContaining({
+        sections: { shared: 'v2', private: '' },
+      }),
+    });
+  });
+
+  it('returns pending and failed counts for sync status UI', () => {
+    enqueueOfflineCreate({
+      sections: { shared: 'queued create', private: '' },
+      sessionMetrics: { durationMinutes: 45, intensity: 5, rounds: 4, giOrNoGi: 'gi', tags: [] },
+      rawTechniqueMentions: [],
+      mediaAttachments: [],
+    });
+
+    window.localStorage.setItem(
+      'journal.offlineMutationQueue.v1',
+      JSON.stringify([
+        ...readOfflineMutationQueue(),
+        {
+          queueId: 'failed-1',
+          mutationType: 'update',
+          createdAt: '2026-02-27T00:00:00.000Z',
+          updatedAt: '2026-02-27T00:00:00.000Z',
+          status: 'failed',
+          attemptCount: 1,
+          entryId: 'entry-2',
+          payload: {
+            sections: { shared: 'failed update', private: '' },
+            sessionMetrics: { durationMinutes: 60, intensity: 6, rounds: 5, giOrNoGi: 'gi', tags: [] },
+            rawTechniqueMentions: [],
+            mediaAttachments: [],
+          },
+          failureReason: 'conflict',
+          errorMessage: 'conflict',
+        },
+      ]),
+    );
+
+    expect(getOfflineMutationQueueCounts()).toEqual({
+      pending: 1,
+      failed: 1,
+      total: 2,
+    });
   });
 });
