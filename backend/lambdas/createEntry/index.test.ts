@@ -150,6 +150,15 @@ describe('createEntry handler auth', () => {
 
     const event = buildEvent('athlete');
     event.body = JSON.stringify({
+      quickAdd: {
+        time: '2026-02-26T18:00:00.000Z',
+        class: 'Evening fundamentals',
+        gym: 'North Academy',
+        partners: ['Alex'],
+        rounds: 6,
+        notes: 'shared notes'
+      },
+      tags: ['guard-type', 'pass'],
       sections: { private: 'private notes', shared: 'shared notes' },
       sessionMetrics: {
         durationMinutes: 60,

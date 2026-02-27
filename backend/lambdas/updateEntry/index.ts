@@ -9,77 +9,7 @@ import { buildKeywordIndexItems, extractEntryTokens } from '../../shared/keyword
 import { withRequestLogging } from '../../shared/logger';
 import { ApiError, errorResponse, response } from '../../shared/responses';
 import { sanitizeTechniqueMentions, upsertTechniqueCandidates } from '../../shared/techniques';
-import type { CreateEntryRequest, Entry } from '../../shared/types';
-
-const isActionPackLike = (value: unknown): boolean => {
-  if (!value || typeof value !== 'object') return false;
-  const maybe = value as Record<string, unknown>;
-  return (
-    Array.isArray(maybe.wins) &&
-    Array.isArray(maybe.leaks) &&
-    typeof maybe.oneFocus === 'string' &&
-    Array.isArray(maybe.drills) &&
-    Array.isArray(maybe.positionalRequests) &&
-    typeof maybe.fallbackDecisionGuidance === 'string' &&
-    Array.isArray(maybe.confidenceFlags)
-  );
-};
-
-const parseBody = (event: APIGatewayProxyEvent): CreateEntryRequest => {
-  if (!event.body) {
-    throw new ApiError({
-      code: 'INVALID_REQUEST',
-      message: 'Request body is required.',
-      statusCode: 400
-    });
-  }
-
-  const parsed = JSON.parse(event.body) as Partial<CreateEntryRequest>;
-  const mediaAttachmentsValid =
-    parsed.mediaAttachments === undefined ||
-    (Array.isArray(parsed.mediaAttachments) &&
-      parsed.mediaAttachments.every((attachment) => typeof attachment === 'object' && attachment !== null));
-  const templateValid =
-    parsed.templateId === undefined ||
-    parsed.templateId === 'class-notes' ||
-    parsed.templateId === 'open-mat-rounds' ||
-    parsed.templateId === 'drill-session';
-  const actionPackDraftValid =
-    parsed.actionPackDraft === undefined || isActionPackLike(parsed.actionPackDraft);
-  const actionPackFinalValid =
-    parsed.actionPackFinal === undefined ||
-    (typeof parsed.actionPackFinal === 'object' &&
-      parsed.actionPackFinal !== null &&
-      typeof parsed.actionPackFinal.finalizedAt === 'string' &&
-      isActionPackLike((parsed.actionPackFinal as { actionPack?: unknown }).actionPack));
-
-  if (
-    !parsed.sections ||
-    typeof parsed.sections.private !== 'string' ||
-    typeof parsed.sections.shared !== 'string' ||
-    !parsed.sessionMetrics ||
-    typeof parsed.sessionMetrics.durationMinutes !== 'number' ||
-    typeof parsed.sessionMetrics.intensity !== 'number' ||
-    typeof parsed.sessionMetrics.rounds !== 'number' ||
-    typeof parsed.sessionMetrics.giOrNoGi !== 'string' ||
-    !Array.isArray(parsed.sessionMetrics.tags) ||
-    (parsed.rawTechniqueMentions !== undefined &&
-      (!Array.isArray(parsed.rawTechniqueMentions) ||
-        parsed.rawTechniqueMentions.some((mention) => typeof mention !== 'string'))) ||
-    !mediaAttachmentsValid ||
-    !templateValid ||
-    !actionPackDraftValid ||
-    !actionPackFinalValid
-  ) {
-    throw new ApiError({
-      code: 'INVALID_REQUEST',
-      message: 'Entry payload is invalid.',
-      statusCode: 400
-    });
-  }
-
-  return parsed as CreateEntryRequest;
-};
+import type { Entry } from '../../shared/types';
 
 const getEntryIdFromPath = (entryId?: string): string => {
   if (!entryId) {

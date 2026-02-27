@@ -408,6 +408,15 @@ describe('updateEntry handler', () => {
 
     const event = buildEvent('athlete');
     event.body = JSON.stringify({
+      quickAdd: {
+        time: '2026-02-26T18:30:00.000Z',
+        class: 'No-gi advanced',
+        gym: 'North Academy',
+        partners: ['Blake'],
+        rounds: 4,
+        notes: 'new shared'
+      },
+      tags: ['top', 'submission'],
       sections: { shared: 'new shared', private: 'new private' },
       sessionMetrics: {
         durationMinutes: 45,

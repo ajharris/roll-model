@@ -42,6 +42,15 @@ const sampleEntry: Entry = {
     },
     finalizedAt: '2026-02-26T00:05:00.000Z',
   },
+  quickAdd: {
+    time: '2026-02-26T00:00:00.000Z',
+    class: 'Class notes',
+    gym: 'North Academy',
+    partners: ['Alex'],
+    rounds: 5,
+    notes: 'quick summary'
+  },
+  tags: []
 };
 
 describe('actionPackIndex', () => {
