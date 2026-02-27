@@ -7,7 +7,18 @@ import { queryItems } from '../../shared/db';
 import { parseEntryRecord } from '../../shared/entries';
 import { withRequestLogging } from '../../shared/logger';
 import { ApiError, errorResponse, response } from '../../shared/responses';
-import type { AIMessage, AIThread, CoachLink, Comment, CurriculumGraph, WeeklyPlan } from '../../shared/types';
+import type {
+  AIMessage,
+  AIThread,
+  CoachLink,
+  Comment,
+  CurriculumGraph,
+  CurriculumStage,
+  Skill,
+  SkillProgress,
+  SkillRelationship,
+  WeeklyPlan
+} from '../../shared/types';
 import { parseWeeklyPlanRecord } from '../../shared/weeklyPlans';
 
 const MODE_VALUES = new Set(['full', 'tidy']);
@@ -96,7 +107,7 @@ const baseHandler: APIGatewayProxyHandler = async (event) => {
       })
     );
 
-    const [linksResult, threadsResult, weeklyPlansResult, curriculumGraphResult] = await Promise.all([
+    const [linksResult, threadsResult, weeklyPlansResult, curriculumResult, curriculumGraphResult] = await Promise.all([
       queryItems({
         KeyConditionExpression: 'PK = :pk AND begins_with(SK, :linkPrefix)',
         ExpressionAttributeValues: {
@@ -116,6 +127,13 @@ const baseHandler: APIGatewayProxyHandler = async (event) => {
         ExpressionAttributeValues: {
           ':pk': `USER#${auth.userId}`,
           ':weeklyPlanPrefix': 'WEEKLY_PLAN#'
+        }
+      }),
+      queryItems({
+        KeyConditionExpression: 'PK = :pk AND begins_with(SK, :curriculumPrefix)',
+        ExpressionAttributeValues: {
+          ':pk': `USER#${auth.userId}`,
+          ':curriculumPrefix': 'CURRICULUM_'
         }
       }),
       queryItems({
@@ -150,6 +168,19 @@ const baseHandler: APIGatewayProxyHandler = async (event) => {
     const weeklyPlans: WeeklyPlan[] = (weeklyPlansResult.Items ?? [])
       .filter((item) => item.entityType === 'WEEKLY_PLAN')
       .map((item) => parseWeeklyPlanRecord(item as Record<string, unknown>));
+
+    const curriculumStages = (curriculumResult.Items ?? [])
+      .filter((item) => item.entityType === 'CURRICULUM_STAGE')
+      .map((item) => stripKeys(item as CurriculumStage & { PK: string; SK: string; entityType: string }));
+    const curriculumSkills = (curriculumResult.Items ?? [])
+      .filter((item) => item.entityType === 'CURRICULUM_SKILL')
+      .map((item) => stripKeys(item as Skill & { PK: string; SK: string; entityType: string }));
+    const curriculumRelationships = (curriculumResult.Items ?? [])
+      .filter((item) => item.entityType === 'CURRICULUM_RELATIONSHIP')
+      .map((item) => stripKeys(item as SkillRelationship & { PK: string; SK: string; entityType: string }));
+    const curriculumProgressions = (curriculumResult.Items ?? [])
+      .filter((item) => item.entityType === 'CURRICULUM_PROGRESS')
+      .map((item) => stripKeys(item as SkillProgress & { PK: string; SK: string; entityType: string }));
 
     const curriculumGraph = (curriculumGraphResult.Items ?? [])
       .find((item) => item.entityType === 'CURRICULUM_GRAPH') as CurriculumGraph | undefined;
@@ -190,6 +221,10 @@ const baseHandler: APIGatewayProxyHandler = async (event) => {
       aiThreads,
       aiMessages,
       weeklyPlans,
+      curriculumStages,
+      curriculumSkills,
+      curriculumRelationships,
+      curriculumProgressions,
       ...(curriculumGraph ? { curriculumGraph } : {})
     };
 
@@ -203,6 +238,10 @@ const baseHandler: APIGatewayProxyHandler = async (event) => {
       aiThreads,
       aiMessages,
       weeklyPlans,
+      curriculumStages,
+      curriculumSkills,
+      curriculumRelationships,
+      curriculumProgressions,
       ...(curriculumGraph ? { curriculumGraph } : {}),
       relationships: {
         entryComments: entries.map((entry) => ({

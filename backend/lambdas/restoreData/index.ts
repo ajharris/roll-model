@@ -75,6 +75,10 @@ const baseHandler: APIGatewayProxyHandler = async (event) => {
         aiThreads: backup.full.aiThreads.length,
         aiMessages: backup.full.aiMessages.length,
         weeklyPlans: backup.full.weeklyPlans.length,
+        curriculumStages: backup.full.curriculumStages.length,
+        curriculumSkills: backup.full.curriculumSkills.length,
+        curriculumRelationships: backup.full.curriculumRelationships.length,
+        curriculumProgressions: backup.full.curriculumProgressions.length,
         curriculumGraph: backup.full.curriculumGraph ? 1 : 0,
         itemsWritten: items.length
       }

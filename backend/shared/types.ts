@@ -486,6 +486,83 @@ export interface WeeklyPlan {
   completion?: WeeklyPlanCompletion;
 }
 
+export type SkillCategory =
+  | 'escape'
+  | 'pass'
+  | 'guard-retention'
+  | 'sweep'
+  | 'submission'
+  | 'takedown'
+  | 'control'
+  | 'transition'
+  | 'concept'
+  | 'other';
+
+export interface CurriculumStage {
+  stageId: string;
+  name: string;
+  order: number;
+  milestoneSkills: string[];
+  notes?: string;
+  updatedAt: string;
+}
+
+export interface Skill {
+  skillId: string;
+  name: string;
+  category: SkillCategory;
+  stageId: string;
+  prerequisites: string[];
+  keyConcepts: string[];
+  commonFailures: string[];
+  drills: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type SkillRelationshipType = 'prerequisite' | 'supports' | 'counter' | 'transition';
+
+export interface SkillRelationship {
+  fromSkillId: string;
+  toSkillId: string;
+  relation: SkillRelationshipType;
+  rationale?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type SkillProgressState =
+  | 'not_started'
+  | 'working'
+  | 'evidence_present'
+  | 'ready_for_review'
+  | 'complete'
+  | 'blocked';
+
+export interface SkillProgress {
+  athleteId: string;
+  skillId: string;
+  state: SkillProgressState;
+  evidenceCount: number;
+  confidence: ConfidenceLevel;
+  rationale: string[];
+  sourceEntryIds: string[];
+  sourceEvidenceIds: string[];
+  suggestedNextSkillIds: string[];
+  lastEvaluatedAt: string;
+  manualOverrideState?: SkillProgressState;
+  manualOverrideReason?: string;
+  coachReviewedBy?: string;
+  coachReviewedAt?: string;
+}
+
+export interface CurriculumRecommendation {
+  skillId: string;
+  score: number;
+  rationale: string[];
+  missingPrerequisiteSkillIds: string[];
+}
+
 export interface CurriculumGraphNode {
   skillId: string;
   label: string;

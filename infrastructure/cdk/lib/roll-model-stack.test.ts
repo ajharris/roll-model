@@ -105,3 +105,25 @@ describe('RollModelStack saved searches API', () => {
     expect(pathParts).toContain('{savedSearchId}');
   });
 });
+
+describe('RollModelStack curriculum API', () => {
+  it('provisions curriculum resources and secondary index support', () => {
+    const app = new cdk.App();
+    const stack = new RollModelStack(app, 'TestRollModelStackCurriculum');
+    const template = Template.fromStack(stack);
+
+    const tables = template.findResources('AWS::DynamoDB::Table');
+    expect(Object.keys(tables)).toHaveLength(1);
+    const table = Object.values(tables)[0];
+    const gsis = table.Properties.GlobalSecondaryIndexes as Array<{ IndexName: string }>;
+    expect(gsis.some((gsi) => gsi.IndexName === 'GSI1')).toBe(true);
+
+    const resources = template.findResources('AWS::ApiGateway::Resource');
+    const pathParts = Object.values(resources).map((resource) => resource.Properties.PathPart as string);
+    expect(pathParts).toContain('curriculum');
+    expect(pathParts).toContain('skills');
+    expect(pathParts).toContain('relationships');
+    expect(pathParts).toContain('progress');
+    expect(pathParts).toContain('recompute');
+  });
+});
