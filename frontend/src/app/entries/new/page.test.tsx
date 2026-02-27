@@ -88,7 +88,7 @@ describe('NewEntryPage phase 1 flow', () => {
     apiClientMock.chat.mockReset();
     apiClientMock.updateEntry.mockReset();
     apiClientMock.upsertEntryCheckoffEvidence.mockReset();
-    flushOfflineCreateQueueMock.mockReset();
+    flushOfflineMutationQueueMock.mockReset();
     readEntryDraftMock.mockReset();
     writeEntryDraftMock.mockReset();
     clearEntryDraftMock.mockReset();
