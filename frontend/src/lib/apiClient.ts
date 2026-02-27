@@ -11,10 +11,13 @@ import type {
   EntryCreatePayload,
   EntrySearchRequest,
   FeedbackPayload,
+  GapPriorityOverride,
+  GapInsightsReport,
   RestoreDataResult,
   SavedEntrySearch,
   SavedEntrySearchUpsertPayload,
   SignupRequestPayload,
+  UpsertGapPriorityInput,
 } from '@/types/api';
 
 export class ApiError extends Error {
@@ -68,6 +71,32 @@ const withQueryString = (path: string, query?: EntrySearchRequest) => {
   append('actionPackField', query.actionPackField);
   append('actionPackToken', query.actionPackToken);
   append('actionPackMinConfidence', query.actionPackMinConfidence);
+
+  const qs = params.toString();
+  return qs ? `${path}?${qs}` : path;
+};
+
+type GapInsightsQuery = Partial<{
+  staleDays: number;
+  lookbackDays: number;
+  repeatFailureWindowDays: number;
+  repeatFailureMinCount: number;
+  topN: number;
+}>;
+
+const withGapInsightsQueryString = (path: string, query?: GapInsightsQuery) => {
+  if (!query) return path;
+  const params = new URLSearchParams();
+  const appendNum = (key: string, value: number | undefined) => {
+    if (typeof value !== 'number' || !Number.isFinite(value)) return;
+    params.set(key, String(Math.trunc(value)));
+  };
+
+  appendNum('staleDays', query.staleDays);
+  appendNum('lookbackDays', query.lookbackDays);
+  appendNum('repeatFailureWindowDays', query.repeatFailureWindowDays);
+  appendNum('repeatFailureMinCount', query.repeatFailureMinCount);
+  appendNum('topN', query.topN);
 
   const qs = params.toString();
   return qs ? `${path}?${qs}` : path;
@@ -383,6 +412,28 @@ export const apiClient = {
     },
   ) =>
     request<{ checkoff: Checkoff; evidence: CheckoffEvidence[] }>(`/checkoffs/${checkoffId}/review`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    }),
+  getGapInsights: async (query?: GapInsightsQuery) => {
+    const result = await request<{ report?: GapInsightsReport } | GapInsightsReport>(
+      withGapInsightsQueryString('/gap-insights', query),
+    );
+    return (result as { report?: GapInsightsReport }).report ?? (result as GapInsightsReport);
+  },
+  getAthleteGapInsights: async (athleteId: string, query?: GapInsightsQuery) => {
+    const result = await request<{ report?: GapInsightsReport } | GapInsightsReport>(
+      withGapInsightsQueryString(`/athletes/${athleteId}/gap-insights`, query),
+    );
+    return (result as { report?: GapInsightsReport }).report ?? (result as GapInsightsReport);
+  },
+  upsertGapPriorities: (payload: { priorities: UpsertGapPriorityInput[] }) =>
+    request<{ saved: GapPriorityOverride[] }>('/gap-insights/priorities', {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    }),
+  upsertAthleteGapPriorities: (athleteId: string, payload: { priorities: UpsertGapPriorityInput[] }) =>
+    request<{ saved: GapPriorityOverride[] }>(`/athletes/${athleteId}/gap-insights/priorities`, {
       method: 'PUT',
       body: JSON.stringify(payload),
     }),
