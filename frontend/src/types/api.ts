@@ -284,3 +284,90 @@ export interface SavedEntrySearchUpsertPayload {
   isPinned?: boolean;
   isFavorite?: boolean;
 }
+
+export type GapInsightType = 'not_training' | 'stale_skill' | 'repeated_failure';
+export type GapPriorityStatus = 'accepted' | 'watch' | 'dismissed';
+
+export interface GapInsightSourceLink {
+  entryId: string;
+  createdAt: string;
+  evidenceId?: string;
+  checkoffId?: string;
+  skillId?: string;
+  position?: string;
+  excerpt?: string;
+}
+
+export interface GapPriorityOverride {
+  gapId: string;
+  status: GapPriorityStatus;
+  manualPriority?: number;
+  note?: string;
+  updatedAt: string;
+  updatedBy: string;
+  updatedByRole: 'athlete' | 'coach';
+}
+
+export interface GapInsightItem {
+  gapId: string;
+  type: GapInsightType;
+  title: string;
+  summary: string;
+  score: number;
+  impact: 'high' | 'medium' | 'low';
+  reasons: string[];
+  nextSteps: string[];
+  sourceLinks: GapInsightSourceLink[];
+  skillId?: string;
+  position?: string;
+  daysSinceLastSeen?: number;
+  repeatCount?: number;
+  failureExamples?: string[];
+  priority?: GapPriorityOverride;
+}
+
+export interface GapInsightsThresholds {
+  staleDays: number;
+  lookbackDays: number;
+  repeatFailureWindowDays: number;
+  repeatFailureMinCount: number;
+  topN: number;
+}
+
+export interface GapInsightsSummary {
+  totalGaps: number;
+  staleSkillCount: number;
+  repeatedFailureCount: number;
+  notTrainingCount: number;
+}
+
+export interface WeeklyFocusItem {
+  gapId: string;
+  title: string;
+  reason: string;
+  nextStep: string;
+}
+
+export interface GapInsightsReport {
+  athleteId: string;
+  generatedAt: string;
+  thresholds: GapInsightsThresholds;
+  summary: GapInsightsSummary;
+  sections: {
+    notTraining: GapInsightItem[];
+    staleSkills: GapInsightItem[];
+    repeatedFailures: GapInsightItem[];
+  };
+  ranked: GapInsightItem[];
+  weeklyFocus: {
+    headline: string;
+    items: WeeklyFocusItem[];
+  };
+}
+
+export interface UpsertGapPriorityInput {
+  gapId: string;
+  status: GapPriorityStatus;
+  manualPriority?: number;
+  note?: string;
+}

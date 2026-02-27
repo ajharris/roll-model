@@ -464,6 +464,22 @@ export class RollModelStack extends cdk.Stack {
       allowHeaders: ['Content-Type', 'Authorization']
     });
 
+    const gapInsights = api.root.addResource('gap-insights');
+    gapInsights.addMethod('GET', new apigateway.LambdaIntegration(getGapInsightsLambda), methodOptions);
+    gapInsights.addCorsPreflight({
+      allowOrigins: apigateway.Cors.ALL_ORIGINS,
+      allowMethods: ['GET', 'OPTIONS'],
+      allowHeaders: ['Content-Type', 'Authorization']
+    });
+
+    const gapInsightsPriorities = gapInsights.addResource('priorities');
+    gapInsightsPriorities.addMethod('PUT', new apigateway.LambdaIntegration(upsertGapPrioritiesLambda), methodOptions);
+    gapInsightsPriorities.addCorsPreflight({
+      allowOrigins: apigateway.Cors.ALL_ORIGINS,
+      allowMethods: ['PUT', 'OPTIONS'],
+      allowHeaders: ['Content-Type', 'Authorization']
+    });
+
     const athletes = api.root.addResource('athletes');
     const athleteById = athletes.addResource('{athleteId}');
     const athleteEntries = athleteById.addResource('entries');
