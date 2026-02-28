@@ -181,7 +181,9 @@ export const buildPromptContext = (entries: Entry[], includePrivate: boolean): s
       sections: includePrivate
         ? { private: entry.sections.private, shared: entry.sections.shared }
         : { shared: entry.sections.shared },
-      sessionMetrics: entry.sessionMetrics
+      sessionMetrics: entry.sessionMetrics,
+      sessionContext: entry.sessionContext,
+      partnerOutcomes: entry.partnerOutcomes
     }))
   );
 };

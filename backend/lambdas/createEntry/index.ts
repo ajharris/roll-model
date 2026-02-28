@@ -8,6 +8,7 @@ import { sanitizeMediaAttachments, withCurrentEntrySchemaVersion } from '../../s
 import { parseEntryPayload } from '../../shared/entryPayload';
 import { buildKeywordIndexItems, extractEntryTokens } from '../../shared/keywords';
 import { withRequestLogging } from '../../shared/logger';
+import { hydratePartnerOutcomes } from '../../shared/partners';
 import { errorResponse, response } from '../../shared/responses';
 import { sanitizeTechniqueMentions, upsertTechniqueCandidates } from '../../shared/techniques';
 import type { CreateEntryRequest, Entry } from '../../shared/types';
@@ -30,6 +31,8 @@ export const buildEntry = (
     tags: input.tags,
     sections: input.sections,
     sessionMetrics: input.sessionMetrics,
+    sessionContext: input.sessionContext,
+    partnerOutcomes: input.partnerOutcomes,
     rawTechniqueMentions: sanitizeTechniqueMentions(input.rawTechniqueMentions),
     mediaAttachments: sanitizeMediaAttachments(input.mediaAttachments),
     templateId: input.templateId,
@@ -46,7 +49,14 @@ const baseHandler: APIGatewayProxyHandler = async (event) => {
 
     const payload = parseEntryPayload(event);
     const nowIso = new Date().toISOString();
-    const entry = buildEntry(auth.userId, payload, nowIso);
+    const entry = buildEntry(
+      auth.userId,
+      {
+        ...payload,
+        partnerOutcomes: await hydratePartnerOutcomes(auth.userId, payload.partnerOutcomes)
+      },
+      nowIso
+    );
 
     await putItem({
       Item: {

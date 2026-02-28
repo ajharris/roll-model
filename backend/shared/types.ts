@@ -8,6 +8,50 @@ export interface SessionMetrics {
   tags: string[];
 }
 
+export interface SessionContext {
+  ruleset?: string;
+  fatigueLevel?: number;
+  injuryNotes: string[];
+  tags: string[];
+}
+
+export interface PartnerGuidance {
+  draft?: string;
+  final?: string;
+  coachReview?: CoachReviewState;
+}
+
+export interface PartnerOutcomeNote {
+  partnerId: string;
+  partnerDisplayName?: string;
+  styleTags: string[];
+  whatWorked: string[];
+  whatFailed: string[];
+  guidance?: PartnerGuidance;
+}
+
+export type PartnerProfileVisibility = 'private' | 'shared-with-coach';
+
+export interface PartnerProfile {
+  partnerId: string;
+  athleteId: string;
+  displayName: string;
+  styleTags: string[];
+  notes?: string;
+  visibility: PartnerProfileVisibility;
+  guidance?: PartnerGuidance;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface UpsertPartnerProfileRequest {
+  displayName: string;
+  styleTags: string[];
+  notes?: string;
+  visibility?: PartnerProfileVisibility;
+  guidance?: PartnerGuidance;
+}
+
 export interface EntryQuickAdd {
   time: string;
   class: string;
@@ -66,6 +110,8 @@ export interface Entry {
   tags: EntryTag[];
   sections: EntrySections;
   sessionMetrics: SessionMetrics;
+  sessionContext?: SessionContext;
+  partnerOutcomes?: PartnerOutcomeNote[];
   rawTechniqueMentions: string[];
   mediaAttachments?: MediaAttachment[];
   templateId?: EntryTemplateId;
@@ -101,6 +147,8 @@ export interface CreateEntryRequest {
   tags: EntryTag[];
   sections: EntrySections;
   sessionMetrics: SessionMetrics;
+  sessionContext?: SessionContext;
+  partnerOutcomes?: PartnerOutcomeNote[];
   rawTechniqueMentions?: string[];
   mediaAttachments?: MediaAttachment[];
   templateId?: EntryTemplateId;
@@ -125,6 +173,12 @@ export interface EntrySearchRequest {
   outcome?: string;
   classType?: string;
   tag?: string;
+  contextTag?: string;
+  ruleset?: string;
+  minFatigue?: string;
+  maxFatigue?: string;
+  partnerId?: string;
+  partnerStyleTag?: string;
   giOrNoGi?: '' | 'gi' | 'no-gi';
   minIntensity?: string;
   maxIntensity?: string;

@@ -70,6 +70,7 @@ const baseHandler: APIGatewayProxyHandler = async (event) => {
       athleteId: auth.userId,
       counts: {
         entries: backup.full.entries.length,
+        partnerProfiles: backup.full.partnerProfiles.length,
         comments: backup.full.comments.length,
         links: backup.full.links.length,
         aiThreads: backup.full.aiThreads.length,

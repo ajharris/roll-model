@@ -13,11 +13,13 @@ import type {
   FeedbackPayload,
   GapPriorityOverride,
   GapInsightsReport,
+  PartnerProfile,
   RestoreDataResult,
   SavedEntrySearch,
   SavedEntrySearchUpsertPayload,
   SignupRequestPayload,
   UpsertGapPriorityInput,
+  UpsertPartnerProfilePayload,
 } from '@/types/api';
 
 export class ApiError extends Error {
@@ -62,6 +64,12 @@ const withQueryString = (path: string, query?: EntrySearchRequest) => {
   append('outcome', query.outcome);
   append('classType', query.classType);
   append('tag', query.tag);
+  append('contextTag', query.contextTag);
+  append('ruleset', query.ruleset);
+  append('minFatigue', query.minFatigue);
+  append('maxFatigue', query.maxFatigue);
+  append('partnerId', query.partnerId);
+  append('partnerStyleTag', query.partnerStyleTag);
   append('giOrNoGi', query.giOrNoGi);
   append('minIntensity', query.minIntensity);
   append('maxIntensity', query.maxIntensity);
@@ -245,6 +253,30 @@ const asSavedSearchObject = (payload: unknown): SavedEntrySearch => {
   return payload as SavedEntrySearch;
 };
 
+const asPartnerArray = (payload: unknown): PartnerProfile[] => {
+  if (
+    payload &&
+    typeof payload === 'object' &&
+    'partners' in payload &&
+    Array.isArray((payload as { partners: unknown }).partners)
+  ) {
+    return (payload as { partners: PartnerProfile[] }).partners;
+  }
+
+  if (Array.isArray(payload)) {
+    return payload as PartnerProfile[];
+  }
+
+  return [];
+};
+
+const asPartnerObject = (payload: unknown): PartnerProfile => {
+  if (payload && typeof payload === 'object' && 'partner' in payload) {
+    return (payload as { partner: PartnerProfile }).partner;
+  }
+  return payload as PartnerProfile;
+};
+
 const asCheckoffArray = (payload: unknown): Checkoff[] => {
   if (
     payload &&
@@ -301,6 +333,47 @@ export const apiClient = {
     request(`/entries/${entryId}`, {
       method: 'DELETE',
     }),
+  listPartners: async () => {
+    const result = await request<unknown>('/partners');
+    return asPartnerArray(result);
+  },
+  getPartner: async (partnerId: string) => {
+    const result = await request<unknown>(`/partners/${partnerId}`);
+    return asPartnerObject(result);
+  },
+  createPartner: async (payload: UpsertPartnerProfilePayload) => {
+    const result = await request<unknown>('/partners', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+    return asPartnerObject(result);
+  },
+  updatePartner: async (partnerId: string, payload: UpsertPartnerProfilePayload) => {
+    const result = await request<unknown>(`/partners/${partnerId}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    });
+    return asPartnerObject(result);
+  },
+  deletePartner: (partnerId: string) =>
+    request(`/partners/${partnerId}`, {
+      method: 'DELETE',
+    }),
+  listAthletePartners: async (athleteId: string) => {
+    const result = await request<unknown>(`/athletes/${athleteId}/partners`);
+    return asPartnerArray(result);
+  },
+  getAthletePartner: async (athleteId: string, partnerId: string) => {
+    const result = await request<unknown>(`/athletes/${athleteId}/partners/${partnerId}`);
+    return asPartnerObject(result);
+  },
+  updateAthletePartner: async (athleteId: string, partnerId: string, payload: Partial<UpsertPartnerProfilePayload>) => {
+    const result = await request<unknown>(`/athletes/${athleteId}/partners/${partnerId}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    });
+    return asPartnerObject(result);
+  },
   postComment: (payload: CommentPayload) =>
     request('/entries/comments', {
       method: 'POST',

@@ -309,6 +309,85 @@ describe('getEntries handler auth', () => {
     expect(body.search.latencyMs).toBeLessThan(500);
   });
 
+  it('filters by session context and partner style metadata', async () => {
+    mockQueryItems.mockResolvedValueOnce({
+      Items: [
+        {
+          PK: 'USER#athlete-1',
+          SK: 'ENTRY#2026-02-24',
+          entityType: 'ENTRY',
+          entryId: 'entry-1',
+          athleteId: 'athlete-1',
+          createdAt: '2026-02-24T10:00:00.000Z',
+          updatedAt: '2026-02-24T10:00:00.000Z',
+          schemaVersion: 4,
+          sections: { shared: 'Worked off knee shield', private: 'private' },
+          sessionMetrics: { durationMinutes: 60, intensity: 7, rounds: 5, giOrNoGi: 'gi', tags: ['guard'] },
+          sessionContext: {
+            ruleset: 'ibjjf',
+            fatigueLevel: 8,
+            injuryNotes: ['left knee'],
+            tags: ['competition-camp'],
+          },
+          partnerOutcomes: [
+            {
+              partnerId: 'partner-1',
+              partnerDisplayName: 'Alex',
+              styleTags: ['pressure-passer'],
+              whatWorked: ['inside frame'],
+              whatFailed: ['late pummel'],
+            },
+          ],
+          rawTechniqueMentions: [],
+        },
+        {
+          PK: 'USER#athlete-1',
+          SK: 'ENTRY#2026-02-23',
+          entityType: 'ENTRY',
+          entryId: 'entry-2',
+          athleteId: 'athlete-1',
+          createdAt: '2026-02-23T10:00:00.000Z',
+          updatedAt: '2026-02-23T10:00:00.000Z',
+          schemaVersion: 4,
+          sections: { shared: 'Passing rounds', private: 'private' },
+          sessionMetrics: { durationMinutes: 60, intensity: 6, rounds: 5, giOrNoGi: 'gi', tags: ['passing'] },
+          sessionContext: {
+            ruleset: 'adcc',
+            fatigueLevel: 5,
+            injuryNotes: [],
+            tags: ['open-mat'],
+          },
+          partnerOutcomes: [
+            {
+              partnerId: 'partner-2',
+              partnerDisplayName: 'Blake',
+              styleTags: ['wrestler'],
+              whatWorked: ['snapdown'],
+              whatFailed: ['front-headlock finish'],
+            },
+          ],
+          rawTechniqueMentions: [],
+        },
+      ],
+    } as unknown as QueryCommandOutput);
+
+    const result = (await handler(
+      buildEvent('athlete', undefined, undefined, {
+        contextTag: 'competition-camp',
+        ruleset: 'ibjjf',
+        partnerStyleTag: 'pressure-passer',
+        minFatigue: '7',
+      }),
+      {} as never,
+      () => undefined
+    )) as APIGatewayProxyResult;
+
+    expect(result.statusCode).toBe(200);
+    const body = JSON.parse(result.body) as { entries: Array<{ entryId: string }>; search: { matchedCount: number } };
+    expect(body.entries.map((entry) => entry.entryId)).toEqual(['entry-1']);
+    expect(body.search.matchedCount).toBe(1);
+  });
+
   it('supports indexed action-pack retrieval for athlete queries', async () => {
     mockQueryActionPackAthleteEntries.mockResolvedValueOnce([
       {
