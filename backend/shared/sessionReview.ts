@@ -76,7 +76,7 @@ const clipOneThing = (value: string): string => {
 const firstSentence = (value: string): string => {
   const sentence = value
     .split(/\r?\n/)[0]
-    .replace(/^[\-\*\d.\)\s]+/, '')
+    .replace(/^[*\d.)\s-]+/, '')
     .split(/[.!?]/)[0];
   return normalizeWhitespace(sentence);
 };
@@ -208,4 +208,3 @@ export const listRecentOneThingCues = (
   }
   return out;
 };
-

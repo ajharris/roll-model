@@ -1,5 +1,5 @@
-import type { Entry, EntryQuickAdd, EntryStructuredFields, EntryTag, MediaAttachment, MediaClipNote } from './types';
 import { normalizeFinalizedSessionReview, normalizeSessionReviewArtifact } from './sessionReview';
+import type { Entry, EntryQuickAdd, EntryStructuredFields, EntryTag, MediaAttachment, MediaClipNote } from './types';
 
 export const CURRENT_ENTRY_SCHEMA_VERSION = 3;
 
