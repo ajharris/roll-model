@@ -7,6 +7,7 @@ import { parseEntryRecord, sanitizeMediaAttachments, withCurrentEntrySchemaVersi
 import { parseEntryPayload } from '../../shared/entryPayload';
 import { buildKeywordIndexItems, extractEntryTokens } from '../../shared/keywords';
 import { withRequestLogging } from '../../shared/logger';
+import { hydratePartnerOutcomes } from '../../shared/partners';
 import { ApiError, errorResponse, response } from '../../shared/responses';
 import { sanitizeTechniqueMentions, upsertTechniqueCandidates } from '../../shared/techniques';
 import type { Entry } from '../../shared/types';
@@ -51,6 +52,7 @@ const baseHandler: APIGatewayProxyHandler = async (event) => {
 
     const entryId = getEntryIdFromPath(event.pathParameters?.entryId);
     const payload = parseEntryPayload(event);
+    const hydratedPartnerOutcomes = await hydratePartnerOutcomes(auth.userId, payload.partnerOutcomes);
     const nowIso = new Date().toISOString();
 
     const metaResult = await getItem({
@@ -102,6 +104,8 @@ const baseHandler: APIGatewayProxyHandler = async (event) => {
       tags: payload.tags,
       sections: payload.sections,
       sessionMetrics: payload.sessionMetrics,
+      sessionContext: payload.sessionContext,
+      partnerOutcomes: hydratedPartnerOutcomes,
       rawTechniqueMentions: sanitizeTechniqueMentions(payload.rawTechniqueMentions),
       mediaAttachments: sanitizeMediaAttachments(payload.mediaAttachments),
       templateId: payload.templateId,
