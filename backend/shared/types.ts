@@ -559,6 +559,32 @@ export interface WeeklyPlanCoachReview {
   notes?: string;
 }
 
+export type WeeklyPositionalFocusType = 'remediate-weakness' | 'reinforce-strength' | 'carry-over';
+
+export interface WeeklyPositionalFocusCard {
+  id: string;
+  title: string;
+  focusType: WeeklyPositionalFocusType;
+  priority: number;
+  position: string;
+  context: string;
+  successCriteria: string[];
+  rationale: string;
+  linkedOneThingCues: string[];
+  recurringFailures: string[];
+  references: WeeklyPlanReference[];
+  status: WeeklyPlanItemStatus;
+  coachNote?: string;
+}
+
+export interface WeeklyPositionalFocus {
+  cards: WeeklyPositionalFocusCard[];
+  locked: boolean;
+  lockedAt?: string;
+  lockedBy?: string;
+  updatedAt: string;
+}
+
 export interface WeeklyPlan {
   planId: string;
   athleteId: string;
@@ -572,6 +598,7 @@ export interface WeeklyPlan {
   drills: WeeklyPlanMenuItem[];
   positionalRounds: WeeklyPlanMenuItem[];
   constraints: WeeklyPlanMenuItem[];
+  positionalFocus: WeeklyPositionalFocus;
   explainability: WeeklyPlanExplainabilityItem[];
   coachReview?: WeeklyPlanCoachReview;
   completion?: WeeklyPlanCompletion;

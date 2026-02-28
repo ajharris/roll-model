@@ -53,6 +53,70 @@ const applyMenuEdits = (
   });
 };
 
+const normalizeFocusCardPriority = (
+  cards: WeeklyPlan['positionalFocus']['cards']
+): WeeklyPlan['positionalFocus']['cards'] =>
+  [...cards]
+    .sort((a, b) => a.priority - b.priority)
+    .map((card, index) => ({
+      ...card,
+      priority: index + 1
+    }));
+
+const applyPositionalFocusEdits = (
+  existing: WeeklyPlan['positionalFocus'],
+  edits: NonNullable<ReturnType<typeof parseUpdateWeeklyPlanPayload>['positionalFocusCards']> | undefined,
+  nowIso: string
+): WeeklyPlan['positionalFocus'] => {
+  if (!edits || edits.length === 0) {
+    return existing;
+  }
+
+  const cards = [...existing.cards];
+  const cardById = new Map(cards.map((item) => [item.id, item] as const));
+
+  for (const edit of edits) {
+    const existingCard = cardById.get(edit.id);
+    if (!existingCard) {
+      continue;
+    }
+
+    const editingPriorityOrContent =
+      edit.priority !== undefined ||
+      edit.title !== undefined ||
+      edit.position !== undefined ||
+      edit.context !== undefined ||
+      edit.rationale !== undefined ||
+      edit.successCriteria !== undefined;
+
+    if (existing.locked && editingPriorityOrContent) {
+      throw new ApiError({
+        code: 'INVALID_REQUEST',
+        message: 'Positional focus priorities are locked for this week.',
+        statusCode: 400
+      });
+    }
+
+    cardById.set(edit.id, {
+      ...existingCard,
+      ...(edit.title ? { title: edit.title } : {}),
+      ...(edit.position ? { position: edit.position } : {}),
+      ...(edit.context ? { context: edit.context } : {}),
+      ...(edit.rationale ? { rationale: edit.rationale } : {}),
+      ...(edit.successCriteria ? { successCriteria: edit.successCriteria } : {}),
+      ...(edit.priority ? { priority: edit.priority } : {}),
+      ...(edit.status ? { status: edit.status } : {}),
+      ...(edit.coachNote ? { coachNote: edit.coachNote } : {})
+    });
+  }
+
+  return {
+    ...existing,
+    cards: normalizeFocusCardPriority(cards.map((item) => cardById.get(item.id) ?? item)),
+    updatedAt: nowIso
+  };
+};
+
 const baseHandler: APIGatewayProxyHandler = async (event) => {
   try {
     const auth = getAuthContext(event);
@@ -143,6 +207,7 @@ const baseHandler: APIGatewayProxyHandler = async (event) => {
       drills: applyMenuEdits(existing.drills, payload.drills, nowIso),
       positionalRounds: applyMenuEdits(existing.positionalRounds, payload.positionalRounds, nowIso),
       constraints: applyMenuEdits(existing.constraints, payload.constraints, nowIso),
+      positionalFocus: applyPositionalFocusEdits(existing.positionalFocus, payload.positionalFocusCards, nowIso),
       ...(payload.completionNotes
         ? {
             completion: {
@@ -171,6 +236,23 @@ const baseHandler: APIGatewayProxyHandler = async (event) => {
         : {}),
       updatedAt: nowIso
     };
+
+    if (payload.lockPositionalFocus) {
+      if (coachMode) {
+        throw new ApiError({
+          code: 'FORBIDDEN',
+          message: 'Coach cannot lock weekly positional focus.',
+          statusCode: 403
+        });
+      }
+      next.positionalFocus = {
+        ...next.positionalFocus,
+        locked: true,
+        lockedAt: next.positionalFocus.lockedAt ?? nowIso,
+        lockedBy: next.positionalFocus.lockedBy ?? auth.userId,
+        updatedAt: nowIso
+      };
+    }
 
     await putItem({
       Item: buildWeeklyPlanRecord(next)
