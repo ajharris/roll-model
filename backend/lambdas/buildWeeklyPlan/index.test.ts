@@ -75,7 +75,11 @@ describe('buildWeeklyPlan handler', () => {
       expect.objectContaining({
         Item: expect.objectContaining({
           entityType: 'WEEKLY_PLAN',
-          athleteId: 'athlete-1'
+          athleteId: 'athlete-1',
+          positionalFocus: expect.objectContaining({
+            cards: expect.any(Array),
+            locked: false
+          })
         })
       })
     );
