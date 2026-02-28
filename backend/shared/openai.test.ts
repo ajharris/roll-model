@@ -7,7 +7,7 @@ jest.mock('@aws-sdk/client-ssm', () => ({
   GetParameterCommand: jest.fn().mockImplementation((input) => input)
 }));
 
-import { getOpenAIApiKey, resetOpenAIApiKeyCache } from './openai';
+import { getOpenAIApiKey, isAIExtractedUpdates, resetOpenAIApiKeyCache } from './openai';
 
 describe('openai key loading', () => {
   beforeEach(() => {
@@ -24,5 +24,35 @@ describe('openai key loading', () => {
     expect(first).toBe('secret-key');
     expect(second).toBe('secret-key');
     expect(sendMock).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('isAIExtractedUpdates', () => {
+  it('accepts optional structured session review payload', () => {
+    expect(
+      isAIExtractedUpdates({
+        summary: 'Summary',
+        actionPack: {
+          wins: ['Win'],
+          leaks: ['Leak'],
+          oneFocus: 'One focus',
+          drills: ['Drill'],
+          positionalRequests: ['Request'],
+          fallbackDecisionGuidance: 'Fallback',
+          confidenceFlags: [{ field: 'wins', confidence: 'high' }],
+        },
+        sessionReview: {
+          promptSet: {
+            whatWorked: ['Worked'],
+            whatFailed: ['Failed'],
+            whatToAskCoach: ['Ask'],
+            whatToDrillSolo: ['Drill solo'],
+          },
+          oneThing: 'One thing.',
+          confidenceFlags: [{ field: 'oneThing', confidence: 'medium' }],
+        },
+        suggestedFollowUpQuestions: ['Question'],
+      })
+    ).toBe(true);
   });
 });

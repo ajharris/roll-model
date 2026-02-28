@@ -139,4 +139,38 @@ describe('entry schema versioning', () => {
       ])
     ).toBe(false);
   });
+
+  it('normalizes stored session review one-thing cue', () => {
+    const entry = parseEntryRecord({
+      PK: 'USER#athlete-1',
+      SK: 'ENTRY#2024-01-01T00:00:00.000Z#entry-1',
+      entityType: 'ENTRY',
+      entryId: 'entry-1',
+      athleteId: 'athlete-1',
+      schemaVersion: 3,
+      createdAt: '2024-01-01T00:00:00.000Z',
+      updatedAt: '2024-01-01T00:00:00.000Z',
+      sections: { shared: 'shared', private: 'private' },
+      sessionMetrics: {
+        durationMinutes: 60,
+        intensity: 7,
+        rounds: 6,
+        giOrNoGi: 'gi',
+        tags: ['guard']
+      },
+      rawTechniqueMentions: [],
+      sessionReviewDraft: {
+        promptSet: {
+          whatWorked: ['Frames'],
+          whatFailed: ['Late pummel'],
+          whatToAskCoach: ['Ask'],
+          whatToDrillSolo: ['Drill']
+        },
+        oneThing: '  Pummel first. Then reset. ',
+        confidenceFlags: []
+      }
+    });
+
+    expect(entry.sessionReviewDraft?.oneThing).toBe('Pummel first');
+  });
 });

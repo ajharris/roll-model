@@ -34,6 +34,9 @@
 - `sections.private`, `sections.shared`
 - `sessionMetrics.durationMinutes`, `sessionMetrics.intensity`, `sessionMetrics.rounds`, `sessionMetrics.giOrNoGi`, `sessionMetrics.tags`
 - `rawTechniqueMentions` (string[])
+- `sessionReviewDraft.promptSet.{whatWorked,whatFailed,whatToAskCoach,whatToDrillSolo}`
+- `sessionReviewDraft.oneThing` (single concise cue)
+- `sessionReviewFinal.review` + `sessionReviewFinal.coachReview?` + `sessionReviewFinal.finalizedAt`
 
 ### Entry meta
 - `athleteId`, `createdAt`

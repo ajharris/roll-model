@@ -9,6 +9,7 @@ import { parseEntrySearchRequest, searchEntries } from '../../shared/entrySearch
 import { isCoachLinkActive } from '../../shared/links';
 import { withRequestLogging } from '../../shared/logger';
 import { ApiError, errorResponse, response } from '../../shared/responses';
+import { listRecentOneThingCues } from '../../shared/sessionReview';
 import type { Entry } from '../../shared/types';
 
 const sanitizeForCoach = (entry: Entry): Omit<Entry, 'sections'> & { sections: { shared: string } } => ({
@@ -20,6 +21,25 @@ const sanitizeForCoach = (entry: Entry): Omit<Entry, 'sections'> & { sections: {
 
 const hasActionPackIndexParams = (searchRequest: ReturnType<typeof parseEntrySearchRequest>): boolean =>
   Boolean(searchRequest.actionPackField || searchRequest.actionPackToken || searchRequest.actionPackMinConfidence);
+
+const parseRecentOneThingLimit = (
+  value: string | undefined
+): number | undefined => {
+  if (!value) {
+    return undefined;
+  }
+
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    throw new ApiError({
+      code: 'INVALID_REQUEST',
+      message: 'recentOneThingLimit must be a positive integer.',
+      statusCode: 400
+    });
+  }
+
+  return Math.min(parsed, 20);
+};
 
 const baseHandler: APIGatewayProxyHandler = async (event) => {
   try {
@@ -60,6 +80,7 @@ const baseHandler: APIGatewayProxyHandler = async (event) => {
     }
 
     const searchRequest = parseEntrySearchRequest(event.queryStringParameters);
+    const recentOneThingLimit = parseRecentOneThingLimit(event.queryStringParameters?.recentOneThingLimit);
     if (hasActionPackIndexParams(searchRequest) && (!searchRequest.actionPackField || !searchRequest.actionPackToken)) {
       throw new ApiError({
         code: 'INVALID_REQUEST',
@@ -92,6 +113,9 @@ const baseHandler: APIGatewayProxyHandler = async (event) => {
     return response(200, {
       entries: isCoachRequest ? searched.entries.map(sanitizeForCoach) : searched.entries,
       search: searched.meta,
+      ...(recentOneThingLimit
+        ? { recentOneThingCues: listRecentOneThingCues(entries, recentOneThingLimit) }
+        : {}),
     });
   } catch (error) {
     return errorResponse(error);

@@ -446,4 +446,65 @@ describe('updateEntry handler', () => {
     expect(mockDeleteItem).toHaveBeenCalledWith({ Key: { PK: 'USER#athlete-1', SK: 'APF#old' } });
     expect(mockBatchWriteItems).toHaveBeenCalledWith([{ id: 'apf-new' }]);
   });
+
+  it('updates and normalizes session review cue on entry update', async () => {
+    mockGetItem
+      .mockResolvedValueOnce({
+        Item: {
+          PK: 'ENTRY#entry-1',
+          SK: 'META',
+          athleteId: 'athlete-1',
+          createdAt: '2024-01-01T00:00:00.000Z'
+        }
+      } as unknown as GetCommandOutput)
+      .mockResolvedValueOnce({
+        Item: {
+          PK: 'USER#athlete-1',
+          SK: 'ENTRY#2024-01-01T00:00:00.000Z#entry-1',
+          entityType: 'ENTRY',
+          entryId: 'entry-1',
+          athleteId: 'athlete-1',
+          createdAt: '2024-01-01T00:00:00.000Z',
+          updatedAt: '2024-01-01T00:00:00.000Z',
+          sections: { shared: 'old shared', private: 'old private' },
+          sessionMetrics: {
+            durationMinutes: 60,
+            intensity: 5,
+            rounds: 6,
+            giOrNoGi: 'gi',
+            tags: ['guard']
+          },
+          rawTechniqueMentions: []
+        }
+      } as unknown as GetCommandOutput);
+
+    mockExtractEntryTokens.mockReturnValueOnce([]).mockReturnValueOnce([]).mockReturnValueOnce([]).mockReturnValueOnce([]);
+    mockBuildKeywordIndexItems.mockReturnValue([]);
+
+    const event = buildEvent('athlete', {
+      sessionReviewDraft: {
+        promptSet: {
+          whatWorked: ['Recovered guard'],
+          whatFailed: ['Late pummel'],
+          whatToAskCoach: ['How to improve timing?'],
+          whatToDrillSolo: ['Pummel first reps'],
+        },
+        oneThing: '  1) Pummel first from half guard. Keep elbow in.',
+        confidenceFlags: [{ field: 'oneThing', confidence: 'high' }],
+      },
+    });
+
+    const result = (await handler(event, {} as never, () => undefined)) as APIGatewayProxyResult;
+
+    expect(result.statusCode).toBe(200);
+    expect(mockPutItem).toHaveBeenCalledWith(
+      expect.objectContaining({
+        Item: expect.objectContaining({
+          sessionReviewDraft: expect.objectContaining({
+            oneThing: 'Pummel first from half guard',
+          }),
+        }),
+      })
+    );
+  });
 });

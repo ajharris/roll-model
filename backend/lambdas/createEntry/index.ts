@@ -34,7 +34,9 @@ export const buildEntry = (
     mediaAttachments: sanitizeMediaAttachments(input.mediaAttachments),
     templateId: input.templateId,
     actionPackDraft: input.actionPackDraft,
-    actionPackFinal: input.actionPackFinal
+    actionPackFinal: input.actionPackFinal,
+    sessionReviewDraft: input.sessionReviewDraft,
+    sessionReviewFinal: input.sessionReviewFinal
   });
 
 const baseHandler: APIGatewayProxyHandler = async (event) => {

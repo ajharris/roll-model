@@ -100,6 +100,8 @@ Create a training entry.
 ## `GET /entries`
 Fetch entries for the authenticated athlete.
 - **Role**: `athlete`
+- **Query options**:
+  - `recentOneThingLimit` (optional, `1..20`): include `recentOneThingCues` in response.
 
 **Response JSON schema (200)**
 ```json
@@ -110,7 +112,19 @@ Fetch entries for the authenticated athlete.
     "entries": {
       "type": "array",
       "items": {"$ref": "#/definitions/Entry"}
-    }
+    },
+    "recentOneThingCues": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["entryId", "createdAt", "cue"],
+        "properties": {
+          "entryId": {"type": "string"},
+          "createdAt": {"type": "string"},
+          "cue": {"type": "string"}
+        }
+      }
+    }    
   },
   "definitions": {
     "Entry": {"$ref": "#/definitions/Entry"}

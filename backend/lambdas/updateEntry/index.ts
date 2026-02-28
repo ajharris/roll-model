@@ -107,6 +107,8 @@ const baseHandler: APIGatewayProxyHandler = async (event) => {
       templateId: payload.templateId,
       actionPackDraft: payload.actionPackDraft,
       actionPackFinal: payload.actionPackFinal,
+      sessionReviewDraft: payload.sessionReviewDraft,
+      sessionReviewFinal: payload.sessionReviewFinal,
       updatedAt: nowIso
     });
 
