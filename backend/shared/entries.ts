@@ -1,3 +1,4 @@
+import { normalizeFinalizedSessionReview, normalizeSessionReviewArtifact } from './sessionReview';
 import type { Entry, EntryQuickAdd, EntryStructuredFields, EntryTag, MediaAttachment, MediaClipNote } from './types';
 
 export const CURRENT_ENTRY_SCHEMA_VERSION = 3;
@@ -269,6 +270,9 @@ export const normalizeEntry = (entry: NormalizableEntryInput): Entry => {
     throw new Error(`Unsupported entry schema version: ${String(schemaVersion)}`);
   }
 
+  const sessionReviewDraft = normalizeSessionReviewArtifact((entry as Record<string, unknown>).sessionReviewDraft);
+  const sessionReviewFinal = normalizeFinalizedSessionReview((entry as Record<string, unknown>).sessionReviewFinal);
+
   return {
     ...entry,
     schemaVersion: CURRENT_ENTRY_SCHEMA_VERSION,
@@ -276,7 +280,9 @@ export const normalizeEntry = (entry: NormalizableEntryInput): Entry => {
     structured: sanitizeStructuredFields((entry as Record<string, unknown>).structured),
     tags: sanitizeEntryTags((entry as Record<string, unknown>).tags, entry.sessionMetrics?.tags),
     rawTechniqueMentions: sanitizeRawTechniqueMentions(entry.rawTechniqueMentions),
-    mediaAttachments: sanitizeMediaAttachments(entry.mediaAttachments)
+    mediaAttachments: sanitizeMediaAttachments(entry.mediaAttachments),
+    ...(sessionReviewDraft ? { sessionReviewDraft } : {}),
+    ...(sessionReviewFinal ? { sessionReviewFinal } : {})
   };
 };
 

@@ -71,6 +71,8 @@ export interface Entry {
   templateId?: EntryTemplateId;
   actionPackDraft?: ActionPack;
   actionPackFinal?: FinalizedActionPack;
+  sessionReviewDraft?: SessionReviewArtifact;
+  sessionReviewFinal?: FinalizedSessionReview;
 }
 
 export interface Comment {
@@ -104,6 +106,8 @@ export interface CreateEntryRequest {
   templateId?: EntryTemplateId;
   actionPackDraft?: ActionPack;
   actionPackFinal?: FinalizedActionPack;
+  sessionReviewDraft?: SessionReviewArtifact;
+  sessionReviewFinal?: FinalizedSessionReview;
 }
 
 export type UpdateEntryRequest = CreateEntryRequest;
@@ -232,6 +236,38 @@ export interface CoachReviewState {
 
 export interface FinalizedActionPack {
   actionPack: ActionPack;
+  coachReview?: CoachReviewState;
+  finalizedAt: string;
+}
+
+export type SessionReviewFieldKey =
+  | 'whatWorked'
+  | 'whatFailed'
+  | 'whatToAskCoach'
+  | 'whatToDrillSolo'
+  | 'oneThing';
+
+export interface SessionReviewConfidenceFlag {
+  field: SessionReviewFieldKey;
+  confidence: ConfidenceLevel;
+  note?: string;
+}
+
+export interface SessionReviewPromptSet {
+  whatWorked: string[];
+  whatFailed: string[];
+  whatToAskCoach: string[];
+  whatToDrillSolo: string[];
+}
+
+export interface SessionReviewArtifact {
+  promptSet: SessionReviewPromptSet;
+  oneThing: string;
+  confidenceFlags: SessionReviewConfidenceFlag[];
+}
+
+export interface FinalizedSessionReview {
+  review: SessionReviewArtifact;
   coachReview?: CoachReviewState;
   finalizedAt: string;
 }
@@ -372,6 +408,7 @@ export interface GapInsightsReport {
 export interface AIExtractedUpdates {
   summary: string;
   actionPack: ActionPack;
+  sessionReview?: SessionReviewArtifact;
   coachReview?: CoachReviewState;
   suggestedFollowUpQuestions: string[];
 }

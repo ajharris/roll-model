@@ -40,6 +40,8 @@ export interface Entry {
   templateId?: EntryTemplateId;
   actionPackDraft?: ActionPack;
   actionPackFinal?: FinalizedActionPack;
+  sessionReviewDraft?: SessionReviewArtifact;
+  sessionReviewFinal?: FinalizedSessionReview;
 }
 
 export interface CommentPayload {
@@ -55,6 +57,8 @@ export interface EntryCreatePayload {
   templateId?: EntryTemplateId;
   actionPackDraft?: ActionPack;
   actionPackFinal?: FinalizedActionPack;
+  sessionReviewDraft?: SessionReviewArtifact;
+  sessionReviewFinal?: FinalizedSessionReview;
 }
 
 export type EntryTemplateId = 'class-notes' | 'open-mat-rounds' | 'drill-session';
@@ -93,6 +97,38 @@ export interface CoachReviewState {
 
 export interface FinalizedActionPack {
   actionPack: ActionPack;
+  coachReview?: CoachReviewState;
+  finalizedAt: string;
+}
+
+export type SessionReviewFieldKey =
+  | 'whatWorked'
+  | 'whatFailed'
+  | 'whatToAskCoach'
+  | 'whatToDrillSolo'
+  | 'oneThing';
+
+export interface SessionReviewConfidenceFlag {
+  field: SessionReviewFieldKey;
+  confidence: ConfidenceLevel;
+  note?: string;
+}
+
+export interface SessionReviewPromptSet {
+  whatWorked: string[];
+  whatFailed: string[];
+  whatToAskCoach: string[];
+  whatToDrillSolo: string[];
+}
+
+export interface SessionReviewArtifact {
+  promptSet: SessionReviewPromptSet;
+  oneThing: string;
+  confidenceFlags: SessionReviewConfidenceFlag[];
+}
+
+export interface FinalizedSessionReview {
+  review: SessionReviewArtifact;
   coachReview?: CoachReviewState;
   finalizedAt: string;
 }
@@ -145,6 +181,7 @@ export interface Checkoff {
 export interface AIExtractedUpdates {
   summary: string;
   actionPack: ActionPack;
+  sessionReview?: SessionReviewArtifact;
   coachReview?: CoachReviewState;
   suggestedFollowUpQuestions: string[];
 }

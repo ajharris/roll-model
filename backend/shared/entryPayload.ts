@@ -2,6 +2,7 @@ import type { APIGatewayProxyEvent } from 'aws-lambda';
 
 import { isValidMediaAttachmentsInput } from './entries';
 import { ApiError } from './responses';
+import { normalizeFinalizedSessionReview, normalizeSessionReviewArtifact } from './sessionReview';
 import type { CreateEntryRequest, EntryStructuredFields, EntryTag } from './types';
 
 const ENTRY_TAG_VALUES = new Set<EntryTag>([
@@ -129,5 +130,24 @@ export const parseEntryPayload = (event: APIGatewayProxyEvent): CreateEntryReque
     invalid('Entry payload is invalid: mediaAttachments must be an array of objects.');
   }
 
-  return payload as unknown as CreateEntryRequest;
+  if (payload.sessionReviewDraft !== undefined && !normalizeSessionReviewArtifact(payload.sessionReviewDraft)) {
+    invalid(
+      'Entry payload is invalid: sessionReviewDraft must include promptSet arrays and a single concise oneThing cue.',
+    );
+  }
+
+  if (payload.sessionReviewFinal !== undefined && !normalizeFinalizedSessionReview(payload.sessionReviewFinal)) {
+    invalid(
+      'Entry payload is invalid: sessionReviewFinal must include review promptSet arrays, a valid oneThing cue, and finalizedAt.',
+    );
+  }
+
+  const normalizedDraft = normalizeSessionReviewArtifact(payload.sessionReviewDraft);
+  const normalizedFinal = normalizeFinalizedSessionReview(payload.sessionReviewFinal);
+
+  return {
+    ...(payload as unknown as CreateEntryRequest),
+    ...(normalizedDraft ? { sessionReviewDraft: normalizedDraft } : {}),
+    ...(normalizedFinal ? { sessionReviewFinal: normalizedFinal } : {})
+  };
 };

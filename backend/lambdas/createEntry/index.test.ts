@@ -135,6 +135,28 @@ describe('createEntry handler auth', () => {
     expect(mockPutItem).not.toHaveBeenCalled();
   });
 
+  it('rejects invalid session review payloads', async () => {
+    const result = (await handler(
+      buildEvent('athlete', {
+        sessionReviewDraft: {
+          promptSet: {
+            whatWorked: [],
+            whatFailed: [],
+            whatToAskCoach: [],
+            whatToDrillSolo: [],
+          },
+          oneThing: '',
+          confidenceFlags: [],
+        },
+      }),
+      {} as never,
+      () => undefined
+    )) as APIGatewayProxyResult;
+
+    expect(result.statusCode).toBe(400);
+    expect(mockPutItem).not.toHaveBeenCalled();
+  });
+
   it('rejects coach tokens', async () => {
     const result = (await handler(buildEvent('coach'), {} as never, () => undefined)) as APIGatewayProxyResult;
 
@@ -186,5 +208,38 @@ describe('createEntry handler auth', () => {
 
     expect(result.statusCode).toBe(201);
     expect(mockBatchWriteItems).toHaveBeenCalledWith([{ id: 'apf-item' }]);
+  });
+
+  it('persists normalized session review one-thing cue', async () => {
+    mockExtractEntryTokens.mockReturnValueOnce(['guard']).mockReturnValueOnce(['guard']);
+    mockBuildKeywordIndexItems.mockReturnValue([]);
+
+    const result = (await handler(
+      buildEvent('athlete', {
+        sessionReviewDraft: {
+          promptSet: {
+            whatWorked: ['Maintained frames'],
+            whatFailed: ['Late underhook response'],
+            whatToAskCoach: ['How to keep elbow-knee connection?'],
+            whatToDrillSolo: ['Pummel early from half guard'],
+          },
+          oneThing: '  - Pummel first in half guard. Then reset stance. ',
+          confidenceFlags: [{ field: 'oneThing', confidence: 'medium' }],
+        },
+      }),
+      {} as never,
+      () => undefined
+    )) as APIGatewayProxyResult;
+
+    expect(result.statusCode).toBe(201);
+    expect(mockPutItem).toHaveBeenCalledWith(
+      expect.objectContaining({
+        Item: expect.objectContaining({
+          sessionReviewDraft: expect.objectContaining({
+            oneThing: 'Pummel first in half guard',
+          }),
+        }),
+      })
+    );
   });
 });

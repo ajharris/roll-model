@@ -148,6 +148,16 @@ describe('aiChat handler', () => {
           fallbackDecisionGuidance: 'If knee line is lost, reset to shin shield.',
           confidenceFlags: [{ field: 'leaks', confidence: 'low', note: 'Could also be cardio pacing.' }],
         },
+        sessionReview: {
+          promptSet: {
+            whatWorked: ['Frames held'],
+            whatFailed: ['Late pummel'],
+            whatToAskCoach: ['How to win underhook race?'],
+            whatToDrillSolo: ['Early pummel reps'],
+          },
+          oneThing: 'Pummel first.',
+          confidenceFlags: [{ field: 'oneThing', confidence: 'medium' }],
+        },
         suggestedFollowUpQuestions: ['What cue helped your first frame?']
       },
       suggested_prompts: ['Ask about intensity']
@@ -206,6 +216,7 @@ describe('aiChat handler', () => {
       extracted_updates: {
         summary: string;
         actionPack: { wins: string[]; leaks: string[]; oneFocus: string };
+        sessionReview?: { oneThing: string };
         suggestedFollowUpQuestions: string[];
       };
       suggested_prompts: string[];
@@ -214,6 +225,7 @@ describe('aiChat handler', () => {
     expect(typeof body.assistant_text).toBe('string');
     expect(body.extracted_updates.summary).toBe('Summary');
     expect(body.extracted_updates.actionPack.oneFocus).toBe('Early hip switch on knee cut');
+    expect(body.extracted_updates.sessionReview?.oneThing).toBe('Pummel first.');
     expect(Array.isArray(body.suggested_prompts)).toBe(true);
 
     const callArgs = mockCallOpenAI.mock.calls[0]?.[0] ?? [];

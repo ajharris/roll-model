@@ -1,6 +1,7 @@
 import { GetParameterCommand, SSMClient } from '@aws-sdk/client-ssm';
 
 import { ApiError } from './responses';
+import { normalizeSessionReviewArtifact } from './sessionReview';
 import type { AIExtractedUpdates, ConfidenceLevel } from './types';
 
 const ssmClient = new SSMClient({});
@@ -26,6 +27,7 @@ export const isAIExtractedUpdates = (value: unknown): value is AIExtractedUpdate
   const maybe = value as Partial<AIExtractedUpdates>;
   const actionPack = maybe.actionPack as AIExtractedUpdates['actionPack'] | undefined;
   const coachReview = maybe.coachReview as AIExtractedUpdates['coachReview'] | undefined;
+  const sessionReview = maybe.sessionReview;
 
   return (
     typeof maybe.summary === 'string' &&
@@ -50,6 +52,7 @@ export const isAIExtractedUpdates = (value: unknown): value is AIExtractedUpdate
         (flag.note === undefined || typeof flag.note === 'string')
       );
     }) &&
+    (sessionReview === undefined || normalizeSessionReviewArtifact(sessionReview) !== null) &&
     (coachReview === undefined ||
       (typeof coachReview === 'object' &&
         typeof coachReview.requiresReview === 'boolean' &&
@@ -157,7 +160,12 @@ export const callOpenAI = async (messages: OpenAIMessage[]): Promise<OpenAIRespo
 
   return {
     text: payload.text,
-    extracted_updates: payload.extracted_updates,
+    extracted_updates: {
+      ...payload.extracted_updates,
+      ...(payload.extracted_updates.sessionReview
+        ? { sessionReview: normalizeSessionReviewArtifact(payload.extracted_updates.sessionReview)! }
+        : {})
+    },
     suggested_prompts: payload.suggested_prompts
   };
 };

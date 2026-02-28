@@ -377,4 +377,51 @@ describe('getEntries handler auth', () => {
     expect(result.statusCode).toBe(400);
     expect(mockQueryActionPackAthleteEntries).not.toHaveBeenCalled();
   });
+
+  it('returns recent one-thing cues when requested', async () => {
+    mockQueryItems.mockResolvedValueOnce({
+      Items: [
+        {
+          PK: 'USER#athlete-1',
+          SK: 'ENTRY#2026-02-26',
+          entityType: 'ENTRY',
+          entryId: 'entry-1',
+          athleteId: 'athlete-1',
+          createdAt: '2026-02-26T00:00:00.000Z',
+          updatedAt: '2026-02-26T00:00:00.000Z',
+          sections: { shared: 'shared', private: 'private' },
+          sessionMetrics: { durationMinutes: 60, intensity: 6, rounds: 5, giOrNoGi: 'gi', tags: [] },
+          rawTechniqueMentions: [],
+          sessionReviewFinal: {
+            review: {
+              promptSet: { whatWorked: [], whatFailed: [], whatToAskCoach: [], whatToDrillSolo: [] },
+              oneThing: 'Pummel first.',
+              confidenceFlags: [],
+            },
+            finalizedAt: '2026-02-26T01:00:00.000Z',
+          },
+        },
+      ],
+    } as unknown as QueryCommandOutput);
+
+    const result = (await handler(
+      buildEvent('athlete', undefined, undefined, { recentOneThingLimit: '3' }),
+      {} as never,
+      () => undefined
+    )) as APIGatewayProxyResult;
+
+    expect(result.statusCode).toBe(200);
+    const body = JSON.parse(result.body) as { recentOneThingCues: Array<{ cue: string }> };
+    expect(body.recentOneThingCues).toEqual([{ entryId: 'entry-1', createdAt: '2026-02-26T00:00:00.000Z', cue: 'Pummel first' }]);
+  });
+
+  it('rejects invalid recent one-thing limit', async () => {
+    const result = (await handler(
+      buildEvent('athlete', undefined, undefined, { recentOneThingLimit: '0' }),
+      {} as never,
+      () => undefined
+    )) as APIGatewayProxyResult;
+
+    expect(result.statusCode).toBe(400);
+  });
 });
