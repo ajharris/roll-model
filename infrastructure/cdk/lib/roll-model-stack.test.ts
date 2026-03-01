@@ -3,9 +3,16 @@ import { Template } from 'aws-cdk-lib/assertions';
 
 import { RollModelStack } from './roll-model-stack';
 
+const buildApp = () =>
+  new cdk.App({
+    context: {
+      '@aws-cdk/core:stackResourceLimit': 700
+    }
+  });
+
 describe('RollModelStack CORS', () => {
   it('uses Authorization-only headers in API Gateway error responses and preflight methods', () => {
-    const app = new cdk.App();
+    const app = buildApp();
     const stack = new RollModelStack(app, 'TestRollModelStack');
     const template = Template.fromStack(stack);
 
@@ -46,7 +53,7 @@ describe('RollModelStack CORS', () => {
 
 describe('RollModelStack observability', () => {
   it('enables tracing and provisions dashboard/alarm observability resources', () => {
-    const app = new cdk.App();
+    const app = buildApp();
     const stack = new RollModelStack(app, 'TestRollModelStackTracing');
     const template = Template.fromStack(stack);
 
@@ -86,7 +93,7 @@ describe('RollModelStack observability', () => {
 
 describe('RollModelStack saved searches API', () => {
   it('provisions saved-search CRUD methods', () => {
-    const app = new cdk.App();
+    const app = buildApp();
     const stack = new RollModelStack(app, 'TestRollModelStackSavedSearches');
     const template = Template.fromStack(stack);
 
@@ -108,7 +115,7 @@ describe('RollModelStack saved searches API', () => {
 
 describe('RollModelStack curriculum API', () => {
   it('provisions curriculum resources and secondary index support', () => {
-    const app = new cdk.App();
+    const app = buildApp();
     const stack = new RollModelStack(app, 'TestRollModelStackCurriculum');
     const template = Template.fromStack(stack);
 

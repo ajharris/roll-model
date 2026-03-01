@@ -6,6 +6,7 @@ import { mergeCheckoffFromEvidence } from '../../shared/checkoffs';
 import { getItem, putItem, queryItems } from '../../shared/db';
 import { isCoachLinkActive } from '../../shared/links';
 import { withRequestLogging } from '../../shared/logger';
+import { recomputeAndPersistProgressViews } from '../../shared/progressStore';
 import { ApiError, errorResponse, response } from '../../shared/responses';
 import type { Checkoff, CheckoffEvidence, CheckoffStatus } from '../../shared/types';
 
@@ -168,6 +169,8 @@ const baseHandler: APIGatewayProxyHandler = async (event) => {
         ...nextCheckoff
       }
     });
+
+    await recomputeAndPersistProgressViews(targetAthleteId);
 
     return response(200, {
       checkoff: nextCheckoff,

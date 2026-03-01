@@ -7,6 +7,7 @@ import { parseEntryRecord, sanitizeMediaAttachments, withCurrentEntrySchemaVersi
 import { parseEntryPayload } from '../../shared/entryPayload';
 import { buildKeywordIndexItems, extractEntryTokens } from '../../shared/keywords';
 import { withRequestLogging } from '../../shared/logger';
+import { recomputeAndPersistProgressViews } from '../../shared/progressStore';
 import { ApiError, errorResponse, response } from '../../shared/responses';
 import { sanitizeTechniqueMentions, upsertTechniqueCandidates } from '../../shared/techniques';
 import type { Entry } from '../../shared/types';
@@ -175,6 +176,7 @@ const baseHandler: APIGatewayProxyHandler = async (event) => {
     }
 
     await upsertTechniqueCandidates(updatedEntry.rawTechniqueMentions, updatedEntry.entryId, nowIso);
+    await recomputeAndPersistProgressViews(auth.userId);
 
     return response(200, { entry: updatedEntry });
   } catch (error) {

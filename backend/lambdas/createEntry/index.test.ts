@@ -4,6 +4,7 @@ import { buildActionPackIndexItems } from '../../shared/actionPackIndex';
 import { batchWriteItems, putItem } from '../../shared/db';
 import { CURRENT_ENTRY_SCHEMA_VERSION } from '../../shared/entries';
 import { buildKeywordIndexItems, extractEntryTokens } from '../../shared/keywords';
+import { recomputeAndPersistProgressViews } from '../../shared/progressStore';
 import { upsertTechniqueCandidates } from '../../shared/techniques';
 
 import { handler } from './index';
@@ -11,6 +12,9 @@ import { handler } from './index';
 jest.mock('../../shared/db');
 jest.mock('../../shared/keywords');
 jest.mock('../../shared/actionPackIndex');
+jest.mock('../../shared/progressStore', () => ({
+  recomputeAndPersistProgressViews: jest.fn()
+}));
 jest.mock('../../shared/techniques', () => ({
   ...jest.requireActual('../../shared/techniques'),
   upsertTechniqueCandidates: jest.fn()
@@ -22,6 +26,7 @@ const mockExtractEntryTokens = jest.mocked(extractEntryTokens);
 const mockBuildKeywordIndexItems = jest.mocked(buildKeywordIndexItems);
 const mockBuildActionPackIndexItems = jest.mocked(buildActionPackIndexItems);
 const mockUpsertTechniqueCandidates = jest.mocked(upsertTechniqueCandidates);
+const mockRecomputeAndPersistProgressViews = jest.mocked(recomputeAndPersistProgressViews);
 
 const buildEvent = (role: 'athlete' | 'coach', bodyOverride?: Record<string, unknown>): APIGatewayProxyEvent =>
   ({
@@ -68,6 +73,17 @@ describe('createEntry handler auth', () => {
     mockBuildKeywordIndexItems.mockReturnValue([]);
     mockBuildActionPackIndexItems.mockReset();
     mockBuildActionPackIndexItems.mockReturnValue([]);
+    mockRecomputeAndPersistProgressViews.mockResolvedValue({
+      athleteId: 'user-123',
+      generatedAt: '2026-02-26T00:00:00.000Z',
+      filters: { contextTags: [] },
+      timeline: { events: [], cumulative: [] },
+      positionHeatmap: { cells: [], maxTrainedCount: 0, neglectedThreshold: 0 },
+      outcomeTrends: { points: [] },
+      lowConfidenceFlags: [],
+      coachAnnotations: [],
+      sourceSummary: { sessionsConsidered: 0, structuredSessions: 0, checkoffsConsidered: 0 }
+    });
   });
 
   it('allows athlete tokens', async () => {

@@ -7,6 +7,7 @@ import { parseUpsertCheckoffEvidencePayload } from '../../shared/checkoffPayload
 import { mergeCheckoffFromEvidence } from '../../shared/checkoffs';
 import { getItem, putItem, queryItems } from '../../shared/db';
 import { withRequestLogging } from '../../shared/logger';
+import { recomputeAndPersistProgressViews } from '../../shared/progressStore';
 import { ApiError, errorResponse, response } from '../../shared/responses';
 import type { Checkoff, CheckoffEvidence } from '../../shared/types';
 
@@ -166,6 +167,8 @@ const baseHandler: APIGatewayProxyHandler = async (event) => {
       savedEvidence.push(evidence);
       updatedCheckoffs.push(nextCheckoff);
     }
+
+    await recomputeAndPersistProgressViews(auth.userId);
 
     return response(200, {
       checkoffs: updatedCheckoffs,

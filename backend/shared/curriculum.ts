@@ -1,5 +1,18 @@
 import { ApiError } from './responses';
-import type { Entry, Checkoff, CheckoffEvidence, Skill, SkillProgress, SkillRelationship, CurriculumStage, CurriculumRecommendation, SkillCategory, SkillProgressState, ConfidenceLevel } from './types';
+import type {
+  Entry,
+  Checkoff,
+  CheckoffEvidence,
+  Skill,
+  SkillProgress,
+  SkillRelationship,
+  CurriculumStage,
+  CurriculumRecommendation,
+  SkillCategory,
+  SkillProgressState,
+  ConfidenceLevel,
+  ProgressViewsReport
+} from './types';
 
 export const CURRICULUM_STAGE_PREFIX = 'CURRICULUM_STAGE#';
 export const CURRICULUM_SKILL_PREFIX = 'CURRICULUM_SKILL#';
@@ -259,6 +272,7 @@ type BuildProgressInput = {
   checkoffs: Checkoff[];
   evidence: CheckoffEvidence[];
   entries: Entry[];
+  progressViews?: ProgressViewsReport | null;
   existingProgress?: SkillProgress[];
   nowIso: string;
 };
@@ -374,15 +388,44 @@ export const buildProgressAndRecommendations = (
       const missingPrerequisiteSkillIds = prereqs.filter(
         (prereqSkillId) => progressBySkill.get(prereqSkillId)?.state !== 'complete'
       );
+      const trendPoint = input.progressViews?.outcomeTrends.points[input.progressViews.outcomeTrends.points.length - 1];
+      const neglectedPositions = (input.progressViews?.positionHeatmap.cells ?? [])
+        .filter((cell) => cell.neglected)
+        .map((cell) => cell.position);
+      const trendRationale: string[] = [];
+      let trendBoost = 0;
+      if (skill.category === 'escape' && trendPoint?.escapesSuccessRate !== null && trendPoint?.escapesSuccessRate !== undefined) {
+        if (trendPoint.escapesSuccessRate < 0.5) {
+          trendBoost += 15;
+          trendRationale.push(`Escape success trend is ${(trendPoint.escapesSuccessRate * 100).toFixed(0)}%.`);
+        }
+      }
+      if (
+        skill.category === 'guard-retention' &&
+        trendPoint?.guardRetentionFailureRate !== null &&
+        trendPoint?.guardRetentionFailureRate !== undefined
+      ) {
+        if (trendPoint.guardRetentionFailureRate > 0.4) {
+          trendBoost += 20;
+          trendRationale.push(`Guard retention failure trend is ${(trendPoint.guardRetentionFailureRate * 100).toFixed(0)}%.`);
+        }
+      }
+      const skillName = skill.name.toLowerCase();
+      if (neglectedPositions.some((position) => skillName.includes(position))) {
+        trendBoost += 10;
+        trendRationale.push('Matches a neglected position in recent sessions.');
+      }
+
       const score =
         (progress.state === 'ready_for_review' ? 120 : progress.state === 'evidence_present' ? 90 : 60) +
         Math.max(0, 20 - missingPrerequisiteSkillIds.length * 10) +
-        Math.min(20, progress.evidenceCount * 4);
+        Math.min(20, progress.evidenceCount * 4) +
+        trendBoost;
 
       return {
         skillId: skill.skillId,
         score,
-        rationale: progress.rationale.slice(0, 4),
+        rationale: normalizeStringList([...progress.rationale.slice(0, 4), ...trendRationale]),
         missingPrerequisiteSkillIds
       } satisfies CurriculumRecommendation;
     })

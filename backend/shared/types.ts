@@ -405,6 +405,102 @@ export interface GapInsightsReport {
   };
 }
 
+export interface ProgressViewsFilters {
+  dateFrom?: string;
+  dateTo?: string;
+  contextTags: string[];
+  giOrNoGi?: '' | 'gi' | 'no-gi';
+}
+
+export interface ProgressLowConfidenceFlag {
+  entryId: string;
+  createdAt: string;
+  source: 'action-pack' | 'session-review' | 'outcome-extraction';
+  field: string;
+  confidence: ConfidenceLevel;
+  note?: string;
+  metric: 'timeline' | 'position-heatmap' | 'outcome-trend';
+}
+
+export interface SkillTimelinePoint {
+  date: string;
+  skillId: string;
+  status: Extract<CheckoffStatus, 'earned' | 'revalidated'>;
+  evidenceCount: number;
+  confidence: ConfidenceLevel;
+  lowConfidence: boolean;
+}
+
+export interface SkillTimelineSeriesPoint {
+  date: string;
+  cumulativeSkills: number;
+}
+
+export interface SkillTimelineDataset {
+  events: SkillTimelinePoint[];
+  cumulative: SkillTimelineSeriesPoint[];
+}
+
+export interface PositionHeatmapCell {
+  position: string;
+  trainedCount: number;
+  lowConfidenceCount: number;
+  neglected: boolean;
+  lastSeenAt?: string;
+}
+
+export interface PositionHeatmapDataset {
+  cells: PositionHeatmapCell[];
+  maxTrainedCount: number;
+  neglectedThreshold: number;
+}
+
+export interface OutcomeTrendPoint {
+  date: string;
+  escapesSuccessRate: number | null;
+  guardRetentionFailureRate: number | null;
+  escapesSuccesses: number;
+  escapeAttempts: number;
+  guardRetentionFailures: number;
+  guardRetentionObservations: number;
+  lowConfidenceCount: number;
+}
+
+export interface OutcomeTrendsDataset {
+  points: OutcomeTrendPoint[];
+}
+
+export type ProgressAnnotationScope = 'general' | 'timeline' | 'position-heatmap' | 'outcome-trend';
+
+export interface ProgressCoachAnnotation {
+  annotationId: string;
+  athleteId: string;
+  scope: ProgressAnnotationScope;
+  targetKey?: string;
+  note: string;
+  correction?: string;
+  createdAt: string;
+  updatedAt: string;
+  createdBy: string;
+  updatedBy: string;
+}
+
+export interface ProgressViewsReport {
+  athleteId: string;
+  generatedAt: string;
+  filters: ProgressViewsFilters;
+  timeline: SkillTimelineDataset;
+  positionHeatmap: PositionHeatmapDataset;
+  outcomeTrends: OutcomeTrendsDataset;
+  lowConfidenceFlags: ProgressLowConfidenceFlag[];
+  coachAnnotations: ProgressCoachAnnotation[];
+  sourceSummary: {
+    sessionsConsidered: number;
+    structuredSessions: number;
+    checkoffsConsidered: number;
+  };
+}
+
 export interface AIExtractedUpdates {
   summary: string;
   actionPack: ActionPack;

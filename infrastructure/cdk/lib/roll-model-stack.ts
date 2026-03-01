@@ -212,6 +212,16 @@ export class RollModelStack extends cdk.Stack {
       'backend/lambdas/getGapInsights/index.ts',
       table
     );
+    const getProgressViewsLambda = this.createLambda(
+      'getProgressViews',
+      'backend/lambdas/getProgressViews/index.ts',
+      table
+    );
+    const upsertProgressAnnotationLambda = this.createLambda(
+      'upsertProgressAnnotation',
+      'backend/lambdas/upsertProgressAnnotation/index.ts',
+      table
+    );
     const upsertGapPrioritiesLambda = this.createLambda(
       'upsertGapPriorities',
       'backend/lambdas/upsertGapPriorities/index.ts',
@@ -292,6 +302,8 @@ export class RollModelStack extends cdk.Stack {
       { name: 'getEntryCheckoffEvidence', fn: getEntryCheckoffEvidenceLambda },
       { name: 'submitFeedback', fn: submitFeedbackLambda },
       { name: 'getGapInsights', fn: getGapInsightsLambda },
+      { name: 'getProgressViews', fn: getProgressViewsLambda },
+      { name: 'upsertProgressAnnotation', fn: upsertProgressAnnotationLambda },
       { name: 'upsertGapPriorities', fn: upsertGapPrioritiesLambda },
       { name: 'buildWeeklyPlan', fn: buildWeeklyPlanLambda },
       { name: 'listWeeklyPlans', fn: listWeeklyPlansLambda },
@@ -544,6 +556,30 @@ export class RollModelStack extends cdk.Stack {
       allowHeaders: ['Content-Type', 'Authorization']
     });
 
+    const progressViews = api.root.addResource('progress-views');
+    progressViews.addMethod('GET', new apigateway.LambdaIntegration(getProgressViewsLambda), methodOptions);
+    progressViews.addCorsPreflight({
+      allowOrigins: apigateway.Cors.ALL_ORIGINS,
+      allowMethods: ['GET', 'OPTIONS'],
+      allowHeaders: ['Content-Type', 'Authorization']
+    });
+
+    const progressAnnotations = progressViews.addResource('annotations');
+    progressAnnotations.addMethod('POST', new apigateway.LambdaIntegration(upsertProgressAnnotationLambda), methodOptions);
+    progressAnnotations.addCorsPreflight({
+      allowOrigins: apigateway.Cors.ALL_ORIGINS,
+      allowMethods: ['POST', 'OPTIONS'],
+      allowHeaders: ['Content-Type', 'Authorization']
+    });
+
+    const progressAnnotationById = progressAnnotations.addResource('{annotationId}');
+    progressAnnotationById.addMethod('PUT', new apigateway.LambdaIntegration(upsertProgressAnnotationLambda), methodOptions);
+    progressAnnotationById.addCorsPreflight({
+      allowOrigins: apigateway.Cors.ALL_ORIGINS,
+      allowMethods: ['PUT', 'OPTIONS'],
+      allowHeaders: ['Content-Type', 'Authorization']
+    });
+
     const curriculum = api.root.addResource('curriculum');
     curriculum.addMethod('GET', new apigateway.LambdaIntegration(listCurriculumLambda), methodOptions);
     curriculum.addCorsPreflight({
@@ -649,6 +685,34 @@ export class RollModelStack extends cdk.Stack {
     const athleteCheckoffReview = athleteCheckoffById.addResource('review');
     athleteCheckoffReview.addMethod('PUT', new apigateway.LambdaIntegration(reviewCheckoffLambda), methodOptions);
     athleteCheckoffReview.addCorsPreflight({
+      allowOrigins: apigateway.Cors.ALL_ORIGINS,
+      allowMethods: ['PUT', 'OPTIONS'],
+      allowHeaders: ['Content-Type', 'Authorization']
+    });
+
+    const athleteProgressViews = athleteById.addResource('progress-views');
+    athleteProgressViews.addMethod('GET', new apigateway.LambdaIntegration(getProgressViewsLambda), methodOptions);
+    athleteProgressViews.addCorsPreflight({
+      allowOrigins: apigateway.Cors.ALL_ORIGINS,
+      allowMethods: ['GET', 'OPTIONS'],
+      allowHeaders: ['Content-Type', 'Authorization']
+    });
+
+    const athleteProgressAnnotations = athleteProgressViews.addResource('annotations');
+    athleteProgressAnnotations.addMethod('POST', new apigateway.LambdaIntegration(upsertProgressAnnotationLambda), methodOptions);
+    athleteProgressAnnotations.addCorsPreflight({
+      allowOrigins: apigateway.Cors.ALL_ORIGINS,
+      allowMethods: ['POST', 'OPTIONS'],
+      allowHeaders: ['Content-Type', 'Authorization']
+    });
+
+    const athleteProgressAnnotationById = athleteProgressAnnotations.addResource('{annotationId}');
+    athleteProgressAnnotationById.addMethod(
+      'PUT',
+      new apigateway.LambdaIntegration(upsertProgressAnnotationLambda),
+      methodOptions
+    );
+    athleteProgressAnnotationById.addCorsPreflight({
       allowOrigins: apigateway.Cors.ALL_ORIGINS,
       allowMethods: ['PUT', 'OPTIONS'],
       allowHeaders: ['Content-Type', 'Authorization']
