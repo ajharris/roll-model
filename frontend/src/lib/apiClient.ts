@@ -2,6 +2,7 @@ import { logAuthFailure, logNetworkFailure } from '@/lib/clientErrorLogging';
 import { frontendConfig } from '@/lib/config';
 import type {
   AIExtractedUpdates,
+  CoachQuestionSet,
   Checkoff,
   CheckoffEvidence,
   CheckoffEvidenceMappingStatus,
@@ -102,6 +103,10 @@ type ProgressViewsQuery = Partial<{
   giOrNoGi: 'gi' | 'no-gi';
 }>;
 
+type CoachQuestionsQuery = Partial<{
+  regenerate: boolean;
+}>;
+
 const withGapInsightsQueryString = (path: string, query?: GapInsightsQuery) => {
   if (!query) return path;
   const params = new URLSearchParams();
@@ -145,6 +150,13 @@ const withProgressViewsQueryString = (path: string, query?: ProgressViewsQuery) 
 
   const qs = params.toString();
   return qs ? `${path}?${qs}` : path;
+};
+
+const withCoachQuestionsQueryString = (path: string, query?: CoachQuestionsQuery) => {
+  if (!query || query.regenerate !== true) return path;
+  const params = new URLSearchParams();
+  params.set('regenerate', 'true');
+  return `${path}?${params.toString()}`;
 };
 
 const buildAuthHeaders = () => {
@@ -544,6 +556,36 @@ export const apiClient = {
     }),
   upsertAthleteGapPriorities: (athleteId: string, payload: { priorities: UpsertGapPriorityInput[] }) =>
     request<{ saved: GapPriorityOverride[] }>(`/athletes/${athleteId}/gap-insights/priorities`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    }),
+  getCoachQuestions: async (query?: CoachQuestionsQuery) => {
+    const result = await request<{ questionSet: CoachQuestionSet }>(
+      withCoachQuestionsQueryString('/coach-questions', query),
+    );
+    return result.questionSet;
+  },
+  getAthleteCoachQuestions: async (athleteId: string, query?: CoachQuestionsQuery) => {
+    const result = await request<{ questionSet: CoachQuestionSet }>(
+      withCoachQuestionsQueryString(`/athletes/${athleteId}/coach-questions`, query),
+    );
+    return result.questionSet;
+  },
+  updateCoachQuestions: (questionSetId: string, payload: {
+    questionEdits?: Array<{ questionId: string; text: string }>;
+    responses?: Array<{ questionId: string; response: string }>;
+    coachNote?: string;
+  }) =>
+    request<{ questionSet: CoachQuestionSet }>(`/coach-questions/${questionSetId}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    }),
+  updateAthleteCoachQuestions: (athleteId: string, questionSetId: string, payload: {
+    questionEdits?: Array<{ questionId: string; text: string }>;
+    responses?: Array<{ questionId: string; response: string }>;
+    coachNote?: string;
+  }) =>
+    request<{ questionSet: CoachQuestionSet }>(`/athletes/${athleteId}/coach-questions/${questionSetId}`, {
       method: 'PUT',
       body: JSON.stringify(payload),
     }),
