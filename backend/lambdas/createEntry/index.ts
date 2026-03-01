@@ -9,10 +9,10 @@ import { parseEntryPayload } from '../../shared/entryPayload';
 import { buildKeywordIndexItems, extractEntryTokens } from '../../shared/keywords';
 import { withRequestLogging } from '../../shared/logger';
 import { hydratePartnerOutcomes } from '../../shared/partners';
+import { recomputeAndPersistProgressViews } from '../../shared/progressStore';
 import { errorResponse, response } from '../../shared/responses';
 import { sanitizeTechniqueMentions, upsertTechniqueCandidates } from '../../shared/techniques';
 import type { CreateEntryRequest, Entry } from '../../shared/types';
-
 
 
 export const buildEntry = (
@@ -101,6 +101,8 @@ const baseHandler: APIGatewayProxyHandler = async (event) => {
         createdAt: entry.createdAt
       }
     });
+
+    await recomputeAndPersistProgressViews(auth.userId);
 
     return response(201, { entry });
   } catch (error) {

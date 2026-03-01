@@ -2,14 +2,19 @@ import type { GetCommandOutput, QueryCommandOutput } from '@aws-sdk/lib-dynamodb
 import type { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 
 import { getItem, putItem, queryItems } from '../../shared/db';
+import { recomputeAndPersistProgressViews } from '../../shared/progressStore';
 
 import { handler } from './index';
 
 jest.mock('../../shared/db');
+jest.mock('../../shared/progressStore', () => ({
+  recomputeAndPersistProgressViews: jest.fn()
+}));
 
 const mockGetItem = jest.mocked(getItem);
 const mockQueryItems = jest.mocked(queryItems);
 const mockPutItem = jest.mocked(putItem);
+const mockRecomputeAndPersistProgressViews = jest.mocked(recomputeAndPersistProgressViews);
 
 const buildEvent = (role: 'athlete' | 'coach', bodyOverride?: Record<string, unknown>): APIGatewayProxyEvent =>
   ({
@@ -33,7 +38,19 @@ describe('reviewCheckoff handler', () => {
     mockGetItem.mockReset();
     mockQueryItems.mockReset();
     mockPutItem.mockReset();
+    mockRecomputeAndPersistProgressViews.mockReset();
     mockPutItem.mockResolvedValue();
+    mockRecomputeAndPersistProgressViews.mockResolvedValue({
+      athleteId: 'athlete-1',
+      generatedAt: '2026-02-26T00:00:00.000Z',
+      filters: { contextTags: [] },
+      timeline: { events: [], cumulative: [] },
+      positionHeatmap: { cells: [], maxTrainedCount: 0, neglectedThreshold: 0 },
+      outcomeTrends: { points: [] },
+      lowConfidenceFlags: [],
+      coachAnnotations: [],
+      sourceSummary: { sessionsConsidered: 0, structuredSessions: 0, checkoffsConsidered: 0 }
+    });
   });
 
   it('applies evidence review updates', async () => {

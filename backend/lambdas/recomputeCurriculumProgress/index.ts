@@ -5,6 +5,7 @@ import { buildProgressAndRecommendations, buildProgressRecord } from '../../shar
 import { listCurriculumSnapshot, listProgressSignals, resolveCurriculumAccess } from '../../shared/curriculumStore';
 import { batchWriteItems } from '../../shared/db';
 import { withRequestLogging } from '../../shared/logger';
+import { listPersistedProgressViews } from '../../shared/progressStore';
 import { errorResponse, response } from '../../shared/responses';
 
 const baseHandler: APIGatewayProxyHandler = async (event) => {
@@ -14,7 +15,11 @@ const baseHandler: APIGatewayProxyHandler = async (event) => {
 
     const { athleteId } = await resolveCurriculumAccess(event, auth, ['athlete', 'coach', 'admin']);
 
-    const [snapshot, signals] = await Promise.all([listCurriculumSnapshot(athleteId), listProgressSignals(athleteId)]);
+    const [snapshot, signals, progressViews] = await Promise.all([
+      listCurriculumSnapshot(athleteId),
+      listProgressSignals(athleteId),
+      listPersistedProgressViews(athleteId)
+    ]);
 
     const nowIso = new Date().toISOString();
     const built = buildProgressAndRecommendations({
@@ -24,6 +29,7 @@ const baseHandler: APIGatewayProxyHandler = async (event) => {
       checkoffs: signals.checkoffs,
       evidence: signals.evidence,
       entries: signals.entries,
+      progressViews,
       existingProgress: snapshot.progressions,
       nowIso
     });

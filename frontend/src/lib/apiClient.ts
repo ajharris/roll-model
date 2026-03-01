@@ -13,6 +13,9 @@ import type {
   FeedbackPayload,
   GapPriorityOverride,
   GapInsightsReport,
+  ProgressAnnotationScope,
+  ProgressCoachAnnotation,
+  ProgressViewsReport,
   PartnerProfile,
   RestoreDataResult,
   SavedEntrySearch,
@@ -92,6 +95,13 @@ type GapInsightsQuery = Partial<{
   topN: number;
 }>;
 
+type ProgressViewsQuery = Partial<{
+  dateFrom: string;
+  dateTo: string;
+  contextTags: string[];
+  giOrNoGi: 'gi' | 'no-gi';
+}>;
+
 const withGapInsightsQueryString = (path: string, query?: GapInsightsQuery) => {
   if (!query) return path;
   const params = new URLSearchParams();
@@ -105,6 +115,33 @@ const withGapInsightsQueryString = (path: string, query?: GapInsightsQuery) => {
   appendNum('repeatFailureWindowDays', query.repeatFailureWindowDays);
   appendNum('repeatFailureMinCount', query.repeatFailureMinCount);
   appendNum('topN', query.topN);
+
+  const qs = params.toString();
+  return qs ? `${path}?${qs}` : path;
+};
+
+const withProgressViewsQueryString = (path: string, query?: ProgressViewsQuery) => {
+  if (!query) return path;
+  const params = new URLSearchParams();
+  const append = (key: string, value: string | undefined) => {
+    if (!value) return;
+    const trimmed = value.trim();
+    if (!trimmed) return;
+    params.set(key, trimmed);
+  };
+
+  append('dateFrom', query.dateFrom);
+  append('dateTo', query.dateTo);
+  append('giOrNoGi', query.giOrNoGi);
+  if (Array.isArray(query.contextTags) && query.contextTags.length > 0) {
+    params.set(
+      'contextTags',
+      query.contextTags
+        .map((tag) => tag.trim())
+        .filter(Boolean)
+        .join(','),
+    );
+  }
 
   const qs = params.toString();
   return qs ? `${path}?${qs}` : path;
@@ -510,4 +547,51 @@ export const apiClient = {
       method: 'PUT',
       body: JSON.stringify(payload),
     }),
+  getProgressViews: async (query?: ProgressViewsQuery) => {
+    const result = await request<{ report?: ProgressViewsReport } | ProgressViewsReport>(
+      withProgressViewsQueryString('/progress-views', query),
+    );
+    return (result as { report?: ProgressViewsReport }).report ?? (result as ProgressViewsReport);
+  },
+  getAthleteProgressViews: async (athleteId: string, query?: ProgressViewsQuery) => {
+    const result = await request<{ report?: ProgressViewsReport } | ProgressViewsReport>(
+      withProgressViewsQueryString(`/athletes/${athleteId}/progress-views`, query),
+    );
+    return (result as { report?: ProgressViewsReport }).report ?? (result as ProgressViewsReport);
+  },
+  upsertProgressAnnotation: (
+    payload: {
+      scope: ProgressAnnotationScope;
+      targetKey?: string;
+      note: string;
+      correction?: string;
+    },
+    annotationId?: string,
+  ) =>
+    request<{ annotation: ProgressCoachAnnotation }>(
+      annotationId ? `/progress-views/annotations/${annotationId}` : '/progress-views/annotations',
+      {
+        method: annotationId ? 'PUT' : 'POST',
+        body: JSON.stringify(payload),
+      },
+    ),
+  upsertAthleteProgressAnnotation: (
+    athleteId: string,
+    payload: {
+      scope: ProgressAnnotationScope;
+      targetKey?: string;
+      note: string;
+      correction?: string;
+    },
+    annotationId?: string,
+  ) =>
+    request<{ annotation: ProgressCoachAnnotation }>(
+      annotationId
+        ? `/athletes/${athleteId}/progress-views/annotations/${annotationId}`
+        : `/athletes/${athleteId}/progress-views/annotations`,
+      {
+        method: annotationId ? 'PUT' : 'POST',
+        body: JSON.stringify(payload),
+      },
+    ),
 };

@@ -152,4 +152,62 @@ describe('buildProgressAndRecommendations', () => {
       'entry-1'
     ]);
   });
+
+  it('reuses persisted progress trends in recommendation rationale', () => {
+    const result = buildProgressAndRecommendations({
+      athleteId: 'athlete-1',
+      skills,
+      relationships,
+      checkoffs: [],
+      evidence: [],
+      entries,
+      progressViews: {
+        athleteId: 'athlete-1',
+        generatedAt: nowIso,
+        filters: {
+          contextTags: []
+        },
+        timeline: { events: [], cumulative: [] },
+        positionHeatmap: {
+          cells: [
+            {
+              position: 'closed guard',
+              trainedCount: 1,
+              lowConfidenceCount: 0,
+              neglected: true,
+              lastSeenAt: nowIso
+            }
+          ],
+          maxTrainedCount: 1,
+          neglectedThreshold: 1
+        },
+        outcomeTrends: {
+          points: [
+            {
+              date: '2026-02-27',
+              escapesSuccessRate: 0.35,
+              guardRetentionFailureRate: 0.6,
+              escapesSuccesses: 1,
+              escapeAttempts: 3,
+              guardRetentionFailures: 3,
+              guardRetentionObservations: 5,
+              lowConfidenceCount: 0
+            }
+          ]
+        },
+        lowConfidenceFlags: [],
+        coachAnnotations: [],
+        sourceSummary: {
+          sessionsConsidered: 2,
+          structuredSessions: 2,
+          checkoffsConsidered: 0
+        }
+      },
+      nowIso
+    });
+
+    expect(result.recommendations.some((item) => item.rationale.join(' ').includes('Guard retention failure trend'))).toBe(
+      true
+    );
+  });
 });
