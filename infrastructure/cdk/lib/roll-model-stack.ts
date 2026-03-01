@@ -150,6 +150,11 @@ export class RollModelStack extends cdk.Stack {
     const getEntriesLambda = this.createLambda('getEntries', 'backend/lambdas/getEntries/index.ts', table);
     const getEntryLambda = this.createLambda('getEntry', 'backend/lambdas/getEntry/index.ts', table);
     const updateEntryLambda = this.createLambda('updateEntry', 'backend/lambdas/updateEntry/index.ts', table);
+    const reviewStructuredMetadataLambda = this.createLambda(
+      'reviewStructuredMetadata',
+      'backend/lambdas/reviewStructuredMetadata/index.ts',
+      table
+    );
     const deleteEntryLambda = this.createLambda('deleteEntry', 'backend/lambdas/deleteEntry/index.ts', table);
     const listSavedSearchesLambda = this.createLambda(
       'listSavedSearches',
@@ -294,6 +299,7 @@ export class RollModelStack extends cdk.Stack {
       { name: 'getEntries', fn: getEntriesLambda },
       { name: 'getEntry', fn: getEntryLambda },
       { name: 'updateEntry', fn: updateEntryLambda },
+      { name: 'reviewStructuredMetadata', fn: reviewStructuredMetadataLambda },
       { name: 'deleteEntry', fn: deleteEntryLambda },
       { name: 'listSavedSearches', fn: listSavedSearchesLambda },
       { name: 'createSavedSearch', fn: createSavedSearchLambda },
@@ -463,6 +469,14 @@ export class RollModelStack extends cdk.Stack {
     entryCheckoffEvidence.addCorsPreflight({
       allowOrigins: apigateway.Cors.ALL_ORIGINS,
       allowMethods: ['GET', 'POST', 'OPTIONS'],
+      allowHeaders: ['Content-Type', 'Authorization']
+    });
+
+    const entryStructuredReview = entryById.addResource('structured-review');
+    entryStructuredReview.addMethod('PUT', new apigateway.LambdaIntegration(reviewStructuredMetadataLambda), methodOptions);
+    entryStructuredReview.addCorsPreflight({
+      allowOrigins: apigateway.Cors.ALL_ORIGINS,
+      allowMethods: ['PUT', 'OPTIONS'],
       allowHeaders: ['Content-Type', 'Authorization']
     });
 

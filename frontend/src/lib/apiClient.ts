@@ -21,6 +21,8 @@ import type {
   SavedEntrySearch,
   SavedEntrySearchUpsertPayload,
   SignupRequestPayload,
+  EntryStructuredMetadataConfirmation,
+  EntryStructuredFields,
   UpsertGapPriorityInput,
   UpsertPartnerProfilePayload,
 } from '@/types/api';
@@ -361,6 +363,19 @@ export const apiClient = {
   },
   updateEntry: async (entryId: string, payload: EntryCreatePayload) => {
     const result = await request<unknown>(`/entries/${entryId}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    });
+    return asEntryObject(result);
+  },
+  reviewEntryStructuredMetadata: async (
+    entryId: string,
+    payload: {
+      structured?: EntryStructuredFields;
+      confirmations?: EntryStructuredMetadataConfirmation[];
+    }
+  ) => {
+    const result = await request<unknown>(`/entries/${entryId}/structured-review`, {
       method: 'PUT',
       body: JSON.stringify(payload),
     });

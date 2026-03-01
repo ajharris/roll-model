@@ -20,6 +20,26 @@ const sanitizeForCoach = (
   void _partnerOutcomes;
   return {
     ...rest,
+    ...(entry.structuredExtraction
+      ? {
+          structuredExtraction: {
+            ...entry.structuredExtraction,
+            suggestions: entry.structuredExtraction.suggestions.map((suggestion) => ({
+              field: suggestion.field,
+              value: suggestion.value,
+              confidence: suggestion.confidence,
+              status: suggestion.status,
+              ...(suggestion.confirmationPrompt ? { confirmationPrompt: suggestion.confirmationPrompt } : {}),
+              ...(suggestion.correctionValue ? { correctionValue: suggestion.correctionValue } : {}),
+              ...(suggestion.updatedByRole ? { updatedByRole: suggestion.updatedByRole } : {}),
+              updatedAt: suggestion.updatedAt
+            })),
+            concepts: [],
+            failures: [],
+            conditioningIssues: []
+          }
+        }
+      : {}),
     sections: {
       shared: entry.sections.shared
     }

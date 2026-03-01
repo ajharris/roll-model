@@ -10,7 +10,13 @@ import { MediaAttachmentsInput } from '@/components/MediaAttachmentsInput';
 import { Protected } from '@/components/Protected';
 import { apiClient } from '@/lib/apiClient';
 import { clearEntryDraft, readEntryDraft, writeEntryDraft } from '@/lib/journalLocal';
-import type { CheckoffEvidence, Entry, MediaAttachment } from '@/types/api';
+import type {
+  CheckoffEvidence,
+  Entry,
+  EntryStructuredFieldKey,
+  EntryStructuredMetadataConfirmation,
+  MediaAttachment
+} from '@/types/api';
 
 type EntryEditDraft = {
   shared: string;
@@ -23,6 +29,14 @@ type EntryEditDraft = {
   techniques: string[];
   mediaAttachments: MediaAttachment[];
 };
+
+const STRUCTURED_FIELDS: Array<{ key: EntryStructuredFieldKey; label: string }> = [
+  { key: 'position', label: 'Position' },
+  { key: 'technique', label: 'Technique' },
+  { key: 'outcome', label: 'Outcome' },
+  { key: 'problem', label: 'Problem' },
+  { key: 'cue', label: 'Cue' },
+];
 
 const sanitizeAttachments = (attachments: MediaAttachment[]): MediaAttachment[] =>
   attachments
@@ -69,6 +83,8 @@ export default function EntryDetailPage() {
   const [status, setStatus] = useState('');
   const [draftState, setDraftState] = useState<'idle' | 'saved'>('idle');
   const [checkoffEvidence, setCheckoffEvidence] = useState<CheckoffEvidence[]>([]);
+  const [structuredDraft, setStructuredDraft] = useState<Partial<Record<EntryStructuredFieldKey, string>>>({});
+  const [structuredConfirmations, setStructuredConfirmations] = useState<EntryStructuredMetadataConfirmation[]>([]);
   const canEdit = Boolean(entry) && !isLoading;
 
   useEffect(() => {
@@ -105,6 +121,14 @@ export default function EntryDetailPage() {
           setTechniques(loadedEntry.rawTechniqueMentions);
           setMediaAttachments(loadedEntry.mediaAttachments ?? []);
         }
+        setStructuredDraft({
+          position: loadedEntry.structured?.position ?? '',
+          technique: loadedEntry.structured?.technique ?? '',
+          outcome: loadedEntry.structured?.outcome ?? '',
+          problem: loadedEntry.structured?.problem ?? '',
+          cue: loadedEntry.structured?.cue ?? '',
+        });
+        setStructuredConfirmations([]);
 
         const evidence = await apiClient.getEntryCheckoffEvidence(entryId);
         if (!cancelled) {
@@ -158,13 +182,25 @@ export default function EntryDetailPage() {
     setStatus('Saving...');
 
     try {
+      const structured = Object.fromEntries(
+        Object.entries(structuredDraft).filter(([, value]) => typeof value === 'string' && value.trim())
+      );
       const updated = await apiClient.updateEntry(entryId, {
         sections: { shared, private: privateText },
         sessionMetrics: { durationMinutes, intensity, rounds, giOrNoGi, tags },
         rawTechniqueMentions: techniques,
         mediaAttachments: sanitizeAttachments(mediaAttachments),
+        structured,
+        ...(structuredConfirmations.length > 0 ? { structuredMetadataConfirmations: structuredConfirmations } : {}),
       });
       setEntry(updated);
+      setStructuredDraft({
+        position: updated.structured?.position ?? '',
+        technique: updated.structured?.technique ?? '',
+        outcome: updated.structured?.outcome ?? '',
+        problem: updated.structured?.problem ?? '',
+        cue: updated.structured?.cue ?? '',
+      });
       clearEntryDraft(draftKey);
       setStatus('Saved.');
     } catch {
@@ -191,6 +227,49 @@ export default function EntryDetailPage() {
       router.push('/entries');
     } catch {
       setStatus('Delete failed.');
+    }
+  };
+
+  const upsertStructuredConfirmation = (next: EntryStructuredMetadataConfirmation) => {
+    setStructuredConfirmations((current) => [...current.filter((item) => item.field !== next.field), next]);
+  };
+
+  const onStructuredFieldChange = (field: EntryStructuredFieldKey, value: string) => {
+    setStructuredDraft((current) => ({ ...current, [field]: value }));
+    const trimmed = value.trim();
+    if (trimmed) {
+      upsertStructuredConfirmation({
+        field,
+        status: 'corrected',
+        correctionValue: trimmed,
+      });
+    }
+  };
+
+  const saveStructuredReview = async () => {
+    if (!entry) return;
+    setStatus('Saving structured review...');
+
+    try {
+      const structured = Object.fromEntries(
+        Object.entries(structuredDraft).filter(([, value]) => typeof value === 'string' && value.trim())
+      );
+      const updated = await apiClient.reviewEntryStructuredMetadata(entry.entryId, {
+        structured,
+        confirmations: structuredConfirmations,
+      });
+      setEntry(updated);
+      setStructuredDraft({
+        position: updated.structured?.position ?? '',
+        technique: updated.structured?.technique ?? '',
+        outcome: updated.structured?.outcome ?? '',
+        problem: updated.structured?.problem ?? '',
+        cue: updated.structured?.cue ?? '',
+      });
+      setStructuredConfirmations([]);
+      setStatus('Structured review saved.');
+    } catch {
+      setStatus('Structured review save failed.');
     }
   };
 
@@ -250,6 +329,65 @@ export default function EntryDetailPage() {
                 ) : null}
               </div>
             ))}
+          </div>
+        )}
+        {entry?.structuredExtraction && (
+          <div className="panel">
+            <h3>Structured extraction</h3>
+            {entry.structuredExtraction.confidenceFlags.length > 0 && (
+              <p className="small">
+                Uncertain fields:{' '}
+                {entry.structuredExtraction.confidenceFlags
+                  .map((flag) => `${flag.field} (${flag.confidence})`)
+                  .join(', ')}
+              </p>
+            )}
+            {STRUCTURED_FIELDS.map(({ key, label }) => {
+              const suggestion = entry.structuredExtraction?.suggestions.find((item) => item.field === key);
+              return (
+                <div key={key}>
+                  <label htmlFor={`entry-structured-${key}`}>{label}</label>
+                  <input
+                    id={`entry-structured-${key}`}
+                    value={structuredDraft[key] ?? ''}
+                    onChange={(e) => onStructuredFieldChange(key, e.target.value)}
+                    disabled={!canEdit}
+                  />
+                  {suggestion?.confirmationPrompt && <p className="small">{suggestion.confirmationPrompt}</p>}
+                  {suggestion && (
+                    <div className="row">
+                      <span className="small">Confidence: {suggestion.confidence}</span>
+                      <button
+                        type="button"
+                        onClick={() => upsertStructuredConfirmation({ field: key, status: 'confirmed' })}
+                        disabled={!canEdit}
+                      >
+                        Confirm
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => upsertStructuredConfirmation({ field: key, status: 'rejected' })}
+                        disabled={!canEdit}
+                      >
+                        Reject
+                      </button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+            {entry.structuredExtraction.concepts.length > 0 && (
+              <p className="small">Concepts: {entry.structuredExtraction.concepts.join(' | ')}</p>
+            )}
+            {entry.structuredExtraction.failures.length > 0 && (
+              <p className="small">Failures: {entry.structuredExtraction.failures.join(' | ')}</p>
+            )}
+            {entry.structuredExtraction.conditioningIssues.length > 0 && (
+              <p className="small">Conditioning: {entry.structuredExtraction.conditioningIssues.join(' | ')}</p>
+            )}
+            <button type="button" onClick={saveStructuredReview} disabled={!canEdit}>
+              Save structured review
+            </button>
           </div>
         )}
         <form onSubmit={save}>

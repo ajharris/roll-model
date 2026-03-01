@@ -109,6 +109,12 @@ describe('createEntry handler auth', () => {
           quickAdd: expect.objectContaining({
             class: 'Evening fundamentals'
           }),
+          structured: expect.objectContaining({
+            technique: 'knee cut'
+          }),
+          structuredExtraction: expect.objectContaining({
+            suggestions: expect.any(Array)
+          }),
           tags: ['guard-type', 'pass']
         })
       })

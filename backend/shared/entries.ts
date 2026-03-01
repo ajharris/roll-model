@@ -1,6 +1,10 @@
 import { normalizeFinalizedSessionReview, normalizeSessionReviewArtifact } from './sessionReview';
 import type {
   Entry,
+  EntryStructuredExtraction,
+  EntryStructuredFieldKey,
+  EntryStructuredSuggestion,
+  EntryStructuredSuggestionStatus,
   EntryQuickAdd,
   EntryStructuredFields,
   EntryTag,
@@ -11,7 +15,7 @@ import type {
   SessionContext
 } from './types';
 
-export const CURRENT_ENTRY_SCHEMA_VERSION = 4;
+export const CURRENT_ENTRY_SCHEMA_VERSION = 5;
 
 type EntryRecordEnvelope = {
   PK: string;
@@ -54,6 +58,13 @@ const STRUCTURED_FIELDS: Array<keyof EntryStructuredFields> = [
   'cue',
   'constraint'
 ];
+const STRUCTURED_SUGGESTION_STATUSES = new Set<EntryStructuredSuggestionStatus>([
+  'suggested',
+  'confirmed',
+  'corrected',
+  'rejected'
+]);
+const STRUCTURED_FIELD_KEYS = new Set<EntryStructuredFieldKey>(['position', 'technique', 'outcome', 'problem', 'cue']);
 
 const sanitizeRawTechniqueMentions = (value: unknown): string[] => {
   if (!Array.isArray(value)) {
@@ -147,6 +158,98 @@ const sanitizeStructuredFields = (value: unknown): EntryStructuredFields | undef
   }
 
   return Object.keys(sanitized).length > 0 ? sanitized : undefined;
+};
+
+const sanitizeStructuredSuggestion = (value: unknown): EntryStructuredSuggestion | null => {
+  const record = asRecord(value);
+  if (!record) {
+    return null;
+  }
+
+  const field = sanitizeString(record.field) as EntryStructuredFieldKey;
+  const confidence = sanitizeString(record.confidence);
+  const status = sanitizeString(record.status) as EntryStructuredSuggestionStatus;
+  const suggestionValue = sanitizeString(record.value);
+  if (
+    !STRUCTURED_FIELD_KEYS.has(field) ||
+    (confidence !== 'high' && confidence !== 'medium' && confidence !== 'low') ||
+    !STRUCTURED_SUGGESTION_STATUSES.has(status) ||
+    !suggestionValue
+  ) {
+    return null;
+  }
+
+  const updatedAt = sanitizeString(record.updatedAt) || new Date().toISOString();
+  const correctionValue = sanitizeString(record.correctionValue);
+  const confirmationPrompt = sanitizeString(record.confirmationPrompt);
+  const note = sanitizeString(record.note);
+  const sourceExcerpt = sanitizeString(record.sourceExcerpt);
+  const updatedByRole = sanitizeString(record.updatedByRole);
+
+  return {
+    field,
+    value: suggestionValue,
+    confidence: confidence as EntryStructuredSuggestion['confidence'],
+    status,
+    ...(confirmationPrompt ? { confirmationPrompt } : {}),
+    ...(correctionValue ? { correctionValue } : {}),
+    ...(note ? { note } : {}),
+    ...(sourceExcerpt ? { sourceExcerpt } : {}),
+    updatedAt,
+    ...(updatedByRole === 'athlete' || updatedByRole === 'coach'
+      ? { updatedByRole: updatedByRole as EntryStructuredSuggestion['updatedByRole'] }
+      : {})
+  };
+};
+
+const sanitizeStructuredExtraction = (value: unknown): EntryStructuredExtraction | undefined => {
+  const record = asRecord(value);
+  if (!record) {
+    return undefined;
+  }
+
+  const suggestions = Array.isArray(record.suggestions)
+    ? record.suggestions.map(sanitizeStructuredSuggestion).filter((item): item is EntryStructuredSuggestion => item !== null)
+    : [];
+  const concepts = sanitizeStringArray(record.concepts);
+  const failures = sanitizeStringArray(record.failures);
+  const conditioningIssues = sanitizeStringArray(record.conditioningIssues);
+  const generatedAt = sanitizeString(record.generatedAt) || new Date().toISOString();
+  const confidenceFlags = Array.isArray(record.confidenceFlags)
+    ? record.confidenceFlags
+        .map((item) => {
+          const flag = asRecord(item);
+          if (!flag) {
+            return null;
+          }
+          const field = sanitizeString(flag.field) as EntryStructuredFieldKey;
+          const confidence = sanitizeString(flag.confidence);
+          if (!STRUCTURED_FIELD_KEYS.has(field) || (confidence !== 'high' && confidence !== 'medium' && confidence !== 'low')) {
+            return null;
+          }
+
+          const note = sanitizeString(flag.note);
+          return {
+            field,
+            confidence: confidence as EntryStructuredExtraction['confidenceFlags'][number]['confidence'],
+            ...(note ? { note } : {})
+          };
+        })
+        .filter((item): item is EntryStructuredExtraction['confidenceFlags'][number] => item !== null)
+    : [];
+
+  if (suggestions.length === 0 && concepts.length === 0 && failures.length === 0 && conditioningIssues.length === 0) {
+    return undefined;
+  }
+
+  return {
+    generatedAt,
+    suggestions,
+    concepts,
+    failures,
+    conditioningIssues,
+    confidenceFlags
+  };
 };
 
 const sanitizeEntryTags = (value: unknown, fallback: unknown): EntryTag[] => {
@@ -391,6 +494,7 @@ const migrateLegacyEntryV0 = (legacy: LegacyEntryV0): Entry => ({
   schemaVersion: CURRENT_ENTRY_SCHEMA_VERSION,
   quickAdd: sanitizeQuickAdd((legacy as Record<string, unknown>).quickAdd, legacy as unknown as Record<string, unknown>),
   structured: sanitizeStructuredFields((legacy as Record<string, unknown>).structured),
+  structuredExtraction: sanitizeStructuredExtraction((legacy as Record<string, unknown>).structuredExtraction),
   tags: sanitizeEntryTags((legacy as Record<string, unknown>).tags, legacy.sessionMetrics?.tags),
   sessionContext: sanitizeSessionContext((legacy as Record<string, unknown>).sessionContext),
   partnerOutcomes: sanitizePartnerOutcomes((legacy as Record<string, unknown>).partnerOutcomes),
@@ -412,7 +516,7 @@ export const normalizeEntry = (entry: NormalizableEntryInput): Entry => {
     return migrateLegacyEntryV0(entry as LegacyEntryV0);
   }
 
-  if (schemaVersion !== 2 && schemaVersion !== 3 && schemaVersion !== CURRENT_ENTRY_SCHEMA_VERSION) {
+  if (schemaVersion !== 2 && schemaVersion !== 3 && schemaVersion !== 4 && schemaVersion !== CURRENT_ENTRY_SCHEMA_VERSION) {
     throw new Error(`Unsupported entry schema version: ${String(schemaVersion)}`);
   }
 
@@ -424,6 +528,7 @@ export const normalizeEntry = (entry: NormalizableEntryInput): Entry => {
     schemaVersion: CURRENT_ENTRY_SCHEMA_VERSION,
     quickAdd: sanitizeQuickAdd((entry as Record<string, unknown>).quickAdd, entry as unknown as Record<string, unknown>),
     structured: sanitizeStructuredFields((entry as Record<string, unknown>).structured),
+    structuredExtraction: sanitizeStructuredExtraction((entry as Record<string, unknown>).structuredExtraction),
     tags: sanitizeEntryTags((entry as Record<string, unknown>).tags, entry.sessionMetrics?.tags),
     sessionContext: sanitizeSessionContext((entry as Record<string, unknown>).sessionContext),
     partnerOutcomes: sanitizePartnerOutcomes((entry as Record<string, unknown>).partnerOutcomes),
