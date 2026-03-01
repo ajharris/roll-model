@@ -771,10 +771,50 @@ export interface SkillProgress {
 }
 
 export interface CurriculumRecommendation {
+  athleteId: string;
+  recommendationId: string;
   skillId: string;
+  sourceSkillId: string;
+  actionType: 'drill' | 'concept' | 'skill';
+  actionTitle: string;
+  actionDetail: string;
+  status: 'draft' | 'active' | 'dismissed';
+  relevanceScore: number;
+  impactScore: number;
+  effortScore: number;
   score: number;
-  rationale: string[];
+  rationale: string;
+  whyNow: string;
+  expectedImpact: string;
+  sourceEvidence: Array<{
+    entryId: string;
+    createdAt?: string;
+    evidenceId?: string;
+    excerpt: string;
+    signalType: 'failure-pattern' | 'checkoff-evidence' | 'curriculum-dependency' | 'progress-trend';
+  }>;
+  supportingNextSkillIds: string[];
   missingPrerequisiteSkillIds: string[];
+  generatedAt: string;
+  updatedAt: string;
+  approvedBy?: string;
+  approvedAt?: string;
+  coachNote?: string;
+  createdByRole?: 'system' | 'coach' | 'athlete';
+}
+
+export interface UpsertCurriculumRecommendationInput {
+  recommendationId: string;
+  status?: CurriculumRecommendation['status'];
+  actionType?: CurriculumRecommendation['actionType'];
+  actionTitle?: string;
+  actionDetail?: string;
+  rationale?: string;
+  coachNote?: string;
+}
+
+export interface UpsertCurriculumRecommendationRequest {
+  recommendation: UpsertCurriculumRecommendationInput;
 }
 
 export interface CurriculumGraphNode {

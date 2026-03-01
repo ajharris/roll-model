@@ -18,7 +18,8 @@ const baseHandler: APIGatewayProxyHandler = async (event) => {
       stages: snapshot.stages,
       skills: snapshot.skills,
       relationships: snapshot.relationships,
-      progressions: snapshot.progressions
+      progressions: snapshot.progressions,
+      recommendations: snapshot.recommendations
     });
   } catch (error) {
     return errorResponse(error);

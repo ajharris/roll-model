@@ -1,6 +1,6 @@
 import { assertNoInvalidCycles, buildProgressAndRecommendations } from './curriculum';
 import { ApiError } from './responses';
-import type { Checkoff, CheckoffEvidence, Entry, Skill, SkillRelationship } from './types';
+import type { Checkoff, CheckoffEvidence, CurriculumRecommendation, Entry, Skill, SkillRelationship } from './types';
 
 const nowIso = '2026-02-27T00:00:00.000Z';
 
@@ -15,7 +15,7 @@ const skills: Skill[] = [
     commonFailures: ['flat hips'],
     drills: ['retention rounds'],
     createdAt: nowIso,
-    updatedAt: nowIso
+    updatedAt: nowIso,
   },
   {
     skillId: 'scissor-sweep',
@@ -27,8 +27,8 @@ const skills: Skill[] = [
     commonFailures: ['no angle'],
     drills: ['kuzushi reps'],
     createdAt: nowIso,
-    updatedAt: nowIso
-  }
+    updatedAt: nowIso,
+  },
 ];
 
 const relationships: SkillRelationship[] = [
@@ -37,8 +37,8 @@ const relationships: SkillRelationship[] = [
     toSkillId: 'scissor-sweep',
     relation: 'supports',
     createdAt: nowIso,
-    updatedAt: nowIso
-  }
+    updatedAt: nowIso,
+  },
 ];
 
 const entries: Entry[] = [
@@ -54,7 +54,7 @@ const entries: Entry[] = [
       gym: 'HQ',
       partners: ['A'],
       rounds: 6,
-      notes: ''
+      notes: '',
     },
     tags: ['sweep'],
     sections: { private: '', shared: '' },
@@ -63,19 +63,19 @@ const entries: Entry[] = [
       intensity: 8,
       rounds: 6,
       giOrNoGi: 'gi',
-      tags: ['comp']
+      tags: ['comp'],
     },
     rawTechniqueMentions: [],
     actionPackDraft: {
       wins: ['Closed guard retention held under pressure'],
-      leaks: ['Scissor sweep failed due to weak kuzushi'],
+      leaks: ['Flat hips while trying closed guard retention'],
       oneFocus: 'Better scissor sweep angle',
       drills: ['Scissor sweep reps'],
       positionalRequests: ['Closed guard rounds'],
       fallbackDecisionGuidance: 'Reset to closed guard frames.',
-      confidenceFlags: []
-    }
-  }
+      confidenceFlags: [],
+    },
+  },
 ];
 
 describe('curriculum cycle validation', () => {
@@ -85,15 +85,15 @@ describe('curriculum cycle validation', () => {
         [
           {
             ...skills[0],
-            prerequisites: ['scissor-sweep']
+            prerequisites: ['scissor-sweep'],
           },
           {
             ...skills[1],
-            prerequisites: ['closed-guard-retention']
-          }
+            prerequisites: ['closed-guard-retention'],
+          },
         ],
-        []
-      )
+        [],
+      ),
     ).toThrow(ApiError);
   });
 
@@ -103,7 +103,7 @@ describe('curriculum cycle validation', () => {
 });
 
 describe('buildProgressAndRecommendations', () => {
-  it('builds progression and recommendation rationale from evidence and entries', () => {
+  it('builds explainable, minimal recommendations from failures and curriculum dependencies', () => {
     const checkoffs: Checkoff[] = [
       {
         checkoffId: 'closed-guard-retention::hit-in-live-roll',
@@ -114,8 +114,8 @@ describe('buildProgressAndRecommendations', () => {
         minEvidenceRequired: 3,
         confirmedEvidenceCount: 2,
         createdAt: nowIso,
-        updatedAt: nowIso
-      }
+        updatedAt: nowIso,
+      },
     ];
 
     const evidence: CheckoffEvidence[] = [
@@ -131,8 +131,8 @@ describe('buildProgressAndRecommendations', () => {
         confidence: 'medium',
         mappingStatus: 'confirmed',
         createdAt: nowIso,
-        updatedAt: nowIso
-      }
+        updatedAt: nowIso,
+      },
     ];
 
     const result = buildProgressAndRecommendations({
@@ -142,18 +142,49 @@ describe('buildProgressAndRecommendations', () => {
       checkoffs,
       evidence,
       entries,
-      nowIso
+      nowIso,
     });
 
     expect(result.progressions.length).toBe(2);
     expect(result.recommendations.length).toBeGreaterThan(0);
-    expect(result.recommendations[0].rationale.join(' ')).toContain('Evidence');
-    expect(result.progressions.find((item) => item.skillId === 'closed-guard-retention')?.sourceEntryIds).toEqual([
-      'entry-1'
-    ]);
+    const topRecommendation = result.recommendations[0];
+    expect(topRecommendation.actionType).toBe('drill');
+    expect(topRecommendation.rationale).toContain('recurring failure');
+    expect(topRecommendation.sourceEvidence.length).toBeGreaterThan(0);
+    expect(topRecommendation.whyNow).toContain('Recent entries');
+    expect(topRecommendation.expectedImpact).toContain('Low-effort reps');
   });
 
-  it('reuses persisted progress trends in recommendation rationale', () => {
+  it('reuses persisted trend context and preserves active coach-edited recommendation', () => {
+    const existingRecommendations: CurriculumRecommendation[] = [
+      {
+        athleteId: 'athlete-1',
+        recommendationId: 'closed-guard-retention:drill:retention-rounds',
+        skillId: 'closed-guard-retention',
+        sourceSkillId: 'closed-guard-retention',
+        actionType: 'drill',
+        actionTitle: 'Retain with collar tie start',
+        actionDetail: 'Coach-customized drill prescription.',
+        status: 'active',
+        relevanceScore: 80,
+        impactScore: 70,
+        effortScore: 20,
+        score: 65,
+        rationale: 'Coach override rationale.',
+        whyNow: 'Historical.',
+        expectedImpact: 'High.',
+        sourceEvidence: [],
+        supportingNextSkillIds: ['scissor-sweep'],
+        missingPrerequisiteSkillIds: [],
+        generatedAt: nowIso,
+        updatedAt: nowIso,
+        approvedBy: 'coach-1',
+        approvedAt: nowIso,
+        coachNote: 'Use this in next two sessions.',
+        createdByRole: 'coach',
+      },
+    ];
+
     const result = buildProgressAndRecommendations({
       athleteId: 'athlete-1',
       skills,
@@ -165,7 +196,7 @@ describe('buildProgressAndRecommendations', () => {
         athleteId: 'athlete-1',
         generatedAt: nowIso,
         filters: {
-          contextTags: []
+          contextTags: [],
         },
         timeline: { events: [], cumulative: [] },
         positionHeatmap: {
@@ -175,11 +206,11 @@ describe('buildProgressAndRecommendations', () => {
               trainedCount: 1,
               lowConfidenceCount: 0,
               neglected: true,
-              lastSeenAt: nowIso
-            }
+              lastSeenAt: nowIso,
+            },
           ],
           maxTrainedCount: 1,
-          neglectedThreshold: 1
+          neglectedThreshold: 1,
         },
         outcomeTrends: {
           points: [
@@ -191,23 +222,26 @@ describe('buildProgressAndRecommendations', () => {
               escapeAttempts: 3,
               guardRetentionFailures: 3,
               guardRetentionObservations: 5,
-              lowConfidenceCount: 0
-            }
-          ]
+              lowConfidenceCount: 0,
+            },
+          ],
         },
         lowConfidenceFlags: [],
         coachAnnotations: [],
         sourceSummary: {
           sessionsConsidered: 2,
           structuredSessions: 2,
-          checkoffsConsidered: 0
-        }
+          checkoffsConsidered: 0,
+        },
       },
-      nowIso
+      existingRecommendations,
+      nowIso,
     });
 
-    expect(result.recommendations.some((item) => item.rationale.join(' ').includes('Guard retention failure trend'))).toBe(
-      true
-    );
+    expect(result.recommendations.some((item) => item.sourceEvidence.some((evidenceItem) => evidenceItem.excerpt.includes('Guard retention failure trend')))).toBe(true);
+    const kept = result.recommendations.find((item) => item.recommendationId === 'closed-guard-retention:drill:retention-rounds');
+    expect(kept?.actionTitle).toBe('Retain with collar tie start');
+    expect(kept?.status).toBe('active');
+    expect(kept?.approvedBy).toBe('coach-1');
   });
 });

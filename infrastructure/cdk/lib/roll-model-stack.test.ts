@@ -132,5 +132,6 @@ describe('RollModelStack curriculum API', () => {
     expect(pathParts).toContain('relationships');
     expect(pathParts).toContain('progress');
     expect(pathParts).toContain('recompute');
+    expect(pathParts).toContain('recommendations');
   });
 });
