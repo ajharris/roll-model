@@ -187,6 +187,10 @@ export class RollModelStack extends cdk.Stack {
       'backend/lambdas/revokeCoachLink/index.ts',
       table
     );
+    const createShareLinkLambda = this.createLambda('createShareLink', 'backend/lambdas/createShareLink/index.ts', table);
+    const listShareLinksLambda = this.createLambda('listShareLinks', 'backend/lambdas/listShareLinks/index.ts', table);
+    const revokeShareLinkLambda = this.createLambda('revokeShareLink', 'backend/lambdas/revokeShareLink/index.ts', table);
+    const getSharedSummaryLambda = this.createLambda('getSharedSummary', 'backend/lambdas/getSharedSummary/index.ts', table);
     const exportDataLambda = this.createLambda('exportData', 'backend/lambdas/exportData/index.ts', table);
     const restoreDataLambda = this.createLambda('restoreData', 'backend/lambdas/restoreData/index.ts', table);
     const aiChatLambda = this.createLambda('aiChat', 'backend/lambdas/aiChat/index.ts', table);
@@ -318,6 +322,10 @@ export class RollModelStack extends cdk.Stack {
       { name: 'postComment', fn: postCommentLambda },
       { name: 'linkCoachAthlete', fn: linkCoachAthleteLambda },
       { name: 'revokeCoachLink', fn: revokeCoachLinkLambda },
+      { name: 'createShareLink', fn: createShareLinkLambda },
+      { name: 'listShareLinks', fn: listShareLinksLambda },
+      { name: 'revokeShareLink', fn: revokeShareLinkLambda },
+      { name: 'getSharedSummary', fn: getSharedSummaryLambda },
       { name: 'exportData', fn: exportDataLambda },
       { name: 'restoreData', fn: restoreDataLambda },
       { name: 'aiChat', fn: aiChatLambda },
@@ -412,6 +420,11 @@ export class RollModelStack extends cdk.Stack {
         ]
       })
     );
+
+    createShareLinkLambda.addEnvironment('SHARE_BASE_URL', process.env.SHARE_BASE_URL ?? '');
+    createShareLinkLambda.addEnvironment('SHARE_TOKEN_SALT', process.env.SHARE_TOKEN_SALT ?? '');
+    createShareLinkLambda.addEnvironment('SHARE_REQUIRE_COACH_REVIEW', process.env.SHARE_REQUIRE_COACH_REVIEW ?? 'false');
+    getSharedSummaryLambda.addEnvironment('SHARE_TOKEN_SALT', process.env.SHARE_TOKEN_SALT ?? '');
 
     const apiAccessLogGroup = new logs.LogGroup(this, 'RollModelApiAccessLogs', {
       retention: logs.RetentionDays.ONE_WEEK,
@@ -575,6 +588,31 @@ export class RollModelStack extends cdk.Stack {
     aiChat.addCorsPreflight({
       allowOrigins: apigateway.Cors.ALL_ORIGINS,
       allowMethods: ['POST', 'OPTIONS'],
+      allowHeaders: ['Content-Type', 'Authorization']
+    });
+
+    const shareLinks = api.root.addResource('share-links');
+    shareLinks.addMethod('GET', new apigateway.LambdaIntegration(listShareLinksLambda), methodOptions);
+    shareLinks.addMethod('POST', new apigateway.LambdaIntegration(createShareLinkLambda), methodOptions);
+    shareLinks.addCorsPreflight({
+      allowOrigins: apigateway.Cors.ALL_ORIGINS,
+      allowMethods: ['GET', 'POST', 'OPTIONS'],
+      allowHeaders: ['Content-Type', 'Authorization']
+    });
+    const shareLinkById = shareLinks.addResource('{shareId}');
+    shareLinkById.addMethod('DELETE', new apigateway.LambdaIntegration(revokeShareLinkLambda), methodOptions);
+    shareLinkById.addCorsPreflight({
+      allowOrigins: apigateway.Cors.ALL_ORIGINS,
+      allowMethods: ['DELETE', 'OPTIONS'],
+      allowHeaders: ['Content-Type', 'Authorization']
+    });
+
+    const shared = api.root.addResource('shared');
+    const sharedByToken = shared.addResource('{token}');
+    sharedByToken.addMethod('GET', new apigateway.LambdaIntegration(getSharedSummaryLambda), publicMethodOptions);
+    sharedByToken.addCorsPreflight({
+      allowOrigins: apigateway.Cors.ALL_ORIGINS,
+      allowMethods: ['GET', 'OPTIONS'],
       allowHeaders: ['Content-Type', 'Authorization']
     });
 

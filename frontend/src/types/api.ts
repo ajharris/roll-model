@@ -692,3 +692,96 @@ export interface ProgressViewsReport {
     checkoffsConsidered: number;
   };
 }
+
+export type ShareVisibility = 'private';
+export type ShareLinkStatus = 'active' | 'revoked';
+export type ShareFieldKey =
+  | 'quickAdd'
+  | 'sections.shared'
+  | 'sessionMetrics'
+  | 'sessionContext'
+  | 'structured'
+  | 'structuredExtraction'
+  | 'actionPack'
+  | 'sessionReview'
+  | 'rawTechniqueMentions'
+  | 'mediaAttachments'
+  | 'partnerOutcomes';
+
+export interface ShareCoachReviewState {
+  required: boolean;
+  approved: boolean;
+  reviewedAt?: string;
+  reviewedBy?: string;
+  notes?: string;
+}
+
+export interface SharePolicy {
+  visibility: ShareVisibility;
+  includeFields: ShareFieldKey[];
+  excludeFields: ShareFieldKey[];
+  includePartnerData: boolean;
+  entryIds?: string[];
+  requireCoachReview: boolean;
+}
+
+export interface SharedSessionHighlight {
+  entryId: string;
+  createdAt: string;
+  quickAdd?: Entry['quickAdd'];
+  sharedSection?: string;
+  sessionMetrics?: SessionMetrics;
+  sessionContext?: SessionContext;
+  structured?: EntryStructuredFields;
+  structuredExtraction?: EntryStructuredExtraction;
+  actionPack?: ActionPack;
+  sessionReview?: SessionReviewArtifact;
+  rawTechniqueMentions?: string[];
+  mediaAttachments?: MediaAttachment[];
+  partnerOutcomes?: PartnerOutcomeNote[];
+}
+
+export interface SharedSessionSummary {
+  summaryId: string;
+  athleteId: string;
+  generatedAt: string;
+  payloadVersion: number;
+  sourceEntryIds: string[];
+  scope: {
+    visibility: ShareVisibility;
+    includeFields: ShareFieldKey[];
+    excludeFields: ShareFieldKey[];
+    includePartnerData: boolean;
+    readOnly: true;
+  };
+  aggregate: {
+    topConcepts: string[];
+    recurringFailures: string[];
+    conditioningIssues: string[];
+  };
+  highlights: SharedSessionHighlight[];
+}
+
+export interface ShareLink {
+  shareId: string;
+  athleteId: string;
+  status: ShareLinkStatus;
+  createdAt: string;
+  updatedAt: string;
+  expiresAt: string;
+  revokedAt?: string;
+  payloadVersion: number;
+  policy: SharePolicy;
+  coachReview: ShareCoachReviewState;
+}
+
+export interface CreateShareLinkPayload {
+  visibility?: ShareVisibility;
+  includeFields?: ShareFieldKey[];
+  excludeFields?: ShareFieldKey[];
+  includePartnerData?: boolean;
+  entryIds?: string[];
+  requireCoachReview?: boolean;
+  coachReview?: ShareCoachReviewState;
+  expiresInHours?: number;
+}

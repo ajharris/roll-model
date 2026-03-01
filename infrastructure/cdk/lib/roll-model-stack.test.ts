@@ -135,3 +135,18 @@ describe('RollModelStack curriculum API', () => {
     expect(pathParts).toContain('recommendations');
   });
 });
+
+describe('RollModelStack sharing API', () => {
+  it('provisions authenticated share management routes and public token read route', () => {
+    const app = buildApp();
+    const stack = new RollModelStack(app, 'TestRollModelStackSharing');
+    const template = Template.fromStack(stack);
+
+    const resources = template.findResources('AWS::ApiGateway::Resource');
+    const pathParts = Object.values(resources).map((resource) => resource.Properties.PathPart as string);
+    expect(pathParts).toContain('share-links');
+    expect(pathParts).toContain('shared');
+    expect(pathParts).toContain('{shareId}');
+    expect(pathParts).toContain('{token}');
+  });
+});
