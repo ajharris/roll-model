@@ -212,6 +212,16 @@ export class RollModelStack extends cdk.Stack {
       'backend/lambdas/getGapInsights/index.ts',
       table
     );
+    const getCoachQuestionsLambda = this.createLambda(
+      'getCoachQuestions',
+      'backend/lambdas/getCoachQuestions/index.ts',
+      table
+    );
+    const updateCoachQuestionsLambda = this.createLambda(
+      'updateCoachQuestions',
+      'backend/lambdas/updateCoachQuestions/index.ts',
+      table
+    );
     const getProgressViewsLambda = this.createLambda(
       'getProgressViews',
       'backend/lambdas/getProgressViews/index.ts',
@@ -312,6 +322,8 @@ export class RollModelStack extends cdk.Stack {
       { name: 'getEntryCheckoffEvidence', fn: getEntryCheckoffEvidenceLambda },
       { name: 'submitFeedback', fn: submitFeedbackLambda },
       { name: 'getGapInsights', fn: getGapInsightsLambda },
+      { name: 'getCoachQuestions', fn: getCoachQuestionsLambda },
+      { name: 'updateCoachQuestions', fn: updateCoachQuestionsLambda },
       { name: 'getProgressViews', fn: getProgressViewsLambda },
       { name: 'upsertProgressAnnotation', fn: upsertProgressAnnotationLambda },
       { name: 'upsertGapPriorities', fn: upsertGapPrioritiesLambda },
@@ -332,6 +344,14 @@ export class RollModelStack extends cdk.Stack {
     ];
 
     aiChatLambda.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: ['ssm:GetParameter'],
+        resources: [
+          `arn:aws:ssm:${cdk.Stack.of(this).region}:${cdk.Stack.of(this).account}:parameter/roll-model/openai_api_key`
+        ]
+      })
+    );
+    getCoachQuestionsLambda.addToRolePolicy(
       new iam.PolicyStatement({
         actions: ['ssm:GetParameter'],
         resources: [
@@ -568,6 +588,21 @@ export class RollModelStack extends cdk.Stack {
       allowHeaders: ['Content-Type', 'Authorization']
     });
 
+    const coachQuestions = api.root.addResource('coach-questions');
+    coachQuestions.addMethod('GET', new apigateway.LambdaIntegration(getCoachQuestionsLambda), methodOptions);
+    coachQuestions.addCorsPreflight({
+      allowOrigins: apigateway.Cors.ALL_ORIGINS,
+      allowMethods: ['GET', 'OPTIONS'],
+      allowHeaders: ['Content-Type', 'Authorization']
+    });
+    const coachQuestionById = coachQuestions.addResource('{questionSetId}');
+    coachQuestionById.addMethod('PUT', new apigateway.LambdaIntegration(updateCoachQuestionsLambda), methodOptions);
+    coachQuestionById.addCorsPreflight({
+      allowOrigins: apigateway.Cors.ALL_ORIGINS,
+      allowMethods: ['PUT', 'OPTIONS'],
+      allowHeaders: ['Content-Type', 'Authorization']
+    });
+
     const progressViews = api.root.addResource('progress-views');
     progressViews.addMethod('GET', new apigateway.LambdaIntegration(getProgressViewsLambda), methodOptions);
     progressViews.addCorsPreflight({
@@ -729,6 +764,21 @@ export class RollModelStack extends cdk.Stack {
     athleteProgressViews.addCorsPreflight({
       allowOrigins: apigateway.Cors.ALL_ORIGINS,
       allowMethods: ['GET', 'OPTIONS'],
+      allowHeaders: ['Content-Type', 'Authorization']
+    });
+
+    const athleteCoachQuestions = athleteById.addResource('coach-questions');
+    athleteCoachQuestions.addMethod('GET', new apigateway.LambdaIntegration(getCoachQuestionsLambda), methodOptions);
+    athleteCoachQuestions.addCorsPreflight({
+      allowOrigins: apigateway.Cors.ALL_ORIGINS,
+      allowMethods: ['GET', 'OPTIONS'],
+      allowHeaders: ['Content-Type', 'Authorization']
+    });
+    const athleteCoachQuestionById = athleteCoachQuestions.addResource('{questionSetId}');
+    athleteCoachQuestionById.addMethod('PUT', new apigateway.LambdaIntegration(updateCoachQuestionsLambda), methodOptions);
+    athleteCoachQuestionById.addCorsPreflight({
+      allowOrigins: apigateway.Cors.ALL_ORIGINS,
+      allowMethods: ['PUT', 'OPTIONS'],
       allowHeaders: ['Content-Type', 'Authorization']
     });
 

@@ -459,6 +459,77 @@ export interface GapInsightsReport {
   };
 }
 
+export type CoachQuestionSignalType = 'unresolved_blocker' | 'repeated_failure' | 'decision_point';
+export type CoachQuestionGenerationReason = 'initial' | 'regenerate' | 'low-confidence-refresh';
+
+export interface CoachQuestionEvidence {
+  entryId: string;
+  createdAt: string;
+  signalType: CoachQuestionSignalType;
+  excerpt: string;
+}
+
+export interface CoachQuestionRubricScore {
+  specific: number;
+  testable: number;
+  coachActionable: number;
+  evidenceBacked: number;
+  nonDuplicative: number;
+  total: number;
+  needsRevision: boolean;
+  notes: string[];
+}
+
+export interface CoachQuestion {
+  questionId: string;
+  text: string;
+  priority: 1 | 2 | 3;
+  signalType: CoachQuestionSignalType;
+  issueKey: string;
+  confidence: ConfidenceLevel;
+  evidence: CoachQuestionEvidence[];
+  rubric: CoachQuestionRubricScore;
+  coachEditedText?: string;
+  athleteResponse?: string;
+}
+
+export interface CoachQuestionSetQualitySummary {
+  averageScore: number;
+  minScore: number;
+  hasDuplicates: boolean;
+  lowConfidenceCount: number;
+}
+
+export interface CoachQuestionSet {
+  questionSetId: string;
+  athleteId: string;
+  generatedAt: string;
+  updatedAt: string;
+  sourceEntryIds: string[];
+  generationReason: CoachQuestionGenerationReason;
+  generatedBy: string;
+  generatedByRole: 'athlete' | 'coach';
+  model: string;
+  promptVersion: number;
+  qualitySummary: CoachQuestionSetQualitySummary;
+  questions: CoachQuestion[];
+  coachNote?: string;
+  coachEditedAt?: string;
+  coachEditedBy?: string;
+}
+
+export interface CoachQuestionSetUpdateRequest {
+  questionEdits?: Array<{
+    questionId: string;
+    text: string;
+  }>;
+  responses?: Array<{
+    questionId: string;
+    response: string;
+  }>;
+  coachNote?: string;
+}
+
 export interface ProgressViewsFilters {
   dateFrom?: string;
   dateTo?: string;
