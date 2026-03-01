@@ -326,7 +326,6 @@ export interface ChatThread {
   messages: ChatMessage[];
 }
 
-export type FeedbackType = 'bug' | 'feature';
 export type FeedbackSeverity = 'low' | 'medium' | 'high' | 'critical';
 
 export interface FeedbackScreenshotAttachment {
