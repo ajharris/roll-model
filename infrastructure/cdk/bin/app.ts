@@ -4,6 +4,7 @@ import * as cdk from 'aws-cdk-lib';
 import { RollModelStack } from '../lib/roll-model-stack';
 
 const app = new cdk.App();
+app.node.setContext('@aws-cdk/core:stackResourceLimit', 700);
 
 new RollModelStack(app, 'RollModelStack', {
   env: {
