@@ -49,6 +49,7 @@ export default function FeedbackPage() {
             <select id="type" value={type} onChange={(e) => setType(e.target.value as FeedbackType)}>
               <option value="bug">Bug</option>
               <option value="feature">Feature request</option>
+              <option value="ui">UI/UX issue</option>
               <option value="other">Other</option>
             </select>
             <label htmlFor="title">Title</label>

@@ -277,7 +277,7 @@ export interface ChatThread {
   messages: ChatMessage[];
 }
 
-export type FeedbackType = 'bug' | 'feature' | 'other';
+export type FeedbackType = 'bug' | 'feature' | 'ui' | 'other';
 
 export interface FeedbackPayload {
   type: FeedbackType;

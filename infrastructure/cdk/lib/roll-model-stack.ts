@@ -373,11 +373,36 @@ export class RollModelStack extends cdk.Stack {
     const githubTokenSsmParamPath = githubTokenSsmParam.startsWith('/') ? githubTokenSsmParam : `/${githubTokenSsmParam}`;
     submitFeedbackLambda.addEnvironment('GITHUB_REPO', process.env.GITHUB_REPO ?? '');
     submitFeedbackLambda.addEnvironment('GITHUB_TOKEN_SSM_PARAM', githubTokenSsmParamPath);
+    submitFeedbackLambda.addEnvironment('APP_ENV', process.env.APP_ENV ?? 'prod');
+    submitFeedbackLambda.addEnvironment('APP_VERSION', process.env.APP_VERSION ?? 'unknown');
+    submitFeedbackLambda.addEnvironment('FEEDBACK_ACTOR_HASH_SALT', process.env.FEEDBACK_ACTOR_HASH_SALT ?? '');
+    submitFeedbackLambda.addEnvironment(
+      'FEEDBACK_REVIEW_REQUIRED_ENVS',
+      process.env.FEEDBACK_REVIEW_REQUIRED_ENVS ?? ''
+    );
+    submitFeedbackLambda.addEnvironment('FEEDBACK_NORMALIZE_MODE', process.env.FEEDBACK_NORMALIZE_MODE ?? 'auto');
+    submitFeedbackLambda.addEnvironment('FEEDBACK_OPENAI_MODEL', process.env.FEEDBACK_OPENAI_MODEL ?? 'gpt-4.1-mini');
+    submitFeedbackLambda.addEnvironment('FEEDBACK_RATE_LIMIT_PER_HOUR', process.env.FEEDBACK_RATE_LIMIT_PER_HOUR ?? '6');
+    submitFeedbackLambda.addEnvironment('FEEDBACK_RATE_LIMIT_PER_DAY', process.env.FEEDBACK_RATE_LIMIT_PER_DAY ?? '20');
+    submitFeedbackLambda.addEnvironment('FEEDBACK_COOLDOWN_SECONDS', process.env.FEEDBACK_COOLDOWN_SECONDS ?? '20');
+    submitFeedbackLambda.addEnvironment(
+      'FEEDBACK_DUPLICATE_WINDOW_HOURS',
+      process.env.FEEDBACK_DUPLICATE_WINDOW_HOURS ?? '24'
+    );
+    submitFeedbackLambda.addEnvironment('FEEDBACK_DUPLICATE_LIMIT', process.env.FEEDBACK_DUPLICATE_LIMIT ?? '2');
     submitFeedbackLambda.addToRolePolicy(
       new iam.PolicyStatement({
         actions: ['ssm:GetParameter'],
         resources: [
           `arn:aws:ssm:${cdk.Stack.of(this).region}:${cdk.Stack.of(this).account}:parameter${githubTokenSsmParamPath}`
+        ]
+      })
+    );
+    submitFeedbackLambda.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: ['ssm:GetParameter'],
+        resources: [
+          `arn:aws:ssm:${cdk.Stack.of(this).region}:${cdk.Stack.of(this).account}:parameter/roll-model/openai_api_key`
         ]
       })
     );
