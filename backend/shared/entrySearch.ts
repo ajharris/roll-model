@@ -33,6 +33,8 @@ type SearchIndex = {
   privateText: string;
   tags: string;
   techniques: string;
+  context: string;
+  partners: string;
   media: string;
   all: string;
 };
@@ -42,6 +44,27 @@ const buildSearchIndex = (entry: Entry): SearchIndex => {
   const privateText = normalizeText(entry.sections.private);
   const tags = normalizeText((entry.sessionMetrics.tags ?? []).join(' '));
   const techniques = normalizeText((entry.rawTechniqueMentions ?? []).join(' '));
+  const context = normalizeText(
+    [
+      entry.sessionContext?.ruleset ?? '',
+      ...(entry.sessionContext?.tags ?? []),
+      ...(entry.sessionContext?.injuryNotes ?? []),
+      entry.sessionContext?.fatigueLevel !== undefined ? String(entry.sessionContext.fatigueLevel) : '',
+    ].join(' '),
+  );
+  const partners = normalizeText(
+    (entry.partnerOutcomes ?? [])
+      .flatMap((outcome) => [
+        outcome.partnerId,
+        outcome.partnerDisplayName ?? '',
+        ...outcome.styleTags,
+        ...outcome.whatWorked,
+        ...outcome.whatFailed,
+        outcome.guidance?.draft ?? '',
+        outcome.guidance?.final ?? '',
+      ])
+      .join(' '),
+  );
   const media = normalizeText(
     (entry.mediaAttachments ?? [])
       .flatMap((attachment) => [
@@ -58,8 +81,10 @@ const buildSearchIndex = (entry: Entry): SearchIndex => {
     privateText,
     tags,
     techniques,
+    context,
+    partners,
     media,
-    all: [shared, privateText, tags, techniques, media].filter(Boolean).join(' '),
+    all: [shared, privateText, tags, techniques, context, partners, media].filter(Boolean).join(' '),
   };
 };
 
@@ -96,6 +121,32 @@ const matchesIntensity = (entry: Entry, request: EntrySearchRequest): boolean =>
 
 const matchesStructuredFilters = (entry: Entry, request: EntrySearchRequest): boolean => {
   if (request.tag && !(entry.sessionMetrics.tags ?? []).includes(request.tag)) return false;
+  if (request.contextTag && !(entry.sessionContext?.tags ?? []).includes(request.contextTag.toLowerCase())) return false;
+  if (request.ruleset && normalizeSearchToken(entry.sessionContext?.ruleset) !== normalizeSearchToken(request.ruleset)) {
+    return false;
+  }
+  if (request.partnerId && !(entry.partnerOutcomes ?? []).some((item) => item.partnerId === request.partnerId)) {
+    return false;
+  }
+  if (
+    request.partnerStyleTag &&
+    !(entry.partnerOutcomes ?? []).some((item) =>
+      item.styleTags.map((tag) => tag.toLowerCase()).includes(request.partnerStyleTag!.toLowerCase())
+    )
+  ) {
+    return false;
+  }
+
+  const minFatigue = Number(request.minFatigue);
+  if (request.minFatigue && Number.isFinite(minFatigue)) {
+    const value = entry.sessionContext?.fatigueLevel;
+    if (value === undefined || value < minFatigue) return false;
+  }
+  const maxFatigue = Number(request.maxFatigue);
+  if (request.maxFatigue && Number.isFinite(maxFatigue)) {
+    const value = entry.sessionContext?.fatigueLevel;
+    if (value === undefined || value > maxFatigue) return false;
+  }
   if (request.giOrNoGi && entry.sessionMetrics.giOrNoGi !== request.giOrNoGi) return false;
   if (!matchesDateRange(entry, request)) return false;
   if (!matchesIntensity(entry, request)) return false;
@@ -154,6 +205,8 @@ const scoreTextQuery = (index: SearchIndex, query: string): number => {
   if (index.privateText.includes(q)) score += 10;
   if (index.techniques.includes(q)) score += 14;
   if (index.tags.includes(q)) score += 10;
+  if (index.context.includes(q)) score += 8;
+  if (index.partners.includes(q)) score += 12;
   if (index.media.includes(q)) score += 6;
 
   tokens.forEach((token) => {
@@ -161,6 +214,8 @@ const scoreTextQuery = (index: SearchIndex, query: string): number => {
     score += countOccurrences(index.privateText, token) * 3;
     score += countOccurrences(index.techniques, token) * 6;
     score += countOccurrences(index.tags, token) * 4;
+    score += countOccurrences(index.context, token) * 3;
+    score += countOccurrences(index.partners, token) * 5;
     score += countOccurrences(index.media, token) * 2;
   });
 
@@ -254,6 +309,12 @@ export const searchEntries = (
       request.outcome ||
       request.classType ||
       request.tag ||
+      request.contextTag ||
+      request.ruleset ||
+      request.minFatigue ||
+      request.maxFatigue ||
+      request.partnerId ||
+      request.partnerStyleTag ||
       request.giOrNoGi ||
       request.minIntensity ||
       request.maxIntensity ||
@@ -315,6 +376,12 @@ export const parseEntrySearchRequest = (
     outcome: pickString(params.outcome),
     classType: pickString(params.classType),
     tag: pickString(params.tag),
+    contextTag: pickString(params.contextTag),
+    ruleset: pickString(params.ruleset),
+    minFatigue: pickString(params.minFatigue),
+    maxFatigue: pickString(params.maxFatigue),
+    partnerId: pickString(params.partnerId),
+    partnerStyleTag: pickString(params.partnerStyleTag),
     giOrNoGi,
     minIntensity: pickString(params.minIntensity),
     maxIntensity: pickString(params.maxIntensity),

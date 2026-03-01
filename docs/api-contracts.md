@@ -21,6 +21,12 @@ All endpoints require Cognito JWT auth and are fronted by API Gateway REST API (
 - `PUT /gap-insights/priorities`
 - `GET /athletes/{athleteId}/gap-insights`
 - `PUT /athletes/{athleteId}/gap-insights/priorities`
+- `POST /weekly-plans/build`
+- `GET /weekly-plans`
+- `PUT /weekly-plans/{planId}`
+- `POST /athletes/{athleteId}/weekly-plans/build`
+- `GET /athletes/{athleteId}/weekly-plans`
+- `PUT /athletes/{athleteId}/weekly-plans/{planId}`
 - `GET /curriculum`
 - `PUT /curriculum/stages`
 - `POST /curriculum/seed`
@@ -516,6 +522,150 @@ Persist athlete/coach priority decisions for gap items.
   ]
 }
 ```
+
+## `POST /weekly-plans/build`
+Generate and persist the current weekly plan and positional-round focus artifact from recent GPT-processed logs + plan context.
+- **Role**: `athlete` (or `coach` via `/athletes/{athleteId}/weekly-plans/build` for linked athletes)
+
+**Request JSON schema**
+```json
+{
+  "type": "object",
+  "properties": {
+    "weekOf": {"type": "string"}
+  }
+}
+```
+
+**Response JSON schema (201)**
+```json
+{
+  "type": "object",
+  "required": ["plan"],
+  "properties": {
+    "plan": {"$ref": "#/definitions/WeeklyPlan"}
+  },
+  "definitions": {
+    "WeeklyPlan": {
+      "type": "object",
+      "required": ["planId", "athleteId", "weekOf", "status", "positionalFocus"],
+      "properties": {
+        "planId": {"type": "string"},
+        "athleteId": {"type": "string"},
+        "weekOf": {"type": "string"},
+        "status": {"type": "string", "enum": ["draft", "active", "completed"]},
+        "primarySkills": {"type": "array", "items": {"type": "string"}},
+        "supportingConcept": {"type": "string"},
+        "conditioningConstraint": {"type": "string"},
+        "positionalFocus": {
+          "type": "object",
+          "required": ["cards", "locked", "updatedAt"],
+          "properties": {
+            "locked": {"type": "boolean"},
+            "lockedAt": {"type": "string"},
+            "lockedBy": {"type": "string"},
+            "updatedAt": {"type": "string"},
+            "cards": {
+              "type": "array",
+              "items": {"$ref": "#/definitions/WeeklyPositionalFocusCard"}
+            }
+          }
+        }
+      }
+    },
+    "WeeklyPositionalFocusCard": {
+      "type": "object",
+      "required": [
+        "id",
+        "title",
+        "focusType",
+        "priority",
+        "position",
+        "context",
+        "successCriteria",
+        "rationale",
+        "linkedOneThingCues",
+        "recurringFailures",
+        "references",
+        "status"
+      ],
+      "properties": {
+        "id": {"type": "string"},
+        "title": {"type": "string"},
+        "focusType": {"type": "string", "enum": ["remediate-weakness", "reinforce-strength", "carry-over"]},
+        "priority": {"type": "integer", "minimum": 1},
+        "position": {"type": "string"},
+        "context": {"type": "string"},
+        "successCriteria": {"type": "array", "items": {"type": "string"}},
+        "rationale": {"type": "string"},
+        "linkedOneThingCues": {"type": "array", "items": {"type": "string"}},
+        "recurringFailures": {"type": "array", "items": {"type": "string"}},
+        "references": {"type": "array", "items": {"type": "object"}},
+        "status": {"type": "string", "enum": ["pending", "done", "skipped"]},
+        "coachNote": {"type": "string"}
+      }
+    }
+  }
+}
+```
+
+## `GET /weekly-plans`
+List weekly plans for the authenticated athlete (or for linked athlete under `/athletes/{athleteId}/weekly-plans`).
+- **Role**: `athlete` or `coach`
+
+**Response JSON schema (200)**
+```json
+{
+  "type": "object",
+  "required": ["plans"],
+  "properties": {
+    "plans": {
+      "type": "array",
+      "items": {"$ref": "#/definitions/WeeklyPlan"}
+    }
+  }
+}
+```
+
+## `PUT /weekly-plans/{planId}`
+Update weekly plan execution and optional positional-focus review edits.
+- **Role**: `athlete` or `coach` (coach via `/athletes/{athleteId}/weekly-plans/{planId}` for linked athletes)
+
+**Request JSON schema**
+```json
+{
+  "type": "object",
+  "properties": {
+    "status": {"type": "string", "enum": ["draft", "active", "completed"]},
+    "coachReviewNote": {"type": "string"},
+    "completionNotes": {"type": "string"},
+    "lockPositionalFocus": {"type": "boolean"},
+    "positionalFocusCards": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id"],
+        "properties": {
+          "id": {"type": "string"},
+          "priority": {"type": "integer", "minimum": 1},
+          "title": {"type": "string"},
+          "position": {"type": "string"},
+          "context": {"type": "string"},
+          "successCriteria": {"type": "array", "items": {"type": "string"}},
+          "rationale": {"type": "string"},
+          "status": {"type": "string", "enum": ["pending", "done", "skipped"]},
+          "coachNote": {"type": "string"}
+        }
+      }
+    }
+  }
+}
+```
+
+**Rules**
+- Coaches can review/edit card priorities/content before lock.
+- Locked positional focus cards reject further priority/content changes.
+- Athlete lock (`lockPositionalFocus=true`) freezes card priorities/content for that week.
 
 ## `POST /ai/chat`
 Chat endpoint for AI-assisted post-training analysis.

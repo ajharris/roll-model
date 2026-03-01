@@ -1,7 +1,7 @@
 import type { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 
 import { buildActionPackIndexItems } from '../../shared/actionPackIndex';
-import { batchWriteItems, putItem } from '../../shared/db';
+import { batchWriteItems, getItem, putItem } from '../../shared/db';
 import { CURRENT_ENTRY_SCHEMA_VERSION } from '../../shared/entries';
 import { buildKeywordIndexItems, extractEntryTokens } from '../../shared/keywords';
 import { recomputeAndPersistProgressViews } from '../../shared/progressStore';
@@ -22,6 +22,7 @@ jest.mock('../../shared/techniques', () => ({
 
 const mockPutItem = jest.mocked(putItem);
 const mockBatchWriteItems = jest.mocked(batchWriteItems);
+const mockGetItem = jest.mocked(getItem);
 const mockExtractEntryTokens = jest.mocked(extractEntryTokens);
 const mockBuildKeywordIndexItems = jest.mocked(buildKeywordIndexItems);
 const mockBuildActionPackIndexItems = jest.mocked(buildActionPackIndexItems);
@@ -69,6 +70,7 @@ describe('createEntry handler auth', () => {
   beforeEach(() => {
     mockPutItem.mockResolvedValue();
     mockBatchWriteItems.mockResolvedValue();
+    mockGetItem.mockResolvedValue({} as never);
     mockExtractEntryTokens.mockReset();
     mockBuildKeywordIndexItems.mockReturnValue([]);
     mockBuildActionPackIndexItems.mockReset();
@@ -171,6 +173,95 @@ describe('createEntry handler auth', () => {
 
     expect(result.statusCode).toBe(400);
     expect(mockPutItem).not.toHaveBeenCalled();
+  });
+
+  it('rejects invalid session context tags', async () => {
+    const result = (await handler(
+      buildEvent('athlete', {
+        sessionContext: {
+          ruleset: 'ibjjf',
+          fatigueLevel: 6,
+          injuryNotes: ['left shoulder'],
+          tags: ['Bad Tag'],
+        },
+      }),
+      {} as never,
+      () => undefined
+    )) as APIGatewayProxyResult;
+
+    expect(result.statusCode).toBe(400);
+    expect(mockPutItem).not.toHaveBeenCalled();
+  });
+
+  it('rejects partner outcomes when partner profile is missing', async () => {
+    mockGetItem.mockResolvedValueOnce({} as never);
+
+    const result = (await handler(
+      buildEvent('athlete', {
+        partnerOutcomes: [
+          {
+            partnerId: 'partner-404',
+            styleTags: ['pressure-passer'],
+            whatWorked: ['Inside frames'],
+            whatFailed: ['Late pummel'],
+          },
+        ],
+      }),
+      {} as never,
+      () => undefined
+    )) as APIGatewayProxyResult;
+
+    expect(result.statusCode).toBe(400);
+    expect(mockPutItem).not.toHaveBeenCalled();
+  });
+
+  it('hydrates partner outcomes from linked partner profile', async () => {
+    mockExtractEntryTokens.mockReturnValueOnce(['guard']).mockReturnValueOnce(['guard']);
+    mockBuildKeywordIndexItems.mockReturnValue([]);
+    mockGetItem.mockResolvedValueOnce({
+      Item: {
+        PK: 'USER#user-123',
+        SK: 'PARTNER#partner-1',
+        entityType: 'PARTNER_PROFILE',
+        partnerId: 'partner-1',
+        athleteId: 'user-123',
+        displayName: 'Alex',
+        styleTags: ['pressure-passer'],
+        visibility: 'private',
+        createdAt: '2026-02-26T00:00:00.000Z',
+        updatedAt: '2026-02-26T00:00:00.000Z',
+      },
+    } as never);
+
+    const result = (await handler(
+      buildEvent('athlete', {
+        partnerOutcomes: [
+          {
+            partnerId: 'partner-1',
+            styleTags: [],
+            whatWorked: ['Knee shield frames'],
+            whatFailed: ['Crossface denial'],
+          },
+        ],
+      }),
+      {} as never,
+      () => undefined
+    )) as APIGatewayProxyResult;
+
+    expect(result.statusCode).toBe(201);
+    expect(mockPutItem).toHaveBeenCalledWith(
+      expect.objectContaining({
+        Item: expect.objectContaining({
+          partnerOutcomes: [
+            expect.objectContaining({
+              partnerId: 'partner-1',
+              partnerDisplayName: 'Alex',
+              styleTags: ['pressure-passer'],
+            }),
+          ],
+        }),
+      })
+    );
   });
 
   it('rejects coach tokens', async () => {

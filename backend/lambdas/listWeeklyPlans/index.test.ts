@@ -46,6 +46,26 @@ describe('listWeeklyPlans handler', () => {
           drills: [{ id: 'drill-1', label: 'x', status: 'pending' }],
           positionalRounds: [],
           constraints: [],
+          positionalFocus: {
+            cards: [
+              {
+                id: 'focus-1',
+                title: 'Fix: underhook timing',
+                focusType: 'remediate-weakness',
+                priority: 1,
+                position: 'half guard top',
+                context: 'no-gi',
+                successCriteria: ['run 4 rounds'],
+                rationale: 'recurring failure',
+                linkedOneThingCues: ['head first'],
+                recurringFailures: ['late underhook'],
+                references: [],
+                status: 'pending'
+              }
+            ],
+            locked: false,
+            updatedAt: '2026-02-24T00:00:00.000Z'
+          },
           explainability: []
         }
       ]

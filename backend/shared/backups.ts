@@ -9,6 +9,7 @@ import type {
   CurriculumGraph,
   CurriculumStage,
   Entry,
+  PartnerProfile,
   Skill,
   SkillProgress,
   SkillRelationship,
@@ -21,6 +22,7 @@ export const CURRENT_BACKUP_SCHEMA_VERSION = '2026-02-27';
 export interface BackupDataset {
   athleteId: string;
   entries: Entry[];
+  partnerProfiles: PartnerProfile[];
   comments: Comment[];
   links: CoachLink[];
   aiThreads: AIThread[];
@@ -46,6 +48,7 @@ type ParsedBackupEnvelope = {
   full: {
     athleteId: string;
     entries: unknown[];
+    partnerProfiles: unknown[];
     comments: unknown[];
     links: unknown[];
     aiThreads: unknown[];
@@ -198,6 +201,26 @@ const parseEntry = (value: unknown): Entry => {
   }
 };
 
+const parsePartnerProfile = (value: unknown): PartnerProfile => {
+  if (!isRecord(value)) {
+    throw new BackupValidationError('format', 'Backup partner profile items must be objects.');
+  }
+  if (
+    typeof value.partnerId !== 'string' ||
+    typeof value.athleteId !== 'string' ||
+    typeof value.displayName !== 'string' ||
+    !Array.isArray(value.styleTags) ||
+    value.styleTags.some((tag) => typeof tag !== 'string') ||
+    (value.notes !== undefined && typeof value.notes !== 'string') ||
+    (value.visibility !== 'private' && value.visibility !== 'shared-with-coach') ||
+    typeof value.createdAt !== 'string' ||
+    typeof value.updatedAt !== 'string'
+  ) {
+    throw new BackupValidationError('format', 'Backup partner profile shape is invalid.');
+  }
+  return value as unknown as PartnerProfile;
+};
+
 const parseWeeklyPlan = (value: unknown): WeeklyPlan => {
   if (!isRecord(value)) {
     throw new BackupValidationError('format', 'Backup weekly plan items must be objects.');
@@ -331,6 +354,7 @@ const parseEnvelope = (raw: unknown): ParsedBackupEnvelope => {
     full: {
       athleteId: requireString(full.athleteId, 'full.athleteId'),
       entries: requireArray(full.entries, 'full.entries'),
+      partnerProfiles: Array.isArray(full.partnerProfiles) ? full.partnerProfiles : [],
       comments: requireArray(full.comments, 'full.comments'),
       links: requireArray(full.links, 'full.links'),
       aiThreads: requireArray(full.aiThreads, 'full.aiThreads'),
@@ -348,6 +372,7 @@ const parseEnvelope = (raw: unknown): ParsedBackupEnvelope => {
 export const parseAndValidateBackup = (raw: unknown): FullBackupEnvelope => {
   const envelope = parseEnvelope(raw);
   const entries = envelope.full.entries.map(parseEntry);
+  const partnerProfiles = envelope.full.partnerProfiles.map(parsePartnerProfile);
   const comments = envelope.full.comments.map(parseComment);
   const links = envelope.full.links.map(parseCoachLink);
   const aiThreads = envelope.full.aiThreads.map(parseAIThread);
@@ -373,6 +398,15 @@ export const parseAndValidateBackup = (raw: unknown): FullBackupEnvelope => {
       throw new BackupValidationError(
         'format',
         `Backup coach link athleteId mismatch for coach ${link.coachId}.`
+      );
+    }
+  }
+
+  for (const partner of partnerProfiles) {
+    if (partner.athleteId !== envelope.full.athleteId) {
+      throw new BackupValidationError(
+        'format',
+        `Backup partner profile athleteId mismatch for partner ${partner.partnerId}.`
       );
     }
   }
@@ -425,6 +459,7 @@ export const parseAndValidateBackup = (raw: unknown): FullBackupEnvelope => {
     full: {
       athleteId: envelope.full.athleteId,
       entries,
+      partnerProfiles,
       comments,
       links,
       aiThreads,
@@ -517,6 +552,15 @@ export const buildRestoreItemsFromBackup = (dataset: BackupDataset): Array<Recor
         visibilityScope: 'private'
       })
     );
+  }
+
+  for (const partner of dataset.partnerProfiles) {
+    items.push({
+      PK: `USER#${dataset.athleteId}`,
+      SK: `PARTNER#${partner.partnerId}`,
+      entityType: 'PARTNER_PROFILE',
+      ...partner
+    });
   }
 
   for (const comment of dataset.comments) {
