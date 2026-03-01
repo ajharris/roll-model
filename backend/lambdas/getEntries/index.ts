@@ -12,12 +12,19 @@ import { ApiError, errorResponse, response } from '../../shared/responses';
 import { listRecentOneThingCues } from '../../shared/sessionReview';
 import type { Entry } from '../../shared/types';
 
-const sanitizeForCoach = (entry: Entry): Omit<Entry, 'sections'> & { sections: { shared: string } } => ({
-  ...entry,
-  sections: {
-    shared: entry.sections.shared
-  }
-});
+const sanitizeForCoach = (
+  entry: Entry
+): Omit<Entry, 'sections' | 'sessionContext' | 'partnerOutcomes'> & { sections: { shared: string } } => {
+  const { sessionContext: _sessionContext, partnerOutcomes: _partnerOutcomes, ...rest } = entry;
+  void _sessionContext;
+  void _partnerOutcomes;
+  return {
+    ...rest,
+    sections: {
+      shared: entry.sections.shared
+    }
+  };
+};
 
 const hasActionPackIndexParams = (searchRequest: ReturnType<typeof parseEntrySearchRequest>): boolean =>
   Boolean(searchRequest.actionPackField || searchRequest.actionPackToken || searchRequest.actionPackMinConfidence);

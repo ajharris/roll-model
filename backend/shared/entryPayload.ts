@@ -24,6 +24,7 @@ const STRUCTURED_FIELDS: Array<keyof EntryStructuredFields> = [
   'cue',
   'constraint'
 ];
+const CONTEXT_TAG_REGEX = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 const invalid = (message: string): never => {
   throw new ApiError({
@@ -35,6 +36,33 @@ const invalid = (message: string): never => {
 
 const asRecord = (value: unknown): Record<string, unknown> | null =>
   typeof value === 'object' && value !== null && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
+const requireRecord = (value: unknown, message: string): Record<string, unknown> => {
+  const record = asRecord(value);
+  if (record === null) {
+    invalid(message);
+  }
+  return record as Record<string, unknown>;
+};
+
+const validateTagArray = (value: unknown, fieldPath: string): void => {
+  if (!Array.isArray(value) || value.some((tag) => typeof tag !== 'string')) {
+    invalid(`Entry payload is invalid: ${fieldPath} must be an array of strings.`);
+  }
+  for (const tag of value as string[]) {
+    const normalized = tag.trim().toLowerCase();
+    if (!normalized || !CONTEXT_TAG_REGEX.test(normalized)) {
+      invalid(
+        `Entry payload is invalid: ${fieldPath} contains invalid tag "${tag}". Use lowercase kebab-case tags.`,
+      );
+    }
+  }
+};
+
+const validateStringArray = (value: unknown, fieldPath: string): void => {
+  if (!Array.isArray(value) || value.some((item) => typeof item !== 'string')) {
+    invalid(`Entry payload is invalid: ${fieldPath} must be an array of strings.`);
+  }
+};
 
 export const parseEntryPayload = (event: APIGatewayProxyEvent): CreateEntryRequest => {
   if (event.body === null || event.body === undefined) {
@@ -116,6 +144,83 @@ export const parseEntryPayload = (event: APIGatewayProxyEvent): CreateEntryReque
   }
   if (!Array.isArray(sessionMetrics.tags) || sessionMetrics.tags.some((tag) => typeof tag !== 'string')) {
     invalid('Entry payload is invalid: sessionMetrics.tags must be an array of strings.');
+  }
+
+  if (payload.sessionContext !== undefined) {
+    const sessionContext = requireRecord(payload.sessionContext, 'Entry payload is invalid: sessionContext must be an object.');
+    if (sessionContext.ruleset !== undefined && typeof sessionContext.ruleset !== 'string') {
+      invalid('Entry payload is invalid: sessionContext.ruleset must be a string.');
+    }
+    const fatigueLevel = sessionContext.fatigueLevel;
+    if (fatigueLevel !== undefined) {
+      if (typeof fatigueLevel !== 'number' || !Number.isFinite(fatigueLevel)) {
+        invalid('Entry payload is invalid: sessionContext.fatigueLevel must be a number.');
+      }
+      const fatigueValue = fatigueLevel as number;
+      if (fatigueValue < 1 || fatigueValue > 10) {
+        invalid('Entry payload is invalid: sessionContext.fatigueLevel must be between 1 and 10.');
+      }
+    }
+    if (sessionContext.injuryNotes !== undefined) {
+      validateStringArray(sessionContext.injuryNotes, 'sessionContext.injuryNotes');
+    }
+    if (sessionContext.tags !== undefined) {
+      validateTagArray(sessionContext.tags, 'sessionContext.tags');
+    }
+  }
+
+  if (payload.partnerOutcomes !== undefined) {
+    const partnerOutcomes = payload.partnerOutcomes;
+    if (!Array.isArray(partnerOutcomes)) {
+      invalid('Entry payload is invalid: partnerOutcomes must be an array.');
+    }
+    (partnerOutcomes as unknown[]).forEach((item: unknown, index: number) => {
+      const partnerOutcome = requireRecord(item, `Entry payload is invalid: partnerOutcomes[${index}] must be an object.`);
+      if (typeof partnerOutcome.partnerId !== 'string' || partnerOutcome.partnerId.trim().length === 0) {
+        invalid(`Entry payload is invalid: partnerOutcomes[${index}].partnerId must be a non-empty string.`);
+      }
+      if (partnerOutcome.styleTags !== undefined) {
+        validateTagArray(partnerOutcome.styleTags, `partnerOutcomes[${index}].styleTags`);
+      }
+      validateStringArray(partnerOutcome.whatWorked, `partnerOutcomes[${index}].whatWorked`);
+      validateStringArray(partnerOutcome.whatFailed, `partnerOutcomes[${index}].whatFailed`);
+      if (partnerOutcome.partnerDisplayName !== undefined && typeof partnerOutcome.partnerDisplayName !== 'string') {
+        invalid(`Entry payload is invalid: partnerOutcomes[${index}].partnerDisplayName must be a string.`);
+      }
+      if (partnerOutcome.guidance !== undefined) {
+        const guidance = requireRecord(
+          partnerOutcome.guidance,
+          `Entry payload is invalid: partnerOutcomes[${index}].guidance must be an object.`,
+        );
+        if (guidance.draft !== undefined && typeof guidance.draft !== 'string') {
+          invalid(`Entry payload is invalid: partnerOutcomes[${index}].guidance.draft must be a string.`);
+        }
+        if (guidance.final !== undefined && typeof guidance.final !== 'string') {
+          invalid(`Entry payload is invalid: partnerOutcomes[${index}].guidance.final must be a string.`);
+        }
+        if (guidance.coachReview !== undefined) {
+          const coachReview = requireRecord(
+            guidance.coachReview,
+            `Entry payload is invalid: partnerOutcomes[${index}].guidance.coachReview must be an object.`,
+          );
+          if (coachReview.requiresReview !== undefined && typeof coachReview.requiresReview !== 'boolean') {
+            invalid(
+              `Entry payload is invalid: partnerOutcomes[${index}].guidance.coachReview.requiresReview must be a boolean.`,
+            );
+          }
+          if (coachReview.coachNotes !== undefined && typeof coachReview.coachNotes !== 'string') {
+            invalid(
+              `Entry payload is invalid: partnerOutcomes[${index}].guidance.coachReview.coachNotes must be a string.`,
+            );
+          }
+          if (coachReview.reviewedAt !== undefined && typeof coachReview.reviewedAt !== 'string') {
+            invalid(
+              `Entry payload is invalid: partnerOutcomes[${index}].guidance.coachReview.reviewedAt must be a string.`,
+            );
+          }
+        }
+      }
+    });
   }
 
   if (

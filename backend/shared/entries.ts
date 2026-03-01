@@ -1,7 +1,17 @@
 import { normalizeFinalizedSessionReview, normalizeSessionReviewArtifact } from './sessionReview';
-import type { Entry, EntryQuickAdd, EntryStructuredFields, EntryTag, MediaAttachment, MediaClipNote } from './types';
+import type {
+  Entry,
+  EntryQuickAdd,
+  EntryStructuredFields,
+  EntryTag,
+  MediaAttachment,
+  MediaClipNote,
+  PartnerGuidance,
+  PartnerOutcomeNote,
+  SessionContext
+} from './types';
 
-export const CURRENT_ENTRY_SCHEMA_VERSION = 3;
+export const CURRENT_ENTRY_SCHEMA_VERSION = 4;
 
 type EntryRecordEnvelope = {
   PK: string;
@@ -51,6 +61,42 @@ const sanitizeRawTechniqueMentions = (value: unknown): string[] => {
   }
 
   return value.filter((mention): mention is string => typeof mention === 'string');
+};
+
+const sanitizeStringArray = (value: unknown): string[] => {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  const deduped = new Set<string>();
+  for (const item of value) {
+    if (typeof item !== 'string') {
+      continue;
+    }
+    const trimmed = item.trim();
+    if (trimmed) {
+      deduped.add(trimmed);
+    }
+  }
+  return [...deduped];
+};
+
+const sanitizeTagArray = (value: unknown): string[] => {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  const deduped = new Set<string>();
+  for (const item of value) {
+    if (typeof item !== 'string') {
+      continue;
+    }
+    const normalized = item.trim().toLowerCase();
+    if (normalized) {
+      deduped.add(normalized);
+    }
+  }
+  return [...deduped];
 };
 
 const sanitizeString = (value: unknown): string => (typeof value === 'string' ? value.trim() : '');
@@ -122,6 +168,104 @@ const sanitizeEntryTags = (value: unknown, fallback: unknown): EntryTag[] => {
   });
 
   return [...deduped];
+};
+
+const sanitizeCoachReviewState = (value: unknown): PartnerGuidance['coachReview'] => {
+  const record = asRecord(value);
+  if (!record) {
+    return undefined;
+  }
+
+  const coachNotes = sanitizeString(record.coachNotes);
+  const reviewedAt = sanitizeString(record.reviewedAt);
+
+  return {
+    requiresReview: Boolean(record.requiresReview),
+    ...(coachNotes ? { coachNotes } : {}),
+    ...(reviewedAt ? { reviewedAt } : {})
+  };
+};
+
+const sanitizePartnerGuidance = (value: unknown): PartnerGuidance | undefined => {
+  const record = asRecord(value);
+  if (!record) {
+    return undefined;
+  }
+
+  const draft = sanitizeString(record.draft);
+  const final = sanitizeString(record.final);
+  const coachReview = sanitizeCoachReviewState(record.coachReview);
+
+  if (!draft && !final && !coachReview) {
+    return undefined;
+  }
+
+  return {
+    ...(draft ? { draft } : {}),
+    ...(final ? { final } : {}),
+    ...(coachReview ? { coachReview } : {})
+  };
+};
+
+const sanitizeSessionContext = (value: unknown): SessionContext | undefined => {
+  const record = asRecord(value);
+  if (!record) {
+    return undefined;
+  }
+
+  const ruleset = sanitizeString(record.ruleset);
+  const fatigueLevel =
+    typeof record.fatigueLevel === 'number' && Number.isFinite(record.fatigueLevel)
+      ? Math.min(10, Math.max(1, Math.round(record.fatigueLevel)))
+      : undefined;
+  const injuryNotes = sanitizeStringArray(record.injuryNotes);
+  const tags = sanitizeTagArray(record.tags);
+
+  if (!ruleset && fatigueLevel === undefined && injuryNotes.length === 0 && tags.length === 0) {
+    return undefined;
+  }
+
+  return {
+    ...(ruleset ? { ruleset } : {}),
+    ...(fatigueLevel !== undefined ? { fatigueLevel } : {}),
+    injuryNotes,
+    tags
+  };
+};
+
+const sanitizePartnerOutcomes = (value: unknown): PartnerOutcomeNote[] => {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map((item) => {
+      const record = asRecord(item);
+      if (!record) {
+        return null;
+      }
+
+      const partnerId = sanitizeString(record.partnerId);
+      if (!partnerId) {
+        return null;
+      }
+
+      const partnerDisplayName = sanitizeString(record.partnerDisplayName);
+      const styleTags = sanitizeTagArray(record.styleTags);
+      const whatWorked = sanitizeStringArray(record.whatWorked);
+      const whatFailed = sanitizeStringArray(record.whatFailed);
+      const guidance = sanitizePartnerGuidance(record.guidance);
+
+      return {
+        partnerId,
+        ...(partnerDisplayName ? { partnerDisplayName } : {}),
+        styleTags,
+        whatWorked,
+        whatFailed,
+        ...(guidance ? { guidance } : {})
+      };
+    })
+    .filter((item): item is PartnerOutcomeNote => item !== null);
 };
 
 export const isValidMediaUrl = (value: string): boolean => {
@@ -248,6 +392,8 @@ const migrateLegacyEntryV0 = (legacy: LegacyEntryV0): Entry => ({
   quickAdd: sanitizeQuickAdd((legacy as Record<string, unknown>).quickAdd, legacy as unknown as Record<string, unknown>),
   structured: sanitizeStructuredFields((legacy as Record<string, unknown>).structured),
   tags: sanitizeEntryTags((legacy as Record<string, unknown>).tags, legacy.sessionMetrics?.tags),
+  sessionContext: sanitizeSessionContext((legacy as Record<string, unknown>).sessionContext),
+  partnerOutcomes: sanitizePartnerOutcomes((legacy as Record<string, unknown>).partnerOutcomes),
   rawTechniqueMentions: sanitizeRawTechniqueMentions(legacy.rawTechniqueMentions),
   mediaAttachments: sanitizeMediaAttachments(legacy.mediaAttachments)
 });
@@ -266,7 +412,7 @@ export const normalizeEntry = (entry: NormalizableEntryInput): Entry => {
     return migrateLegacyEntryV0(entry as LegacyEntryV0);
   }
 
-  if (schemaVersion !== 2 && schemaVersion !== CURRENT_ENTRY_SCHEMA_VERSION) {
+  if (schemaVersion !== 2 && schemaVersion !== 3 && schemaVersion !== CURRENT_ENTRY_SCHEMA_VERSION) {
     throw new Error(`Unsupported entry schema version: ${String(schemaVersion)}`);
   }
 
@@ -279,6 +425,8 @@ export const normalizeEntry = (entry: NormalizableEntryInput): Entry => {
     quickAdd: sanitizeQuickAdd((entry as Record<string, unknown>).quickAdd, entry as unknown as Record<string, unknown>),
     structured: sanitizeStructuredFields((entry as Record<string, unknown>).structured),
     tags: sanitizeEntryTags((entry as Record<string, unknown>).tags, entry.sessionMetrics?.tags),
+    sessionContext: sanitizeSessionContext((entry as Record<string, unknown>).sessionContext),
+    partnerOutcomes: sanitizePartnerOutcomes((entry as Record<string, unknown>).partnerOutcomes),
     rawTechniqueMentions: sanitizeRawTechniqueMentions(entry.rawTechniqueMentions),
     mediaAttachments: sanitizeMediaAttachments(entry.mediaAttachments),
     ...(sessionReviewDraft ? { sessionReviewDraft } : {}),

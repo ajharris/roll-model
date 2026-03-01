@@ -107,6 +107,9 @@ describe('exportData handler', () => {
       } as unknown as QueryCommandOutput)
       .mockResolvedValueOnce({
         Items: []
+      } as unknown as QueryCommandOutput)
+      .mockResolvedValueOnce({
+        Items: []
       } as unknown as QueryCommandOutput);
 
     const result = (await handler(buildEvent(), {} as never, () => undefined)) as APIGatewayProxyResult;
@@ -118,21 +121,27 @@ describe('exportData handler', () => {
       full: {
         athleteId: string;
         entries: Array<{ entryId: string }>;
+        partnerProfiles: Array<{ partnerId: string }>;
         comments: Array<{ commentId: string }>;
       };
-      tidy: { entries: Array<{ entryId: string }>; comments: Array<{ commentId: string }> };
+      tidy: { entries: Array<{ entryId: string }>; partnerProfiles: Array<{ partnerId: string }>; comments: Array<{ commentId: string }> };
     };
     expect(body.schemaVersion).toBe('2026-02-27');
     expect(body.generatedAt).toBeDefined();
     expect(body.full.athleteId).toBe('athlete-1');
     expect(body.full.entries[0].entryId).toBe('entry-1');
+    expect(body.full.partnerProfiles).toHaveLength(0);
     expect(body.full.comments[0].commentId).toBe('comment-1');
     expect(body.tidy.entries).toHaveLength(1);
+    expect(body.tidy.partnerProfiles).toHaveLength(0);
     expect(body.tidy.comments).toHaveLength(1);
   });
 
   it('returns tidy only when mode=tidy', async () => {
     mockQueryItems
+      .mockResolvedValueOnce({
+        Items: []
+      } as unknown as QueryCommandOutput)
       .mockResolvedValueOnce({
         Items: []
       } as unknown as QueryCommandOutput)

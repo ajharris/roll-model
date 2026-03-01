@@ -27,6 +27,42 @@ export interface SessionMetrics {
   tags: string[];
 }
 
+export interface SessionContext {
+  ruleset?: string;
+  fatigueLevel?: number;
+  injuryNotes: string[];
+  tags: string[];
+}
+
+export interface PartnerGuidance {
+  draft?: string;
+  final?: string;
+  coachReview?: CoachReviewState;
+}
+
+export type PartnerProfileVisibility = 'private' | 'shared-with-coach';
+
+export interface PartnerOutcomeNote {
+  partnerId: string;
+  partnerDisplayName?: string;
+  styleTags: string[];
+  whatWorked: string[];
+  whatFailed: string[];
+  guidance?: PartnerGuidance;
+}
+
+export interface PartnerProfile {
+  partnerId: string;
+  athleteId: string;
+  displayName: string;
+  styleTags: string[];
+  notes?: string;
+  visibility: PartnerProfileVisibility;
+  guidance?: PartnerGuidance;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Entry {
   entryId: string;
   athleteId: string;
@@ -35,6 +71,8 @@ export interface Entry {
   schemaVersion?: number;
   sections: EntrySections;
   sessionMetrics: SessionMetrics;
+  sessionContext?: SessionContext;
+  partnerOutcomes?: PartnerOutcomeNote[];
   rawTechniqueMentions: string[];
   mediaAttachments?: MediaAttachment[];
   templateId?: EntryTemplateId;
@@ -52,6 +90,8 @@ export interface CommentPayload {
 export interface EntryCreatePayload {
   sections: EntrySections;
   sessionMetrics: SessionMetrics;
+  sessionContext?: SessionContext;
+  partnerOutcomes?: PartnerOutcomeNote[];
   rawTechniqueMentions: string[];
   mediaAttachments?: MediaAttachment[];
   templateId?: EntryTemplateId;
@@ -199,6 +239,12 @@ export interface EntrySearchRequest {
   outcome?: string;
   classType?: string;
   tag?: string;
+  contextTag?: string;
+  ruleset?: string;
+  minFatigue?: string;
+  maxFatigue?: string;
+  partnerId?: string;
+  partnerStyleTag?: string;
   giOrNoGi?: '' | 'gi' | 'no-gi';
   minIntensity?: string;
   maxIntensity?: string;
@@ -267,6 +313,7 @@ export interface RestoreDataResult {
   athleteId: string;
   counts: {
     entries: number;
+    partnerProfiles: number;
     comments: number;
     links: number;
     aiThreads: number;
@@ -320,6 +367,14 @@ export interface SavedEntrySearchUpsertPayload {
   sortDirection: SavedEntrySearchSortDirection;
   isPinned?: boolean;
   isFavorite?: boolean;
+}
+
+export interface UpsertPartnerProfilePayload {
+  displayName: string;
+  styleTags: string[];
+  notes?: string;
+  visibility?: PartnerProfileVisibility;
+  guidance?: PartnerGuidance;
 }
 
 export type GapInsightType = 'not_training' | 'stale_skill' | 'repeated_failure';

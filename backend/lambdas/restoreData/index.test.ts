@@ -102,6 +102,22 @@ describe('restoreData handler', () => {
         Items: [
           {
             PK: 'USER#athlete-1',
+            SK: 'PARTNER#partner-1',
+            entityType: 'PARTNER_PROFILE',
+            partnerId: 'partner-1',
+            athleteId: 'athlete-1',
+            displayName: 'Alex',
+            styleTags: ['pressure-passer'],
+            visibility: 'private',
+            createdAt: '2024-01-01T00:00:00.000Z',
+            updatedAt: '2024-01-02T00:00:00.000Z'
+          }
+        ]
+      } as unknown as QueryCommandOutput)
+      .mockResolvedValueOnce({
+        Items: [
+          {
+            PK: 'USER#athlete-1',
             SK: 'AI_THREAD#thread-1',
             entityType: 'AI_THREAD',
             threadId: 'thread-1',
@@ -145,6 +161,7 @@ describe('restoreData handler', () => {
         entries: Array<Record<string, unknown>>;
         comments: Array<Record<string, unknown>>;
         links: Array<Record<string, unknown>>;
+        partnerProfiles: Array<Record<string, unknown>>;
         aiThreads: Array<Record<string, unknown>>;
         aiMessages: Array<Record<string, unknown>>;
         weeklyPlans: Array<Record<string, unknown>>;
@@ -190,6 +207,12 @@ describe('restoreData handler', () => {
         },
         {
           PK: 'USER#athlete-1',
+          SK: 'PARTNER#partner-1',
+          entityType: 'PARTNER_PROFILE',
+          ...exportedPayload.full.partnerProfiles[0]
+        },
+        {
+          PK: 'USER#athlete-1',
           SK: 'AI_THREAD#thread-1',
           entityType: 'AI_THREAD',
           ...exportedPayload.full.aiThreads[0]
@@ -207,6 +230,7 @@ describe('restoreData handler', () => {
       restored: boolean;
       counts: {
         entries: number;
+        partnerProfiles: number;
         comments: number;
         links: number;
         aiThreads: number;
@@ -222,6 +246,7 @@ describe('restoreData handler', () => {
     };
     expect(restoreBody.restored).toBe(true);
     expect(restoreBody.counts.entries).toBe(1);
+    expect(restoreBody.counts.partnerProfiles).toBe(1);
     expect(restoreBody.counts.comments).toBe(1);
     expect(restoreBody.counts.links).toBe(1);
     expect(restoreBody.counts.aiThreads).toBe(1);
@@ -232,7 +257,7 @@ describe('restoreData handler', () => {
     expect(restoreBody.counts.curriculumRelationships).toBe(0);
     expect(restoreBody.counts.curriculumProgressions).toBe(0);
     expect(restoreBody.counts.curriculumGraph).toBe(0);
-    expect(restoreBody.counts.itemsWritten).toBeGreaterThanOrEqual(6);
+    expect(restoreBody.counts.itemsWritten).toBeGreaterThanOrEqual(7);
   });
 
   it('rejects incompatible backup schema version with clear error', async () => {

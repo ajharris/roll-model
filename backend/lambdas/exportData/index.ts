@@ -14,6 +14,7 @@ import type {
   Comment,
   CurriculumGraph,
   CurriculumStage,
+  PartnerProfile,
   Skill,
   SkillProgress,
   SkillRelationship,
@@ -107,12 +108,19 @@ const baseHandler: APIGatewayProxyHandler = async (event) => {
       })
     );
 
-    const [linksResult, threadsResult, weeklyPlansResult, curriculumResult, curriculumGraphResult] = await Promise.all([
+    const [linksResult, partnersResult, threadsResult, weeklyPlansResult, curriculumResult, curriculumGraphResult] = await Promise.all([
       queryItems({
         KeyConditionExpression: 'PK = :pk AND begins_with(SK, :linkPrefix)',
         ExpressionAttributeValues: {
           ':pk': `USER#${auth.userId}`,
           ':linkPrefix': 'COACH#'
+        }
+      }),
+      queryItems({
+        KeyConditionExpression: 'PK = :pk AND begins_with(SK, :partnerPrefix)',
+        ExpressionAttributeValues: {
+          ':pk': `USER#${auth.userId}`,
+          ':partnerPrefix': 'PARTNER#'
         }
       }),
       queryItems({
@@ -165,6 +173,18 @@ const baseHandler: APIGatewayProxyHandler = async (event) => {
         });
       });
 
+    const partnerProfiles = (partnersResult.Items ?? [])
+      .filter((item) => item.entityType === 'PARTNER_PROFILE')
+      .map((item) =>
+        stripKeys(
+          item as PartnerProfile & {
+            PK: string;
+            SK: string;
+            entityType: string;
+          }
+        )
+      );
+
     const weeklyPlans: WeeklyPlan[] = (weeklyPlansResult.Items ?? [])
       .filter((item) => item.entityType === 'WEEKLY_PLAN')
       .map((item) => parseWeeklyPlanRecord(item as Record<string, unknown>));
@@ -216,6 +236,7 @@ const baseHandler: APIGatewayProxyHandler = async (event) => {
     const fullExport = {
       athleteId: auth.userId,
       entries,
+      partnerProfiles,
       comments,
       links,
       aiThreads,
@@ -233,6 +254,7 @@ const baseHandler: APIGatewayProxyHandler = async (event) => {
         athleteId: auth.userId
       },
       entries,
+      partnerProfiles,
       comments,
       links,
       aiThreads,

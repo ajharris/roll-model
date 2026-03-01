@@ -89,6 +89,7 @@ describe('buildWeeklyPlanFromSignals', () => {
     expect(plan.conditioningConstraint).toContain('frames first');
     expect(plan.drills.length).toBeGreaterThan(0);
     expect(plan.positionalRounds.length).toBeGreaterThan(0);
+    expect(plan.positionalFocus.cards.length).toBeGreaterThan(0);
     expect(plan.constraints.length).toBeGreaterThan(0);
 
     const primaryExplain = plan.explainability.find((item) => item.selectionType === 'primary-skill');
@@ -110,6 +111,28 @@ describe('buildWeeklyPlanFromSignals', () => {
       drills: [{ id: 'drill-1', label: 'd', status: 'pending' }],
       positionalRounds: [{ id: 'round-1', label: 'r', status: 'done' }],
       constraints: [{ id: 'constraint-1', label: 'c', status: 'done' }],
+      positionalFocus: {
+        cards: [
+          {
+            id: 'focus-1',
+            title: 'Fix: knee cut underhook leak',
+            focusType: 'carry-over',
+            priority: 1,
+            position: 'half guard top',
+            context: 'no-gi | live rounds',
+            successCriteria: ['Run 4 rounds from half guard top.'],
+            rationale: 'Carry over unresolved leak.',
+            linkedOneThingCues: ['win head position first'],
+            recurringFailures: ['late underhook in knee cut pass'],
+            references: [],
+            status: 'pending'
+          }
+        ],
+        locked: true,
+        lockedAt: '2026-02-17T00:00:00.000Z',
+        lockedBy: 'athlete-1',
+        updatedAt: '2026-02-17T00:00:00.000Z'
+      },
       explainability: []
     };
 
@@ -127,5 +150,68 @@ describe('buildWeeklyPlanFromSignals', () => {
       item.references.some((reference) => reference.sourceType === 'weekly-plan' && reference.sourceId === 'plan-1')
     );
     expect(hasPriorRef).toBe(true);
+    expect(plan.positionalFocus.cards[0]?.focusType).toBe('carry-over');
+  });
+
+  it('balances remediation and reinforcement from changing log signals', () => {
+    const entryA = buildEntry({
+      entryId: 'entry-a',
+      createdAt: '2026-02-26T00:00:00.000Z',
+      actionPackFinal: {
+        actionPack: {
+          wins: ['strong knee cut finish'],
+          leaks: ['losing far-side underhook from half guard top'],
+          oneFocus: 'head first in passing',
+          drills: ['half guard top knee cut reps'],
+          positionalRequests: ['half guard top'],
+          fallbackDecisionGuidance: 'recover frames before re-pass',
+          confidenceFlags: []
+        },
+        finalizedAt: '2026-02-26T00:00:00.000Z'
+      },
+      sessionReviewFinal: {
+        review: {
+          promptSet: {
+            whatWorked: ['knee cut entry timing'],
+            whatFailed: ['lost underhook and got swept'],
+            whatToAskCoach: [],
+            whatToDrillSolo: ['head position while pummeling']
+          },
+          oneThing: 'Head first before switching hips',
+          confidenceFlags: []
+        },
+        finalizedAt: '2026-02-26T00:00:00.000Z'
+      }
+    });
+    const entryB = buildEntry({
+      entryId: 'entry-b',
+      createdAt: '2026-02-25T00:00:00.000Z',
+      actionPackFinal: {
+        actionPack: {
+          wins: ['strong knee cut finish'],
+          leaks: ['losing far-side underhook from half guard top'],
+          oneFocus: 'head first in passing',
+          drills: ['half guard top pummel to knee cut'],
+          positionalRequests: ['half guard top'],
+          fallbackDecisionGuidance: 'recover frames before re-pass',
+          confidenceFlags: []
+        },
+        finalizedAt: '2026-02-25T00:00:00.000Z'
+      }
+    });
+
+    const plan = buildWeeklyPlanFromSignals({
+      entries: [entryA, entryB],
+      checkoffs: [],
+      curriculumGraph: null,
+      priorPlans: [],
+      weekOf: '2026-02-25',
+      nowIso: '2026-02-27T00:00:00.000Z'
+    });
+
+    expect(plan.positionalFocus.cards.some((card) => card.focusType === 'remediate-weakness')).toBe(true);
+    expect(plan.positionalFocus.cards.some((card) => card.focusType === 'reinforce-strength')).toBe(true);
+    expect(plan.positionalFocus.cards[0]?.rationale.toLowerCase()).toContain('recurring');
+    expect(plan.positionalFocus.cards[0]?.linkedOneThingCues.length).toBeGreaterThan(0);
   });
 });
