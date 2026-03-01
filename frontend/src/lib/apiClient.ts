@@ -12,6 +12,7 @@ import type {
   EntryCreatePayload,
   EntrySearchRequest,
   FeedbackPayload,
+  FeedbackSubmissionResult,
   GapPriorityOverride,
   GapInsightsReport,
   ProgressAnnotationScope,
@@ -503,7 +504,7 @@ export const apiClient = {
       body: JSON.stringify(payload),
     }),
   submitFeedback: (payload: FeedbackPayload) =>
-    request<{ issueNumber: number; issueUrl: string }>('/feedback', {
+    request<FeedbackSubmissionResult>('/feedback', {
       method: 'POST',
       body: JSON.stringify(payload),
     }),

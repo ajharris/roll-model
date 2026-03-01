@@ -726,6 +726,86 @@ Chat endpoint for AI-assisted post-training analysis.
 - Default context uses latest 10 entries plus latest 20 messages in the thread.
 - Keyword search considers up to 8 unique tokens and up to 10 matched entries by overlap and recency.
 
+## `POST /feedback`
+Submit structured in-app feature/bug feedback from authenticated users.
+- **Role**: `athlete`, `coach`, or `admin`
+- **Auth gate**: Cognito JWT required.
+
+**Request JSON schema**
+```json
+{
+  "type": "object",
+  "required": [
+    "type",
+    "problem",
+    "proposedChange",
+    "contextSteps",
+    "severity",
+    "screenshots",
+    "previewConfirmed"
+  ],
+  "properties": {
+    "type": {"type": "string", "enum": ["bug", "feature"]},
+    "problem": {"type": "string", "minLength": 12, "maxLength": 3000},
+    "proposedChange": {"type": "string", "minLength": 12, "maxLength": 3000},
+    "contextSteps": {"type": "string", "minLength": 12, "maxLength": 3000},
+    "severity": {"type": "string", "enum": ["low", "medium", "high", "critical"]},
+    "screenshots": {
+      "type": "array",
+      "maxItems": 5,
+      "items": {
+        "type": "object",
+        "required": ["url"],
+        "properties": {
+          "url": {"type": "string", "pattern": "^https://"},
+          "caption": {"type": "string", "maxLength": 240}
+        }
+      }
+    },
+    "reviewerWorkflow": {
+      "type": "object",
+      "properties": {
+        "requiresReview": {"type": "boolean"},
+        "reviewerRole": {"type": "string", "enum": ["coach", "admin"]},
+        "note": {"type": "string", "maxLength": 500}
+      }
+    },
+    "normalization": {
+      "type": "object",
+      "properties": {
+        "usedGpt": {"type": "boolean"},
+        "originalProblem": {"type": "string"},
+        "originalProposedChange": {"type": "string"}
+      }
+    },
+    "previewConfirmed": {"type": "boolean", "const": true}
+  }
+}
+```
+
+**Response JSON schema (201)**
+```json
+{
+  "type": "object",
+  "required": ["feedbackId", "issueNumber", "issueUrl"],
+  "properties": {
+    "feedbackId": {"type": "string"},
+    "issueNumber": {"type": "integer"},
+    "issueUrl": {"type": "string"}
+  }
+}
+```
+
+**Storage + automation linkage**
+- Final payloads are persisted in DynamoDB as `FEEDBACK_SUBMISSION` records.
+- Each stored payload includes reporter metadata plus linked GitHub issue number/URL for downstream issue automation.
+- Reviewer-routing submissions are marked `pending_reviewer_validation` and labeled for coach/admin triage.
+
+**Attachment strategy**
+- Current strategy is URL-based screenshot references (`https://...`) in payload and issue body.
+- This keeps submissions lightweight while preserving deterministic references for reviewers and issue automation.
+- File upload can be added later with pre-signed object storage URLs without changing reviewer workflow semantics.
+
 ## Error format and codes
 **Error JSON schema**
 ```json
