@@ -58,7 +58,7 @@ export const AppShell = ({ children }: { children: ReactNode }) => {
                 </>
               )}
               <Link href="/feedback" className="button-link">
-                Feedback
+                Suggest a feature
               </Link>
               <button
                 onClick={() => {

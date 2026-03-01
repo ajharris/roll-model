@@ -1,6 +1,12 @@
 import type { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 
+import { putItem } from '../../shared/db';
+
 import { handler } from './index';
+
+jest.mock('../../shared/db');
+
+const mockPutItem = jest.mocked(putItem);
 
 const buildEvent = (body?: Record<string, unknown>, claims?: Record<string, string>): APIGatewayProxyEvent =>
   ({
@@ -14,10 +20,24 @@ const buildEvent = (body?: Record<string, unknown>, claims?: Record<string, stri
     }
   }) as unknown as APIGatewayProxyEvent;
 
+const validPayload = {
+  type: 'bug',
+  problem: 'When I submit from mobile, the save button does nothing.',
+  proposedChange: 'Disable the button while loading and show an inline error message on failure.',
+  contextSteps: 'Open on iPhone Safari, tap Save with weak connection, observe no feedback or retry.',
+  severity: 'high',
+  screenshots: [{ url: 'https://example.com/screenshot-1.png', caption: 'Button remains active' }],
+  reviewerWorkflow: { requiresReview: true, reviewerRole: 'coach', note: 'Please sanity-check priority.' },
+  normalization: { usedGpt: true, originalProblem: 'save broke on phone' },
+  previewConfirmed: true
+} as const;
+
 describe('submitFeedback handler', () => {
   beforeEach(() => {
     process.env.GITHUB_TOKEN = 'token-123';
     process.env.GITHUB_REPO = 'owner/repo';
+    mockPutItem.mockReset();
+    mockPutItem.mockResolvedValue(undefined);
     global.fetch = jest.fn().mockResolvedValue({
       ok: true,
       json: async () => ({ number: 42, html_url: 'https://github.com/owner/repo/issues/42' })
@@ -31,7 +51,7 @@ describe('submitFeedback handler', () => {
   it('creates a GitHub issue', async () => {
     const result = (await handler(
       buildEvent(
-        { type: 'bug', title: 'Login fails', details: 'Details here', steps: 'Step 1', expected: 'Works', actual: 'Fails' },
+        validPayload,
         { sub: 'user-1', 'custom:role': 'athlete', email: 'user@example.com' }
       ),
       {} as never,
@@ -47,12 +67,23 @@ describe('submitFeedback handler', () => {
         method: 'POST'
       })
     );
+    expect(mockPutItem).toHaveBeenCalledTimes(1);
+    expect(mockPutItem).toHaveBeenCalledWith(
+      expect.objectContaining({
+        Item: expect.objectContaining({
+          entityType: 'FEEDBACK_SUBMISSION',
+          athleteId: 'user-1',
+          github: expect.objectContaining({ issueNumber: 42 }),
+          status: 'pending_reviewer_validation'
+        })
+      })
+    );
   });
 
   it('rejects invalid payloads', async () => {
     const result = (await handler(
       buildEvent(
-        { type: 'unknown', title: 'Bad', details: 'Nope' },
+        { ...validPayload, type: 'unknown' },
         { sub: 'user-1', 'custom:role': 'athlete' }
       ),
       {} as never,
@@ -64,12 +95,28 @@ describe('submitFeedback handler', () => {
     expect(body.error.code).toBe('INVALID_REQUEST');
   });
 
+  it('rejects submission without preview confirmation', async () => {
+    const result = (await handler(
+      buildEvent(
+        { ...validPayload, previewConfirmed: false },
+        { sub: 'user-1', 'custom:role': 'athlete' }
+      ),
+      {} as never,
+      () => undefined
+    )) as APIGatewayProxyResult;
+
+    expect(result.statusCode).toBe(400);
+    const body = JSON.parse(result.body) as { error: { code: string; message: string } };
+    expect(body.error.code).toBe('INVALID_REQUEST');
+    expect(body.error.message).toContain('Preview confirmation');
+  });
+
   it('requires GitHub configuration', async () => {
     delete process.env.GITHUB_TOKEN;
     delete process.env.GITHUB_REPO;
 
     const result = (await handler(
-      buildEvent({ type: 'bug', title: 'Missing token', details: 'Details here' }, { sub: 'user-1', 'custom:role': 'athlete' }),
+      buildEvent(validPayload, { sub: 'user-1', 'custom:role': 'athlete' }),
       {} as never,
       () => undefined
     )) as APIGatewayProxyResult;
@@ -86,7 +133,15 @@ describe('submitFeedback handler', () => {
     }) as unknown as typeof fetch;
 
     const result = (await handler(
-      buildEvent({ type: 'feature', title: 'New idea', details: 'Details here' }, { sub: 'user-1', 'custom:role': 'athlete' }),
+      buildEvent(
+        {
+          ...validPayload,
+          type: 'feature',
+          reviewerWorkflow: { requiresReview: false },
+          screenshots: []
+        },
+        { sub: 'user-1', 'custom:role': 'athlete' }
+      ),
       {} as never,
       () => undefined
     )) as APIGatewayProxyResult;
@@ -107,5 +162,17 @@ describe('submitFeedback handler', () => {
     expect(result.statusCode).toBe(401);
     const body = JSON.parse(result.body) as { error: { code: string } };
     expect(body.error.code).toBe('UNAUTHORIZED');
+  });
+
+  it('rejects unsupported roles', async () => {
+    const result = (await handler(
+      buildEvent(validPayload, { sub: 'user-1', 'custom:role': 'unknown-role' }),
+      {} as never,
+      () => undefined
+    )) as APIGatewayProxyResult;
+
+    expect(result.statusCode).toBe(403);
+    const body = JSON.parse(result.body) as { error: { code: string } };
+    expect(body.error.code).toBe('INVALID_ROLE');
   });
 });

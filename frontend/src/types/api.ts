@@ -326,15 +326,42 @@ export interface ChatThread {
   messages: ChatMessage[];
 }
 
-export type FeedbackType = 'bug' | 'feature' | 'other';
+export type FeedbackType = 'bug' | 'feature';
+export type FeedbackSeverity = 'low' | 'medium' | 'high' | 'critical';
+
+export interface FeedbackScreenshotAttachment {
+  url: string;
+  caption?: string;
+}
+
+export interface FeedbackReviewerWorkflow {
+  requiresReview: boolean;
+  reviewerRole?: 'coach' | 'admin';
+  note?: string;
+}
+
+export interface FeedbackNormalizationState {
+  usedGpt: boolean;
+  originalProblem?: string;
+  originalProposedChange?: string;
+}
 
 export interface FeedbackPayload {
   type: FeedbackType;
-  title: string;
-  details: string;
-  steps?: string;
-  expected?: string;
-  actual?: string;
+  problem: string;
+  proposedChange: string;
+  contextSteps: string;
+  severity: FeedbackSeverity;
+  screenshots: FeedbackScreenshotAttachment[];
+  reviewerWorkflow?: FeedbackReviewerWorkflow;
+  normalization?: FeedbackNormalizationState;
+  previewConfirmed: boolean;
+}
+
+export interface FeedbackSubmissionResult {
+  feedbackId: string;
+  issueNumber: number;
+  issueUrl: string;
 }
 
 export interface SignupRequestPayload {

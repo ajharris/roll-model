@@ -162,14 +162,27 @@ describe('apiClient', () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       status: 201,
-      json: async () => ({ issueNumber: 5, issueUrl: 'https://github.com/example/issues/5' }),
+      json: async () => ({
+        feedbackId: 'feedback-1',
+        issueNumber: 5,
+        issueUrl: 'https://github.com/example/issues/5',
+      }),
     });
     vi.stubGlobal('fetch', fetchMock);
 
     const { apiClient, configureApiClient } = await import('./apiClient');
     configureApiClient(() => 'jwt-token');
 
-    const response = await apiClient.submitFeedback({ type: 'bug', title: 'Bug', details: 'Details' });
+    const response = await apiClient.submitFeedback({
+      type: 'bug',
+      problem: 'When I submit feedback from mobile, the form hangs.',
+      proposedChange: 'Show progress + disable submit while pending.',
+      contextSteps: 'Open iOS Safari, fill form, tap submit on weak LTE.',
+      severity: 'high',
+      screenshots: [{ url: 'https://example.com/screenshot.png' }],
+      previewConfirmed: true,
+      reviewerWorkflow: { requiresReview: false },
+    });
 
     expect(response.issueNumber).toBe(5);
     expect(fetchMock).toHaveBeenCalledWith(
