@@ -278,6 +278,16 @@ export class RollModelStack extends cdk.Stack {
       'backend/lambdas/reviewCurriculumProgress/index.ts',
       table
     );
+    const listCurriculumRecommendationsLambda = this.createLambda(
+      'listCurriculumRecommendations',
+      'backend/lambdas/listCurriculumRecommendations/index.ts',
+      table
+    );
+    const updateCurriculumRecommendationLambda = this.createLambda(
+      'updateCurriculumRecommendation',
+      'backend/lambdas/updateCurriculumRecommendation/index.ts',
+      table
+    );
     const seedCurriculumLambda = this.createLambda('seedCurriculum', 'backend/lambdas/seedCurriculum/index.ts', table);
     const backendLambdas: Array<{ name: string; fn: nodejs.NodejsFunction }> = [
       { name: 'createEntry', fn: createEntryLambda },
@@ -316,6 +326,8 @@ export class RollModelStack extends cdk.Stack {
       { name: 'deleteCurriculumRelationship', fn: deleteCurriculumRelationshipLambda },
       { name: 'recomputeCurriculumProgress', fn: recomputeCurriculumProgressLambda },
       { name: 'reviewCurriculumProgress', fn: reviewCurriculumProgressLambda },
+      { name: 'listCurriculumRecommendations', fn: listCurriculumRecommendationsLambda },
+      { name: 'updateCurriculumRecommendation', fn: updateCurriculumRecommendationLambda },
       { name: 'seedCurriculum', fn: seedCurriculumLambda }
     ];
 
@@ -662,6 +674,28 @@ export class RollModelStack extends cdk.Stack {
       allowMethods: ['PUT', 'OPTIONS'],
       allowHeaders: ['Content-Type', 'Authorization']
     });
+    const curriculumRecommendations = curriculum.addResource('recommendations');
+    curriculumRecommendations.addMethod(
+      'GET',
+      new apigateway.LambdaIntegration(listCurriculumRecommendationsLambda),
+      methodOptions
+    );
+    curriculumRecommendations.addCorsPreflight({
+      allowOrigins: apigateway.Cors.ALL_ORIGINS,
+      allowMethods: ['GET', 'OPTIONS'],
+      allowHeaders: ['Content-Type', 'Authorization']
+    });
+    const curriculumRecommendationById = curriculumRecommendations.addResource('{recommendationId}');
+    curriculumRecommendationById.addMethod(
+      'PUT',
+      new apigateway.LambdaIntegration(updateCurriculumRecommendationLambda),
+      methodOptions
+    );
+    curriculumRecommendationById.addCorsPreflight({
+      allowOrigins: apigateway.Cors.ALL_ORIGINS,
+      allowMethods: ['PUT', 'OPTIONS'],
+      allowHeaders: ['Content-Type', 'Authorization']
+    });
 
     const athletes = api.root.addResource('athletes');
     const athleteById = athletes.addResource('{athleteId}');
@@ -849,6 +883,28 @@ export class RollModelStack extends cdk.Stack {
       methodOptions
     );
     athleteCurriculumProgressReview.addCorsPreflight({
+      allowOrigins: apigateway.Cors.ALL_ORIGINS,
+      allowMethods: ['PUT', 'OPTIONS'],
+      allowHeaders: ['Content-Type', 'Authorization']
+    });
+    const athleteCurriculumRecommendations = athleteCurriculum.addResource('recommendations');
+    athleteCurriculumRecommendations.addMethod(
+      'GET',
+      new apigateway.LambdaIntegration(listCurriculumRecommendationsLambda),
+      methodOptions
+    );
+    athleteCurriculumRecommendations.addCorsPreflight({
+      allowOrigins: apigateway.Cors.ALL_ORIGINS,
+      allowMethods: ['GET', 'OPTIONS'],
+      allowHeaders: ['Content-Type', 'Authorization']
+    });
+    const athleteCurriculumRecommendationById = athleteCurriculumRecommendations.addResource('{recommendationId}');
+    athleteCurriculumRecommendationById.addMethod(
+      'PUT',
+      new apigateway.LambdaIntegration(updateCurriculumRecommendationLambda),
+      methodOptions
+    );
+    athleteCurriculumRecommendationById.addCorsPreflight({
       allowOrigins: apigateway.Cors.ALL_ORIGINS,
       allowMethods: ['PUT', 'OPTIONS'],
       allowHeaders: ['Content-Type', 'Authorization']
