@@ -7,8 +7,8 @@ import { parseEntryRecord, sanitizeMediaAttachments, withCurrentEntrySchemaVersi
 import { parseEntryPayload } from '../../shared/entryPayload';
 import { buildKeywordIndexItems, extractEntryTokens } from '../../shared/keywords';
 import { withRequestLogging } from '../../shared/logger';
-import { recomputeAndPersistProgressViews } from '../../shared/progressStore';
 import { hydratePartnerOutcomes } from '../../shared/partners';
+import { recomputeAndPersistProgressViews } from '../../shared/progressStore';
 import { ApiError, errorResponse, response } from '../../shared/responses';
 import { sanitizeTechniqueMentions, upsertTechniqueCandidates } from '../../shared/techniques';
 import type { Entry } from '../../shared/types';
