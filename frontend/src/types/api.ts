@@ -345,6 +345,7 @@ export interface FeedbackNormalizationState {
   originalProblem?: string;
   originalProposedChange?: string;
 }
+export type FeedbackType = 'bug' | 'feature' | 'ui' | 'other';
 
 export interface FeedbackPayload {
   type: FeedbackType;
