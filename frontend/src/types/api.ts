@@ -69,6 +69,8 @@ export interface Entry {
   createdAt: string;
   updatedAt?: string;
   schemaVersion?: number;
+  structured?: EntryStructuredFields;
+  structuredExtraction?: EntryStructuredExtraction;
   sections: EntrySections;
   sessionMetrics: SessionMetrics;
   sessionContext?: SessionContext;
@@ -82,6 +84,51 @@ export interface Entry {
   sessionReviewFinal?: FinalizedSessionReview;
 }
 
+export type EntryStructuredFieldKey = 'position' | 'technique' | 'outcome' | 'problem' | 'cue';
+export type EntryStructuredSuggestionStatus = 'suggested' | 'confirmed' | 'corrected' | 'rejected';
+
+export interface EntryStructuredFields {
+  position?: string;
+  technique?: string;
+  outcome?: string;
+  problem?: string;
+  cue?: string;
+  constraint?: string;
+}
+
+export interface EntryStructuredSuggestion {
+  field: EntryStructuredFieldKey;
+  value: string;
+  confidence: ConfidenceLevel;
+  status: EntryStructuredSuggestionStatus;
+  confirmationPrompt?: string;
+  correctionValue?: string;
+  note?: string;
+  sourceExcerpt?: string;
+  updatedAt: string;
+  updatedByRole?: 'athlete' | 'coach';
+}
+
+export interface EntryStructuredExtraction {
+  generatedAt: string;
+  suggestions: EntryStructuredSuggestion[];
+  concepts: string[];
+  failures: string[];
+  conditioningIssues: string[];
+  confidenceFlags: Array<{
+    field: EntryStructuredFieldKey;
+    confidence: ConfidenceLevel;
+    note?: string;
+  }>;
+}
+
+export interface EntryStructuredMetadataConfirmation {
+  field: EntryStructuredFieldKey;
+  status: 'confirmed' | 'corrected' | 'rejected';
+  correctionValue?: string;
+  note?: string;
+}
+
 export interface CommentPayload {
   entryId: string;
   body: string;
@@ -90,6 +137,8 @@ export interface CommentPayload {
 export interface EntryCreatePayload {
   sections: EntrySections;
   sessionMetrics: SessionMetrics;
+  structured?: EntryStructuredFields;
+  structuredMetadataConfirmations?: EntryStructuredMetadataConfirmation[];
   sessionContext?: SessionContext;
   partnerOutcomes?: PartnerOutcomeNote[];
   rawTechniqueMentions: string[];

@@ -70,6 +70,47 @@ export interface EntryStructuredFields {
   constraint?: string;
 }
 
+export type EntryStructuredFieldKey = 'position' | 'technique' | 'outcome' | 'problem' | 'cue';
+export type EntryStructuredSuggestionStatus = 'suggested' | 'confirmed' | 'corrected' | 'rejected';
+
+export interface EntryStructuredSuggestion {
+  field: EntryStructuredFieldKey;
+  value: string;
+  confidence: ConfidenceLevel;
+  status: EntryStructuredSuggestionStatus;
+  confirmationPrompt?: string;
+  correctionValue?: string;
+  note?: string;
+  sourceExcerpt?: string;
+  updatedAt: string;
+  updatedByRole?: 'athlete' | 'coach';
+}
+
+export interface EntryStructuredExtraction {
+  generatedAt: string;
+  suggestions: EntryStructuredSuggestion[];
+  concepts: string[];
+  failures: string[];
+  conditioningIssues: string[];
+  confidenceFlags: Array<{
+    field: EntryStructuredFieldKey;
+    confidence: ConfidenceLevel;
+    note?: string;
+  }>;
+}
+
+export interface EntryStructuredMetadataConfirmation {
+  field: EntryStructuredFieldKey;
+  status: 'confirmed' | 'corrected' | 'rejected';
+  correctionValue?: string;
+  note?: string;
+}
+
+export interface StructuredMetadataReviewRequest {
+  structured?: EntryStructuredFields;
+  confirmations?: EntryStructuredMetadataConfirmation[];
+}
+
 export type EntryTag =
   | 'guard-type'
   | 'top'
@@ -107,6 +148,7 @@ export interface Entry {
   updatedAt: string;
   quickAdd: EntryQuickAdd;
   structured?: EntryStructuredFields;
+  structuredExtraction?: EntryStructuredExtraction;
   tags: EntryTag[];
   sections: EntrySections;
   sessionMetrics: SessionMetrics;
@@ -144,6 +186,7 @@ export interface CoachLink {
 export interface CreateEntryRequest {
   quickAdd: EntryQuickAdd;
   structured?: EntryStructuredFields;
+  structuredMetadataConfirmations?: EntryStructuredMetadataConfirmation[];
   tags: EntryTag[];
   sections: EntrySections;
   sessionMetrics: SessionMetrics;

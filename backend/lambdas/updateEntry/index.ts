@@ -10,6 +10,7 @@ import { withRequestLogging } from '../../shared/logger';
 import { hydratePartnerOutcomes } from '../../shared/partners';
 import { recomputeAndPersistProgressViews } from '../../shared/progressStore';
 import { ApiError, errorResponse, response } from '../../shared/responses';
+import { extractStructuredMetadata } from '../../shared/structuredExtraction';
 import { sanitizeTechniqueMentions, upsertTechniqueCandidates } from '../../shared/techniques';
 import type { Entry } from '../../shared/types';
 
@@ -98,10 +99,15 @@ const baseHandler: APIGatewayProxyHandler = async (event) => {
     }
 
     const existingEntry = parseEntryRecord(existingEntryResult.Item as Record<string, unknown>);
+    const structuredExtraction = extractStructuredMetadata(payload, {
+      nowIso,
+      actorRole: 'athlete'
+    });
     const updatedEntry: Entry = withCurrentEntrySchemaVersion({
       ...existingEntry,
       quickAdd: payload.quickAdd,
-      structured: payload.structured,
+      structured: structuredExtraction.structured,
+      structuredExtraction: structuredExtraction.extraction,
       tags: payload.tags,
       sections: payload.sections,
       sessionMetrics: payload.sessionMetrics,

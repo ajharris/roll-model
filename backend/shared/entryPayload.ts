@@ -3,7 +3,12 @@ import type { APIGatewayProxyEvent } from 'aws-lambda';
 import { isValidMediaAttachmentsInput } from './entries';
 import { ApiError } from './responses';
 import { normalizeFinalizedSessionReview, normalizeSessionReviewArtifact } from './sessionReview';
-import type { CreateEntryRequest, EntryStructuredFields, EntryTag } from './types';
+import type {
+  CreateEntryRequest,
+  EntryStructuredFieldKey,
+  EntryStructuredFields,
+  EntryTag
+} from './types';
 
 const ENTRY_TAG_VALUES = new Set<EntryTag>([
   'guard-type',
@@ -25,6 +30,7 @@ const STRUCTURED_FIELDS: Array<keyof EntryStructuredFields> = [
   'constraint'
 ];
 const CONTEXT_TAG_REGEX = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const STRUCTURED_FIELD_KEYS = new Set<EntryStructuredFieldKey>(['position', 'technique', 'outcome', 'problem', 'cue']);
 
 const invalid = (message: string): never => {
   throw new ApiError({
@@ -233,6 +239,41 @@ export const parseEntryPayload = (event: APIGatewayProxyEvent): CreateEntryReque
 
   if (!isValidMediaAttachmentsInput(payload.mediaAttachments)) {
     invalid('Entry payload is invalid: mediaAttachments must be an array of objects.');
+  }
+
+  if (payload.structuredMetadataConfirmations !== undefined) {
+    if (!Array.isArray(payload.structuredMetadataConfirmations)) {
+      invalid('Entry payload is invalid: structuredMetadataConfirmations must be an array.');
+    }
+    (payload.structuredMetadataConfirmations as unknown[]).forEach((item, index) => {
+      const record = requireRecord(
+        item,
+        `Entry payload is invalid: structuredMetadataConfirmations[${index}] must be an object.`
+      );
+      if (typeof record.field !== 'string' || !STRUCTURED_FIELD_KEYS.has(record.field as EntryStructuredFieldKey)) {
+        invalid(
+          `Entry payload is invalid: structuredMetadataConfirmations[${index}].field must be one of position, technique, outcome, problem, cue.`
+        );
+      }
+      if (record.status !== 'confirmed' && record.status !== 'corrected' && record.status !== 'rejected') {
+        invalid(
+          `Entry payload is invalid: structuredMetadataConfirmations[${index}].status must be confirmed, corrected, or rejected.`
+        );
+      }
+      if (record.correctionValue !== undefined && typeof record.correctionValue !== 'string') {
+        invalid(
+          `Entry payload is invalid: structuredMetadataConfirmations[${index}].correctionValue must be a string.`
+        );
+      }
+      if (record.note !== undefined && typeof record.note !== 'string') {
+        invalid(`Entry payload is invalid: structuredMetadataConfirmations[${index}].note must be a string.`);
+      }
+      if (record.status === 'corrected' && typeof record.correctionValue !== 'string') {
+        invalid(
+          `Entry payload is invalid: structuredMetadataConfirmations[${index}].correctionValue is required when status is corrected.`
+        );
+      }
+    });
   }
 
   if (payload.sessionReviewDraft !== undefined && !normalizeSessionReviewArtifact(payload.sessionReviewDraft)) {

@@ -23,6 +23,9 @@ import type {
   ActionPackFieldKey,
   Entry,
   EntryCreatePayload,
+  EntryStructuredFieldKey,
+  EntryStructuredFields,
+  EntryStructuredMetadataConfirmation,
   EntryTemplateId,
   CheckoffEvidenceType,
   MediaAttachment,
@@ -40,6 +43,14 @@ type DraftShape = {
   mediaAttachments: MediaAttachment[];
   templateId?: EntryTemplateId;
 };
+
+const STRUCTURED_FIELDS: Array<{ key: EntryStructuredFieldKey; label: string }> = [
+  { key: 'position', label: 'Position' },
+  { key: 'technique', label: 'Technique' },
+  { key: 'outcome', label: 'Outcome' },
+  { key: 'problem', label: 'Problem' },
+  { key: 'cue', label: 'Cue' },
+];
 
 const NEW_ENTRY_DRAFT_KEY = 'new';
 const DEFAULT_TEMPLATE: EntryTemplateId = 'class-notes';
@@ -230,6 +241,8 @@ export default function NewEntryPage() {
   const [actionPack, setActionPack] = useState<ActionPack | null>(null);
   const [coachReviewRequired, setCoachReviewRequired] = useState(false);
   const [coachReviewNotes, setCoachReviewNotes] = useState('');
+  const [structured, setStructured] = useState<EntryStructuredFields>({});
+  const [metadataConfirmations, setMetadataConfirmations] = useState<EntryStructuredMetadataConfirmation[]>([]);
   const router = useRouter();
   const syncStateLabel = syncCounts.failed > 0 ? 'failed' : syncCounts.pending > 0 ? 'pending' : 'synced';
 
@@ -336,10 +349,53 @@ export default function NewEntryPage() {
         rawTechniqueMentions: techniques,
         mediaAttachments: sanitizeAttachments(mediaAttachments),
         templateId,
+        ...(Object.keys(structured).length > 0 ? { structured } : {}),
+        ...(metadataConfirmations.length > 0 ? { structuredMetadataConfirmations: metadataConfirmations } : {}),
         ...(actionPack ? { actionPackDraft: actionPack } : {}),
       }),
-    [actionPack, durationMinutes, giOrNoGi, intensity, mediaAttachments, privateText, rounds, shared, tags, techniques, templateId],
+    [
+      actionPack,
+      durationMinutes,
+      giOrNoGi,
+      intensity,
+      mediaAttachments,
+      metadataConfirmations,
+      privateText,
+      rounds,
+      shared,
+      structured,
+      tags,
+      techniques,
+      templateId,
+    ],
   );
+
+  const upsertConfirmation = (next: EntryStructuredMetadataConfirmation) => {
+    setMetadataConfirmations((current) => {
+      const filtered = current.filter((item) => item.field !== next.field);
+      return [...filtered, next];
+    });
+  };
+
+  const setStructuredField = (field: EntryStructuredFieldKey, value: string) => {
+    const trimmed = value.trim();
+    setStructured((current) => {
+      const next = { ...current };
+      if (trimmed) {
+        next[field] = trimmed;
+      } else {
+        delete next[field];
+      }
+      return next;
+    });
+    if (trimmed) {
+      upsertConfirmation({
+        field,
+        status: 'corrected',
+        correctionValue: trimmed,
+      });
+    }
+  };
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -348,6 +404,7 @@ export default function NewEntryPage() {
     try {
       const saved = await apiClient.createEntry(payload);
       setCreatedEntry(saved);
+      setStructured(saved.structured ?? {});
       clearEntryDraft(NEW_ENTRY_DRAFT_KEY);
       setStatus('Saved.');
       router.push('/entries');
@@ -386,6 +443,7 @@ export default function NewEntryPage() {
     try {
       entryForGpt = await apiClient.createEntry(payload);
       setCreatedEntry(entryForGpt);
+      setStructured(entryForGpt.structured ?? {});
       clearEntryDraft(NEW_ENTRY_DRAFT_KEY);
       setStatus('Saved. Running GPT extraction...');
     } catch {
@@ -673,6 +731,62 @@ export default function NewEntryPage() {
             <button type="button" onClick={finalizeActionPack}>
               Finalize shared feedback
             </button>
+          </div>
+        )}
+
+        {createdEntry?.structuredExtraction && (
+          <div className="panel">
+            <h3>Structured extraction</h3>
+            <p className="small">
+              Confirm or correct suggested metadata. Corrections are one-step and persisted to your record.
+            </p>
+            {createdEntry.structuredExtraction.confidenceFlags.length > 0 && (
+              <p className="small">
+                Uncertain fields:{' '}
+                {createdEntry.structuredExtraction.confidenceFlags
+                  .map((flag) => `${flag.field} (${flag.confidence})`)
+                  .join(', ')}
+              </p>
+            )}
+            {STRUCTURED_FIELDS.map(({ key, label }) => {
+              const suggestion = createdEntry.structuredExtraction?.suggestions.find((item) => item.field === key);
+              return (
+                <div key={key}>
+                  <label htmlFor={`structured-${key}`}>{label}</label>
+                  <input
+                    id={`structured-${key}`}
+                    type="text"
+                    value={structured[key] ?? ''}
+                    onChange={(e) => setStructuredField(key, e.target.value)}
+                    placeholder={suggestion?.value ?? ''}
+                  />
+                  {suggestion?.confirmationPrompt && <p className="small">{suggestion.confirmationPrompt}</p>}
+                  {suggestion && (
+                    <div className="row">
+                      <span className="small">Confidence: {suggestion.confidence}</span>
+                      <button
+                        type="button"
+                        onClick={() => upsertConfirmation({ field: key, status: 'confirmed' })}
+                      >
+                        Confirm
+                      </button>
+                      <button type="button" onClick={() => upsertConfirmation({ field: key, status: 'rejected' })}>
+                        Reject
+                      </button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+            {createdEntry.structuredExtraction.concepts.length > 0 && (
+              <p className="small">Concepts: {createdEntry.structuredExtraction.concepts.join(' | ')}</p>
+            )}
+            {createdEntry.structuredExtraction.failures.length > 0 && (
+              <p className="small">Failures: {createdEntry.structuredExtraction.failures.join(' | ')}</p>
+            )}
+            {createdEntry.structuredExtraction.conditioningIssues.length > 0 && (
+              <p className="small">Conditioning: {createdEntry.structuredExtraction.conditioningIssues.join(' | ')}</p>
+            )}
           </div>
         )}
 

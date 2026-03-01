@@ -5,7 +5,15 @@ import { useState } from 'react';
 
 import { Protected } from '@/components/Protected';
 import { apiClient } from '@/lib/apiClient';
-import type { Entry } from '@/types/api';
+import type { Entry, EntryStructuredFieldKey, EntryStructuredMetadataConfirmation } from '@/types/api';
+
+const STRUCTURED_FIELDS: Array<{ key: EntryStructuredFieldKey; label: string }> = [
+  { key: 'position', label: 'Position' },
+  { key: 'technique', label: 'Technique' },
+  { key: 'outcome', label: 'Outcome' },
+  { key: 'problem', label: 'Problem' },
+  { key: 'cue', label: 'Cue' },
+];
 
 export default function CoachPage() {
   const [athleteId, setAthleteId] = useState('');
@@ -13,6 +21,8 @@ export default function CoachPage() {
   const [selected, setSelected] = useState<Entry | null>(null);
   const [comment, setComment] = useState('');
   const [localComments, setLocalComments] = useState<Record<string, string[]>>({});
+  const [structuredDraft, setStructuredDraft] = useState<Partial<Record<EntryStructuredFieldKey, string>>>({});
+  const [confirmations, setConfirmations] = useState<EntryStructuredMetadataConfirmation[]>([]);
   const [status, setStatus] = useState('');
 
   const load = async (event: FormEvent) => {
@@ -39,6 +49,61 @@ export default function CoachPage() {
     }
   };
 
+  const selectEntry = (entry: Entry) => {
+    setSelected(entry);
+    setStructuredDraft({
+      position: entry.structured?.position ?? '',
+      technique: entry.structured?.technique ?? '',
+      outcome: entry.structured?.outcome ?? '',
+      problem: entry.structured?.problem ?? '',
+      cue: entry.structured?.cue ?? '',
+    });
+    setConfirmations([]);
+  };
+
+  const upsertConfirmation = (next: EntryStructuredMetadataConfirmation) => {
+    setConfirmations((current) => [...current.filter((item) => item.field !== next.field), next]);
+  };
+
+  const setStructuredField = (field: EntryStructuredFieldKey, value: string) => {
+    setStructuredDraft((current) => ({ ...current, [field]: value }));
+    const trimmed = value.trim();
+    if (trimmed) {
+      upsertConfirmation({
+        field,
+        status: 'corrected',
+        correctionValue: trimmed,
+      });
+    }
+  };
+
+  const saveStructuredReview = async () => {
+    if (!selected) return;
+
+    try {
+      const structured = Object.fromEntries(
+        Object.entries(structuredDraft).filter(([, value]) => typeof value === 'string' && value.trim())
+      );
+      const updated = await apiClient.reviewEntryStructuredMetadata(selected.entryId, {
+        structured,
+        confirmations,
+      });
+      setSelected(updated);
+      setEntries((current) => current.map((entry) => (entry.entryId === updated.entryId ? updated : entry)));
+      setStructuredDraft({
+        position: updated.structured?.position ?? '',
+        technique: updated.structured?.technique ?? '',
+        outcome: updated.structured?.outcome ?? '',
+        problem: updated.structured?.problem ?? '',
+        cue: updated.structured?.cue ?? '',
+      });
+      setConfirmations([]);
+      setStatus('Structured metadata review saved.');
+    } catch {
+      setStatus('Could not save structured metadata review.');
+    }
+  };
+
   return (
     <Protected allow={['coach']}>
       <section>
@@ -52,7 +117,7 @@ export default function CoachPage() {
         <div className="grid">
           <div>
             {entries.map((entry) => (
-              <button key={entry.entryId} className="list-item" onClick={() => setSelected(entry)}>
+              <button key={entry.entryId} className="list-item" onClick={() => selectEntry(entry)}>
                 {new Date(entry.createdAt).toLocaleDateString()} - {entry.sections.shared.slice(0, 60)}
               </button>
             ))}
@@ -79,6 +144,44 @@ export default function CoachPage() {
                     </p>
                   </>
                 )}
+                <h4>Structured metadata review</h4>
+                {STRUCTURED_FIELDS.map(({ key, label }) => {
+                  const suggestion = selected.structuredExtraction?.suggestions.find((item) => item.field === key);
+                  return (
+                    <div key={key}>
+                      <label htmlFor={`coach-structured-${key}`}>{label}</label>
+                      <input
+                        id={`coach-structured-${key}`}
+                        value={structuredDraft[key] ?? ''}
+                        onChange={(e) => setStructuredField(key, e.target.value)}
+                      />
+                      {suggestion?.confirmationPrompt && <p className="small">{suggestion.confirmationPrompt}</p>}
+                      {suggestion && (
+                        <div className="row">
+                          <span className="small">Confidence: {suggestion.confidence}</span>
+                          <button type="button" onClick={() => upsertConfirmation({ field: key, status: 'confirmed' })}>
+                            Confirm
+                          </button>
+                          <button type="button" onClick={() => upsertConfirmation({ field: key, status: 'rejected' })}>
+                            Reject
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+                {selected.structuredExtraction?.concepts?.length ? (
+                  <p className="small">Concepts: {selected.structuredExtraction.concepts.join(' | ')}</p>
+                ) : null}
+                {selected.structuredExtraction?.failures?.length ? (
+                  <p className="small">Failures: {selected.structuredExtraction.failures.join(' | ')}</p>
+                ) : null}
+                {selected.structuredExtraction?.conditioningIssues?.length ? (
+                  <p className="small">Conditioning: {selected.structuredExtraction.conditioningIssues.join(' | ')}</p>
+                ) : null}
+                <button type="button" onClick={saveStructuredReview}>
+                  Save structured review
+                </button>
                 <h4>Comment</h4>
                 <textarea value={comment} onChange={(e) => setComment(e.target.value)} />
                 <button onClick={post}>Post comment</button>

@@ -11,6 +11,7 @@ import { withRequestLogging } from '../../shared/logger';
 import { hydratePartnerOutcomes } from '../../shared/partners';
 import { recomputeAndPersistProgressViews } from '../../shared/progressStore';
 import { errorResponse, response } from '../../shared/responses';
+import { extractStructuredMetadata } from '../../shared/structuredExtraction';
 import { sanitizeTechniqueMentions, upsertTechniqueCandidates } from '../../shared/techniques';
 import type { CreateEntryRequest, Entry } from '../../shared/types';
 
@@ -21,13 +22,16 @@ export const buildEntry = (
   nowIso: string,
   entryId = uuidv4()
 ): Entry =>
-  withCurrentEntrySchemaVersion({
+  (() => {
+    const structuredExtraction = extractStructuredMetadata(input, { nowIso, actorRole: 'athlete' });
+    return withCurrentEntrySchemaVersion({
     entryId,
     athleteId,
     createdAt: nowIso,
     updatedAt: nowIso,
     quickAdd: input.quickAdd,
-    structured: input.structured,
+    structured: structuredExtraction.structured,
+    structuredExtraction: structuredExtraction.extraction,
     tags: input.tags,
     sections: input.sections,
     sessionMetrics: input.sessionMetrics,
@@ -40,7 +44,8 @@ export const buildEntry = (
     actionPackFinal: input.actionPackFinal,
     sessionReviewDraft: input.sessionReviewDraft,
     sessionReviewFinal: input.sessionReviewFinal
-  });
+    });
+  })();
 
 const baseHandler: APIGatewayProxyHandler = async (event) => {
   try {
