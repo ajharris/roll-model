@@ -564,18 +564,6 @@ export const sanitizeMediaAttachments = (value: unknown): MediaAttachment[] => {
 const applySchemaVersion = (payload: EntrySchemaPayload, schemaVersion: number): EntrySchemaPayload => ({
   ...payload,
   schemaVersion
-const migrateLegacyEntryV0 = (legacy: LegacyEntryV0): Entry => ({
-  ...legacy,
-  schemaVersion: CURRENT_ENTRY_SCHEMA_VERSION,
-  quickAdd: sanitizeQuickAdd((legacy as Record<string, unknown>).quickAdd, legacy as unknown as Record<string, unknown>),
-  structured: sanitizeStructuredFields((legacy as Record<string, unknown>).structured),
-  structuredExtraction: sanitizeStructuredExtraction((legacy as Record<string, unknown>).structuredExtraction),
-  tags: sanitizeEntryTags((legacy as Record<string, unknown>).tags, legacy.sessionMetrics?.tags),
-  sessionContext: sanitizeSessionContext((legacy as Record<string, unknown>).sessionContext),
-  partnerOutcomes: sanitizePartnerOutcomes((legacy as Record<string, unknown>).partnerOutcomes),
-  rawTechniqueMentions: sanitizeRawTechniqueMentions(legacy.rawTechniqueMentions),
-  mediaAttachments: sanitizeMediaAttachments(legacy.mediaAttachments),
-  importMetadata: sanitizeEntryImportMetadata((legacy as Record<string, unknown>).importMetadata)
 });
 
 const entrySchemaMigrations: Array<MigrationStep<EntrySchemaPayload>> = [
@@ -671,6 +659,7 @@ export const normalizeEntry = (entry: NormalizableEntryInput): Entry => {
     partnerOutcomes: sanitizePartnerOutcomes((migratedEntry as Record<string, unknown>).partnerOutcomes),
     rawTechniqueMentions: sanitizeRawTechniqueMentions(migratedEntry.rawTechniqueMentions),
     mediaAttachments: sanitizeMediaAttachments(migratedEntry.mediaAttachments),
+    importMetadata: sanitizeEntryImportMetadata((migratedEntry as Record<string, unknown>).importMetadata),
     ...(sessionReviewDraft ? { sessionReviewDraft } : {}),
     ...(sessionReviewFinal ? { sessionReviewFinal } : {})
   };
