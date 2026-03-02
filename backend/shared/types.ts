@@ -165,11 +165,27 @@ export interface Entry {
 
 export interface Comment {
   commentId: string;
+  athleteId?: string;
   entryId: string;
+  checkoffId?: string;
   coachId: string;
   createdAt: string;
+  updatedAt?: string;
   body: string;
   visibility: 'visible' | 'hiddenByAthlete';
+  targetType?: 'entry' | 'checkoff';
+  targetId?: string;
+  kind?: 'coach-note' | 'gpt-feedback';
+  approval?: {
+    requiresApproval: boolean;
+    status: 'pending' | 'approved';
+    approvedAt?: string;
+    approvedBy?: string;
+  };
+  gptFeedback?: {
+    draft: string;
+    coachEdited?: string;
+  };
 }
 
 export type CoachLinkStatus = 'pending' | 'active' | 'revoked';
@@ -252,7 +268,15 @@ export interface TechniqueCandidate {
 
 export interface PostCommentRequest {
   entryId?: string;
+  checkoffId?: string;
   body: string;
+  kind?: 'coach-note' | 'gpt-feedback';
+  requiresApproval?: boolean;
+  approvalStatus?: 'pending' | 'approved';
+  gptFeedback?: {
+    draft: string;
+    coachEdited?: string;
+  };
 }
 
 export interface ApiErrorShape {
@@ -985,6 +1009,10 @@ export interface SharePolicy {
   excludeFields: ShareFieldKey[];
   includePartnerData: boolean;
   entryIds?: string[];
+  dateFrom?: string;
+  dateTo?: string;
+  skillId?: string;
+  coachId?: string;
   requireCoachReview: boolean;
 }
 
@@ -1015,6 +1043,10 @@ export interface SharedSessionSummary {
     includeFields: ShareFieldKey[];
     excludeFields: ShareFieldKey[];
     includePartnerData: boolean;
+    dateFrom?: string;
+    dateTo?: string;
+    skillId?: string;
+    coachId?: string;
     readOnly: true;
   };
   aggregate: {

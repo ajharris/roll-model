@@ -117,6 +117,31 @@ export interface CreateShareLinkRequest {
   expiresAt: string;
 }
 
+const parseOptionalIsoDate = (value: unknown, fieldPath: string): string | undefined => {
+  if (value === undefined) {
+    return undefined;
+  }
+  const normalized = sanitizeString(value);
+  if (!normalized) {
+    invalid(`${fieldPath} must be a non-empty ISO timestamp when provided.`);
+  }
+  if (!Number.isFinite(Date.parse(normalized))) {
+    invalid(`${fieldPath} must be a valid ISO timestamp.`);
+  }
+  return normalized;
+};
+
+const parseOptionalSkillId = (value: unknown): string | undefined => {
+  if (value === undefined) {
+    return undefined;
+  }
+  const normalized = sanitizeString(value).toLowerCase();
+  if (!normalized) {
+    invalid('skillId must be a non-empty string when provided.');
+  }
+  return normalized;
+};
+
 const parseCoachReview = (value: unknown): ShareCoachReviewState => {
   if (value === undefined) {
     return {
@@ -195,6 +220,13 @@ export const parseCreateShareLinkRequest = (
   const excludeFields = parseFieldList(requestPayload.excludeFields, 'excludeFields');
   const includePartnerData = requestPayload.includePartnerData === true;
   const entryIds = parseEntryIds(requestPayload.entryIds);
+  const dateFrom = parseOptionalIsoDate(requestPayload.dateFrom, 'dateFrom');
+  const dateTo = parseOptionalIsoDate(requestPayload.dateTo, 'dateTo');
+  const skillId = parseOptionalSkillId(requestPayload.skillId);
+  const coachId = sanitizeString(requestPayload.coachId);
+  if (dateFrom && dateTo && Date.parse(dateFrom) > Date.parse(dateTo)) {
+    invalid('dateFrom must be earlier than or equal to dateTo.');
+  }
 
   const requestCoachReview = requestPayload.requireCoachReview === true || options?.enforceCoachReview === true;
   const coachReview = parseCoachReview(requestPayload.coachReview);
@@ -211,6 +243,10 @@ export const parseCreateShareLinkRequest = (
       excludeFields,
       includePartnerData,
       ...(entryIds && entryIds.length > 0 ? { entryIds } : {}),
+      ...(dateFrom ? { dateFrom } : {}),
+      ...(dateTo ? { dateTo } : {}),
+      ...(skillId ? { skillId } : {}),
+      ...(coachId ? { coachId } : {}),
       requireCoachReview: requestCoachReview,
     },
     coachReview: {
@@ -303,6 +339,35 @@ const buildHighlight = (entry: Entry, fields: Set<ShareFieldKey>): SharedSession
   return highlight;
 };
 
+const entryMatchesSkill = (entry: Entry, skillId: string): boolean => {
+  const token = skillId.trim().toLowerCase();
+  if (!token) {
+    return true;
+  }
+
+  const values: string[] = [
+    entry.structured?.position ?? '',
+    entry.structured?.technique ?? '',
+    entry.structured?.outcome ?? '',
+    entry.structured?.problem ?? '',
+    entry.structured?.cue ?? '',
+    ...(entry.rawTechniqueMentions ?? []),
+    ...(entry.structuredExtraction?.concepts ?? []),
+    ...(entry.structuredExtraction?.failures ?? []),
+    ...(entry.actionPackDraft?.wins ?? []),
+    ...(entry.actionPackDraft?.leaks ?? []),
+    ...(entry.actionPackDraft?.drills ?? []),
+    ...(entry.actionPackDraft?.positionalRequests ?? []),
+    entry.actionPackDraft?.fallbackDecisionGuidance ?? '',
+  ];
+
+  const haystack = values
+    .map((value) => value.trim().toLowerCase())
+    .filter(Boolean);
+
+  return haystack.some((value) => value.includes(token));
+};
+
 export const buildSharedSessionSummary = (
   params: {
     shareId: string;
@@ -312,9 +377,19 @@ export const buildSharedSessionSummary = (
     entries: Entry[];
   }
 ): SharedSessionSummary => {
-  const scopedEntries = params.policy.entryIds?.length
-    ? params.entries.filter((entry) => params.policy.entryIds?.includes(entry.entryId))
-    : params.entries;
+  let scopedEntries = params.entries;
+  if (params.policy.entryIds?.length) {
+    scopedEntries = scopedEntries.filter((entry) => params.policy.entryIds?.includes(entry.entryId));
+  }
+  if (params.policy.dateFrom) {
+    scopedEntries = scopedEntries.filter((entry) => Date.parse(entry.createdAt) >= Date.parse(params.policy.dateFrom as string));
+  }
+  if (params.policy.dateTo) {
+    scopedEntries = scopedEntries.filter((entry) => Date.parse(entry.createdAt) <= Date.parse(params.policy.dateTo as string));
+  }
+  if (params.policy.skillId) {
+    scopedEntries = scopedEntries.filter((entry) => entryMatchesSkill(entry, params.policy.skillId as string));
+  }
 
   const structuredEntries = scopedEntries
     .filter((entry) => isStructuredRecord(entry))
@@ -342,6 +417,10 @@ export const buildSharedSessionSummary = (
       includeFields: [...fields],
       excludeFields: params.policy.excludeFields,
       includePartnerData: params.policy.includePartnerData,
+      ...(params.policy.dateFrom ? { dateFrom: params.policy.dateFrom } : {}),
+      ...(params.policy.dateTo ? { dateTo: params.policy.dateTo } : {}),
+      ...(params.policy.skillId ? { skillId: params.policy.skillId } : {}),
+      ...(params.policy.coachId ? { coachId: params.policy.coachId } : {}),
       readOnly: true,
     },
     aggregate: {

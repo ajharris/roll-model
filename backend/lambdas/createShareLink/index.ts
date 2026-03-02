@@ -2,10 +2,11 @@ import type { APIGatewayProxyHandler } from 'aws-lambda';
 import { v4 as uuidv4 } from 'uuid';
 
 import { getAuthContext, requireRole } from '../../shared/auth';
-import { putItem, queryItems } from '../../shared/db';
+import { getItem, putItem, queryItems } from '../../shared/db';
 import { parseEntryRecord } from '../../shared/entries';
+import { isCoachLinkActive } from '../../shared/links';
 import { withRequestLogging } from '../../shared/logger';
-import { errorResponse, response } from '../../shared/responses';
+import { ApiError, errorResponse, response } from '../../shared/responses';
 import {
   SHARE_PAYLOAD_VERSION,
   buildShareAuditEvent,
@@ -33,6 +34,22 @@ const baseHandler: APIGatewayProxyHandler = async (event) => {
     const request = parseCreateShareLinkRequest(event.body, nowIso, {
       enforceCoachReview: isTrue(process.env.SHARE_REQUIRE_COACH_REVIEW),
     });
+
+    if (request.policy.coachId) {
+      const link = await getItem({
+        Key: {
+          PK: `USER#${auth.userId}`,
+          SK: `COACH#${request.policy.coachId}`,
+        },
+      });
+      if (!isCoachLinkActive(link.Item as Record<string, unknown> | undefined)) {
+        throw new ApiError({
+          code: 'FORBIDDEN',
+          message: 'Coach is not linked to this athlete.',
+          statusCode: 403,
+        });
+      }
+    }
 
     const entriesResult = await queryItems({
       KeyConditionExpression: 'PK = :pk AND begins_with(SK, :entryPrefix)',

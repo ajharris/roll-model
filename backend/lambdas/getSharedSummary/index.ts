@@ -134,6 +134,10 @@ const baseHandler: APIGatewayProxyHandler = async (event) => {
         includeFields: share.summary.scope.includeFields,
         excludeFields: share.summary.scope.excludeFields,
         includePartnerData: share.summary.scope.includePartnerData,
+        ...(share.summary.scope.dateFrom ? { dateFrom: share.summary.scope.dateFrom } : {}),
+        ...(share.summary.scope.dateTo ? { dateTo: share.summary.scope.dateTo } : {}),
+        ...(share.summary.scope.skillId ? { skillId: share.summary.scope.skillId } : {}),
+        ...(share.summary.scope.coachId ? { coachId: share.summary.scope.coachId } : {}),
       },
       summary: share.summary,
     });

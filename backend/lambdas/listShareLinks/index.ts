@@ -39,6 +39,10 @@ const baseHandler: APIGatewayProxyHandler = async (event) => {
         visibility: share.policy.visibility,
         includePartnerData: share.policy.includePartnerData,
         requireCoachReview: share.policy.requireCoachReview,
+        dateFrom: share.policy.dateFrom,
+        dateTo: share.policy.dateTo,
+        skillId: share.policy.skillId,
+        coachId: share.policy.coachId,
         expired: isExpired(share.expiresAt, nowIso),
       })),
     });
