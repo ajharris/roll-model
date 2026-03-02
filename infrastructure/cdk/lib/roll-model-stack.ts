@@ -177,6 +177,8 @@ export class RollModelStack extends cdk.Stack {
       table
     );
     const postCommentLambda = this.createLambda('postComment', 'backend/lambdas/postComment/index.ts', table);
+    const listCommentsLambda = this.createLambda('listComments', 'backend/lambdas/listComments/index.ts', table);
+    const updateCommentLambda = this.createLambda('updateComment', 'backend/lambdas/updateComment/index.ts', table);
     const linkCoachAthleteLambda = this.createLambda(
       'linkCoachAthlete',
       'backend/lambdas/linkCoachAthlete/index.ts',
@@ -320,6 +322,8 @@ export class RollModelStack extends cdk.Stack {
       { name: 'updateSavedSearch', fn: updateSavedSearchLambda },
       { name: 'deleteSavedSearch', fn: deleteSavedSearchLambda },
       { name: 'postComment', fn: postCommentLambda },
+      { name: 'listComments', fn: listCommentsLambda },
+      { name: 'updateComment', fn: updateCommentLambda },
       { name: 'linkCoachAthlete', fn: linkCoachAthleteLambda },
       { name: 'revokeCoachLink', fn: revokeCoachLinkLambda },
       { name: 'createShareLink', fn: createShareLinkLambda },
@@ -514,10 +518,13 @@ export class RollModelStack extends cdk.Stack {
     });
 
     const entryComments = entryById.addResource('comments');
+    entryComments.addMethod('GET', new apigateway.LambdaIntegration(listCommentsLambda), methodOptions);
     entryComments.addMethod('POST', new apigateway.LambdaIntegration(postCommentLambda), methodOptions);
+    const entryCommentById = entryComments.addResource('{commentId}');
+    entryCommentById.addMethod('PUT', new apigateway.LambdaIntegration(updateCommentLambda), methodOptions);
     entryComments.addCorsPreflight({
       allowOrigins: apigateway.Cors.ALL_ORIGINS,
-      allowMethods: ['POST', 'OPTIONS'],
+      allowMethods: ['GET', 'POST', 'PUT', 'OPTIONS'],
       allowHeaders: ['Content-Type', 'Authorization']
     });
 
@@ -641,6 +648,16 @@ export class RollModelStack extends cdk.Stack {
     });
 
     const checkoffById = checkoffs.addResource('{checkoffId}');
+    const checkoffComments = checkoffById.addResource('comments');
+    checkoffComments.addMethod('GET', new apigateway.LambdaIntegration(listCommentsLambda), methodOptions);
+    checkoffComments.addMethod('POST', new apigateway.LambdaIntegration(postCommentLambda), methodOptions);
+    const checkoffCommentById = checkoffComments.addResource('{commentId}');
+    checkoffCommentById.addMethod('PUT', new apigateway.LambdaIntegration(updateCommentLambda), methodOptions);
+    checkoffComments.addCorsPreflight({
+      allowOrigins: apigateway.Cors.ALL_ORIGINS,
+      allowMethods: ['GET', 'POST', 'PUT', 'OPTIONS'],
+      allowHeaders: ['Content-Type', 'Authorization']
+    });
     const checkoffReview = checkoffById.addResource('review');
     checkoffReview.addMethod('PUT', new apigateway.LambdaIntegration(reviewCheckoffLambda), methodOptions);
     checkoffReview.addCorsPreflight({
@@ -828,6 +845,16 @@ export class RollModelStack extends cdk.Stack {
     });
 
     const athleteCheckoffById = athleteCheckoffs.addResource('{checkoffId}');
+    const athleteCheckoffComments = athleteCheckoffById.addResource('comments');
+    athleteCheckoffComments.addMethod('GET', new apigateway.LambdaIntegration(listCommentsLambda), methodOptions);
+    athleteCheckoffComments.addMethod('POST', new apigateway.LambdaIntegration(postCommentLambda), methodOptions);
+    const athleteCheckoffCommentById = athleteCheckoffComments.addResource('{commentId}');
+    athleteCheckoffCommentById.addMethod('PUT', new apigateway.LambdaIntegration(updateCommentLambda), methodOptions);
+    athleteCheckoffComments.addCorsPreflight({
+      allowOrigins: apigateway.Cors.ALL_ORIGINS,
+      allowMethods: ['GET', 'POST', 'PUT', 'OPTIONS'],
+      allowHeaders: ['Content-Type', 'Authorization']
+    });
     const athleteCheckoffReview = athleteCheckoffById.addResource('review');
     athleteCheckoffReview.addMethod('PUT', new apigateway.LambdaIntegration(reviewCheckoffLambda), methodOptions);
     athleteCheckoffReview.addCorsPreflight({

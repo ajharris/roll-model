@@ -140,4 +140,40 @@ describe('sharing helpers', () => {
       )
     ).toThrow(ApiError);
   });
+
+  it('supports scoped summary by date range and skill id', () => {
+    const parsed = parseCreateShareLinkRequest(
+      JSON.stringify({
+        dateFrom: '2026-03-01T00:00:00.000Z',
+        dateTo: '2026-03-01T23:59:59.999Z',
+        skillId: 'knee cut',
+      }),
+      '2026-03-01T12:00:00.000Z'
+    );
+
+    const summary = buildSharedSessionSummary({
+      shareId: 'share-1',
+      athleteId: 'athlete-1',
+      generatedAt: '2026-03-01T12:00:00.000Z',
+      policy: parsed.policy,
+      entries: [entryFixture],
+    });
+
+    expect(summary.sourceEntryIds).toEqual(['entry-1']);
+    expect(summary.scope.dateFrom).toBe('2026-03-01T00:00:00.000Z');
+    expect(summary.scope.dateTo).toBe('2026-03-01T23:59:59.999Z');
+    expect(summary.scope.skillId).toBe('knee cut');
+  });
+
+  it('rejects inverted date range', () => {
+    expect(() =>
+      parseCreateShareLinkRequest(
+        JSON.stringify({
+          dateFrom: '2026-03-02T00:00:00.000Z',
+          dateTo: '2026-03-01T00:00:00.000Z',
+        }),
+        '2026-03-01T12:00:00.000Z'
+      )
+    ).toThrow(ApiError);
+  });
 });

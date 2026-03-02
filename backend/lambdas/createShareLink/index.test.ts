@@ -1,6 +1,6 @@
 import type { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 
-import { putItem, queryItems } from '../../shared/db';
+import { getItem, putItem, queryItems } from '../../shared/db';
 
 import { handler } from './index';
 
@@ -8,6 +8,7 @@ jest.mock('../../shared/db');
 
 const mockPutItem = jest.mocked(putItem);
 const mockQueryItems = jest.mocked(queryItems);
+const mockGetItem = jest.mocked(getItem);
 
 const buildEvent = (body?: Record<string, unknown>): APIGatewayProxyEvent =>
   ({
@@ -26,6 +27,7 @@ describe('createShareLink handler', () => {
   beforeEach(() => {
     mockPutItem.mockReset();
     mockQueryItems.mockReset();
+    mockGetItem.mockReset();
     mockPutItem.mockResolvedValue();
 
     mockQueryItems.mockResolvedValue({
@@ -126,5 +128,18 @@ describe('createShareLink handler', () => {
 
     const sharePut = putCalls.find((call) => call.Item?.entityType === 'SHARE_LINK');
     expect(sharePut?.Item?.summary?.highlights?.[0]?.partnerOutcomes).toBeUndefined();
+  });
+
+  it('rejects coach-linked sharing when coach link is missing', async () => {
+    mockGetItem.mockResolvedValueOnce({} as never);
+
+    const result = (await handler(
+      buildEvent({ coachId: 'coach-x' }),
+      {} as never,
+      () => undefined
+    )) as APIGatewayProxyResult;
+
+    expect(result.statusCode).toBe(403);
+    expect(JSON.parse(result.body).error.code).toBe('FORBIDDEN');
   });
 });

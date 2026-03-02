@@ -117,6 +117,14 @@ const baseHandler: APIGatewayProxyHandler = async (event) => {
             SK: item.SK
           }
         });
+        if (typeof item.commentId === 'string') {
+          await deleteItem({
+            Key: {
+              PK: `COMMENT#${item.commentId}`,
+              SK: 'META'
+            }
+          });
+        }
       }
     }
 
