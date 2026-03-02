@@ -72,6 +72,40 @@ export interface EntryQuickAdd {
   notes: string;
 }
 
+export type EntryTag =
+  | 'guard-type'
+  | 'top'
+  | 'bottom'
+  | 'submission'
+  | 'sweep'
+  | 'pass'
+  | 'escape'
+  | 'takedown';
+
+export type LegacyImportSourceType = 'markdown' | 'google-doc';
+export type LegacyImportMode = 'gpt-assisted' | 'heuristic';
+export type LegacyImportConflictStatus = 'none' | 'possible-duplicate' | 'requires-review';
+export type LegacyImportDedupStatus = 'new' | 'duplicate-source' | 'duplicate-content';
+
+export interface LegacyImportSourceRef {
+  sourceType: LegacyImportSourceType;
+  sourceId?: string;
+  sourceUrl?: string;
+  sourceTitle?: string;
+  capturedAt: string;
+  contentHash: string;
+}
+
+export interface EntryImportMetadata {
+  importId: string;
+  mode: LegacyImportMode;
+  source: LegacyImportSourceRef;
+  dedupStatus: Exclude<LegacyImportDedupStatus, 'new'> | 'override-imported';
+  conflictStatus: LegacyImportConflictStatus;
+  requiresCoachReview: boolean;
+  coachReview?: CoachReviewState;
+}
+
 export interface Entry {
   entryId: string;
   athleteId: string;
@@ -92,6 +126,7 @@ export interface Entry {
   actionPackFinal?: FinalizedActionPack;
   sessionReviewDraft?: SessionReviewArtifact;
   sessionReviewFinal?: FinalizedSessionReview;
+  importMetadata?: EntryImportMetadata;
 }
 
 export type EntryStructuredFieldKey = 'position' | 'technique' | 'outcome' | 'problem' | 'cue';
@@ -158,6 +193,56 @@ export interface EntryCreatePayload {
   actionPackFinal?: FinalizedActionPack;
   sessionReviewDraft?: SessionReviewArtifact;
   sessionReviewFinal?: FinalizedSessionReview;
+}
+
+export interface LegacyImportDraftEntry {
+  quickAdd: EntryQuickAdd;
+  tags: EntryTag[];
+  structured?: EntryStructuredFields;
+  structuredMetadataConfirmations?: EntryStructuredMetadataConfirmation[];
+  sections: EntrySections;
+  sessionMetrics: SessionMetrics;
+  rawTechniqueMentions: string[];
+}
+
+export interface LegacyImportPreviewRequest {
+  sourceType: LegacyImportSourceType;
+  rawContent: string;
+  sourceId?: string;
+  sourceUrl?: string;
+  sourceTitle?: string;
+  useGpt?: boolean;
+}
+
+export interface LegacyImportPreview {
+  importId: string;
+  mode: LegacyImportMode;
+  draftEntry: LegacyImportDraftEntry;
+  structuredExtraction: EntryStructuredExtraction;
+  confidenceFlags: EntryStructuredExtraction['confidenceFlags'];
+  dedupStatus: LegacyImportDedupStatus;
+  duplicateEntryIds: string[];
+  conflictStatus: LegacyImportConflictStatus;
+  requiresCoachReview: boolean;
+  source: LegacyImportSourceRef;
+  warnings: string[];
+}
+
+export interface LegacyImportCommitRequest {
+  preview: LegacyImportPreview;
+  corrections?: {
+    structured?: EntryStructuredFields;
+    confirmations?: EntryStructuredMetadataConfirmation[];
+    tags?: EntryTag[];
+    quickAdd?: Partial<EntryQuickAdd>;
+    sessionMetrics?: Partial<SessionMetrics>;
+    sections?: Partial<EntrySections>;
+    rawTechniqueMentions?: string[];
+    requiresCoachReview?: boolean;
+    coachReview?: CoachReviewState;
+  };
+  duplicateResolution?: 'skip' | 'allow';
+  conflictResolution?: 'save-as-draft' | 'commit';
 }
 
 export type EntryTemplateId = 'class-notes' | 'open-mat-rounds' | 'drill-session';

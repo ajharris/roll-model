@@ -27,6 +27,9 @@ import type {
   EntryStructuredFields,
   UpsertGapPriorityInput,
   UpsertPartnerProfilePayload,
+  LegacyImportCommitRequest,
+  LegacyImportPreview,
+  LegacyImportPreviewRequest,
 } from '@/types/api';
 
 export class ApiError extends Error {
@@ -394,6 +397,19 @@ export const apiClient = {
     });
     return asEntryObject(result);
   },
+  previewLegacyEntryImport: async (payload: LegacyImportPreviewRequest) =>
+    request<{ preview: LegacyImportPreview }>('/imports/entries/preview', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }).then((result) => result.preview),
+  commitLegacyEntryImport: async (payload: LegacyImportCommitRequest) =>
+    request<{ skipped: boolean; reason?: string; duplicateEntryIds?: string[]; entry?: Entry }>(
+      '/imports/entries/commit',
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      },
+    ),
   deleteEntry: (entryId: string) =>
     request(`/entries/${entryId}`, {
       method: 'DELETE',

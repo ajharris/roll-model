@@ -2,6 +2,7 @@ import { migratePayload, type MigrationStep } from './migrations';
 import { normalizeFinalizedSessionReview, normalizeSessionReviewArtifact } from './sessionReview';
 import type {
   Entry,
+  EntryImportMetadata,
   EntryStructuredExtraction,
   EntryStructuredFieldKey,
   EntryStructuredSuggestion,
@@ -9,6 +10,9 @@ import type {
   EntryQuickAdd,
   EntryStructuredFields,
   EntryTag,
+  LegacyImportConflictStatus,
+  LegacyImportMode,
+  LegacyImportSourceType,
   MediaAttachment,
   MediaClipNote,
   PartnerGuidance,
@@ -67,6 +71,13 @@ const STRUCTURED_SUGGESTION_STATUSES = new Set<EntryStructuredSuggestionStatus>(
   'rejected'
 ]);
 const STRUCTURED_FIELD_KEYS = new Set<EntryStructuredFieldKey>(['position', 'technique', 'outcome', 'problem', 'cue']);
+const LEGACY_IMPORT_SOURCE_TYPES = new Set<LegacyImportSourceType>(['markdown', 'google-doc']);
+const LEGACY_IMPORT_MODES = new Set<LegacyImportMode>(['gpt-assisted', 'heuristic']);
+const LEGACY_IMPORT_CONFLICT_STATUSES = new Set<LegacyImportConflictStatus>([
+  'none',
+  'possible-duplicate',
+  'requires-review'
+]);
 
 const sanitizeRawTechniqueMentions = (value: unknown): string[] => {
   if (!Array.isArray(value)) {
@@ -251,6 +262,65 @@ const sanitizeStructuredExtraction = (value: unknown): EntryStructuredExtraction
     failures,
     conditioningIssues,
     confidenceFlags
+  };
+};
+
+const sanitizeEntryImportMetadata = (value: unknown): EntryImportMetadata | undefined => {
+  const record = asRecord(value);
+  if (!record) {
+    return undefined;
+  }
+
+  const importId = sanitizeString(record.importId);
+  const mode = sanitizeString(record.mode) as LegacyImportMode;
+  const dedupStatus = sanitizeString(record.dedupStatus);
+  const conflictStatus = sanitizeString(record.conflictStatus) as LegacyImportConflictStatus;
+  const source = asRecord(record.source);
+  if (
+    !importId ||
+    !LEGACY_IMPORT_MODES.has(mode) ||
+    (dedupStatus !== 'duplicate-source' && dedupStatus !== 'duplicate-content' && dedupStatus !== 'override-imported') ||
+    !LEGACY_IMPORT_CONFLICT_STATUSES.has(conflictStatus) ||
+    !source
+  ) {
+    return undefined;
+  }
+
+  const sourceType = sanitizeString(source.sourceType) as LegacyImportSourceType;
+  const contentHash = sanitizeString(source.contentHash);
+  const capturedAt = sanitizeString(source.capturedAt) || new Date().toISOString();
+  if (!LEGACY_IMPORT_SOURCE_TYPES.has(sourceType) || !contentHash) {
+    return undefined;
+  }
+
+  const sourceId = sanitizeString(source.sourceId);
+  const sourceUrl = sanitizeString(source.sourceUrl);
+  const sourceTitle = sanitizeString(source.sourceTitle);
+  const coachReview = asRecord(record.coachReview);
+
+  return {
+    importId,
+    mode,
+    dedupStatus: dedupStatus as EntryImportMetadata['dedupStatus'],
+    conflictStatus,
+    requiresCoachReview: Boolean(record.requiresCoachReview),
+    source: {
+      sourceType,
+      ...(sourceId ? { sourceId } : {}),
+      ...(sourceUrl ? { sourceUrl } : {}),
+      ...(sourceTitle ? { sourceTitle } : {}),
+      capturedAt,
+      contentHash
+    },
+    ...(coachReview
+      ? {
+          coachReview: {
+            requiresReview: Boolean(coachReview.requiresReview),
+            ...(sanitizeString(coachReview.coachNotes) ? { coachNotes: sanitizeString(coachReview.coachNotes) } : {}),
+            ...(sanitizeString(coachReview.reviewedAt) ? { reviewedAt: sanitizeString(coachReview.reviewedAt) } : {})
+          }
+        }
+      : {})
   };
 };
 
@@ -494,6 +564,18 @@ export const sanitizeMediaAttachments = (value: unknown): MediaAttachment[] => {
 const applySchemaVersion = (payload: EntrySchemaPayload, schemaVersion: number): EntrySchemaPayload => ({
   ...payload,
   schemaVersion
+const migrateLegacyEntryV0 = (legacy: LegacyEntryV0): Entry => ({
+  ...legacy,
+  schemaVersion: CURRENT_ENTRY_SCHEMA_VERSION,
+  quickAdd: sanitizeQuickAdd((legacy as Record<string, unknown>).quickAdd, legacy as unknown as Record<string, unknown>),
+  structured: sanitizeStructuredFields((legacy as Record<string, unknown>).structured),
+  structuredExtraction: sanitizeStructuredExtraction((legacy as Record<string, unknown>).structuredExtraction),
+  tags: sanitizeEntryTags((legacy as Record<string, unknown>).tags, legacy.sessionMetrics?.tags),
+  sessionContext: sanitizeSessionContext((legacy as Record<string, unknown>).sessionContext),
+  partnerOutcomes: sanitizePartnerOutcomes((legacy as Record<string, unknown>).partnerOutcomes),
+  rawTechniqueMentions: sanitizeRawTechniqueMentions(legacy.rawTechniqueMentions),
+  mediaAttachments: sanitizeMediaAttachments(legacy.mediaAttachments),
+  importMetadata: sanitizeEntryImportMetadata((legacy as Record<string, unknown>).importMetadata)
 });
 
 const entrySchemaMigrations: Array<MigrationStep<EntrySchemaPayload>> = [
