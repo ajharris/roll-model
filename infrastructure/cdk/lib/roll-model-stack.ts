@@ -6,6 +6,8 @@ import * as apigateway from 'aws-cdk-lib/aws-apigateway';
 import * as cloudwatch from 'aws-cdk-lib/aws-cloudwatch';
 import * as cognito from 'aws-cdk-lib/aws-cognito';
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
+import * as events from 'aws-cdk-lib/aws-events';
+import * as eventsTargets from 'aws-cdk-lib/aws-events-targets';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as nodejs from 'aws-cdk-lib/aws-lambda-nodejs';
@@ -273,6 +275,41 @@ export class RollModelStack extends cdk.Stack {
       'backend/lambdas/updateWeeklyPlan/index.ts',
       table
     );
+    const getAutomationSettingsLambda = this.createLambda(
+      'getAutomationSettings',
+      'backend/lambdas/getAutomationSettings/index.ts',
+      table
+    );
+    const upsertAutomationSettingsLambda = this.createLambda(
+      'upsertAutomationSettings',
+      'backend/lambdas/upsertAutomationSettings/index.ts',
+      table
+    );
+    const listAutomationNotificationsLambda = this.createLambda(
+      'listAutomationNotifications',
+      'backend/lambdas/listAutomationNotifications/index.ts',
+      table
+    );
+    const captureAfterClassReminderLambda = this.createLambda(
+      'captureAfterClassReminder',
+      'backend/lambdas/captureAfterClassReminder/index.ts',
+      table
+    );
+    const runAutomationDispatchLambda = this.createLambda(
+      'runAutomationDispatch',
+      'backend/lambdas/runAutomationDispatch/index.ts',
+      table
+    );
+    const listWeeklyDigestsLambda = this.createLambda(
+      'listWeeklyDigests',
+      'backend/lambdas/listWeeklyDigests/index.ts',
+      table
+    );
+    const updateWeeklyDigestLambda = this.createLambda(
+      'updateWeeklyDigest',
+      'backend/lambdas/updateWeeklyDigest/index.ts',
+      table
+    );
     const listCurriculumLambda = this.createLambda('listCurriculum', 'backend/lambdas/listCurriculum/index.ts', table);
     const upsertCurriculumStagesLambda = this.createLambda(
       'upsertCurriculumStages',
@@ -360,6 +397,13 @@ export class RollModelStack extends cdk.Stack {
       { name: 'buildWeeklyPlan', fn: buildWeeklyPlanLambda },
       { name: 'listWeeklyPlans', fn: listWeeklyPlansLambda },
       { name: 'updateWeeklyPlan', fn: updateWeeklyPlanLambda },
+      { name: 'getAutomationSettings', fn: getAutomationSettingsLambda },
+      { name: 'upsertAutomationSettings', fn: upsertAutomationSettingsLambda },
+      { name: 'listAutomationNotifications', fn: listAutomationNotificationsLambda },
+      { name: 'captureAfterClassReminder', fn: captureAfterClassReminderLambda },
+      { name: 'runAutomationDispatch', fn: runAutomationDispatchLambda },
+      { name: 'listWeeklyDigests', fn: listWeeklyDigestsLambda },
+      { name: 'updateWeeklyDigest', fn: updateWeeklyDigestLambda },
       { name: 'listCurriculum', fn: listCurriculumLambda },
       { name: 'upsertCurriculumStages', fn: upsertCurriculumStagesLambda },
       { name: 'upsertCurriculumSkill', fn: upsertCurriculumSkillLambda },
@@ -390,6 +434,22 @@ export class RollModelStack extends cdk.Stack {
       })
     );
     previewLegacyEntryImportLambda.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: ['ssm:GetParameter'],
+        resources: [
+          `arn:aws:ssm:${cdk.Stack.of(this).region}:${cdk.Stack.of(this).account}:parameter/roll-model/openai_api_key`
+        ]
+      })
+    );
+    captureAfterClassReminderLambda.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: ['ssm:GetParameter'],
+        resources: [
+          `arn:aws:ssm:${cdk.Stack.of(this).region}:${cdk.Stack.of(this).account}:parameter/roll-model/openai_api_key`
+        ]
+      })
+    );
+    runAutomationDispatchLambda.addToRolePolicy(
       new iam.PolicyStatement({
         actions: ['ssm:GetParameter'],
         resources: [
@@ -991,6 +1051,77 @@ export class RollModelStack extends cdk.Stack {
       allowHeaders: ['Content-Type', 'Authorization']
     });
 
+    const automation = api.root.addResource('automation');
+    const automationSettings = automation.addResource('settings');
+    automationSettings.addMethod('GET', new apigateway.LambdaIntegration(getAutomationSettingsLambda), methodOptions);
+    automationSettings.addMethod('PUT', new apigateway.LambdaIntegration(upsertAutomationSettingsLambda), methodOptions);
+    automationSettings.addCorsPreflight({
+      allowOrigins: apigateway.Cors.ALL_ORIGINS,
+      allowMethods: ['GET', 'PUT', 'OPTIONS'],
+      allowHeaders: ['Content-Type', 'Authorization']
+    });
+
+    const automationNotifications = automation.addResource('notifications');
+    automationNotifications.addMethod('GET', new apigateway.LambdaIntegration(listAutomationNotificationsLambda), methodOptions);
+    automationNotifications.addCorsPreflight({
+      allowOrigins: apigateway.Cors.ALL_ORIGINS,
+      allowMethods: ['GET', 'OPTIONS'],
+      allowHeaders: ['Content-Type', 'Authorization']
+    });
+
+    const automationReminders = automation.addResource('reminders');
+    const automationReminderById = automationReminders.addResource('{notificationId}');
+    const automationReminderCapture = automationReminderById.addResource('capture');
+    automationReminderCapture.addMethod('POST', new apigateway.LambdaIntegration(captureAfterClassReminderLambda), methodOptions);
+    automationReminderCapture.addCorsPreflight({
+      allowOrigins: apigateway.Cors.ALL_ORIGINS,
+      allowMethods: ['POST', 'OPTIONS'],
+      allowHeaders: ['Content-Type', 'Authorization']
+    });
+
+    const weeklyDigests = api.root.addResource('weekly-digests');
+    weeklyDigests.addMethod('GET', new apigateway.LambdaIntegration(listWeeklyDigestsLambda), methodOptions);
+    weeklyDigests.addCorsPreflight({
+      allowOrigins: apigateway.Cors.ALL_ORIGINS,
+      allowMethods: ['GET', 'OPTIONS'],
+      allowHeaders: ['Content-Type', 'Authorization']
+    });
+    const weeklyDigestById = weeklyDigests.addResource('{digestId}');
+    weeklyDigestById.addMethod('PUT', new apigateway.LambdaIntegration(updateWeeklyDigestLambda), methodOptions);
+    weeklyDigestById.addCorsPreflight({
+      allowOrigins: apigateway.Cors.ALL_ORIGINS,
+      allowMethods: ['PUT', 'OPTIONS'],
+      allowHeaders: ['Content-Type', 'Authorization']
+    });
+
+    const athleteAutomation = athleteById.addResource('automation');
+    const athleteAutomationNotifications = athleteAutomation.addResource('notifications');
+    athleteAutomationNotifications.addMethod(
+      'GET',
+      new apigateway.LambdaIntegration(listAutomationNotificationsLambda),
+      methodOptions
+    );
+    athleteAutomationNotifications.addCorsPreflight({
+      allowOrigins: apigateway.Cors.ALL_ORIGINS,
+      allowMethods: ['GET', 'OPTIONS'],
+      allowHeaders: ['Content-Type', 'Authorization']
+    });
+
+    const athleteWeeklyDigests = athleteById.addResource('weekly-digests');
+    athleteWeeklyDigests.addMethod('GET', new apigateway.LambdaIntegration(listWeeklyDigestsLambda), methodOptions);
+    athleteWeeklyDigests.addCorsPreflight({
+      allowOrigins: apigateway.Cors.ALL_ORIGINS,
+      allowMethods: ['GET', 'OPTIONS'],
+      allowHeaders: ['Content-Type', 'Authorization']
+    });
+    const athleteWeeklyDigestById = athleteWeeklyDigests.addResource('{digestId}');
+    athleteWeeklyDigestById.addMethod('PUT', new apigateway.LambdaIntegration(updateWeeklyDigestLambda), methodOptions);
+    athleteWeeklyDigestById.addCorsPreflight({
+      allowOrigins: apigateway.Cors.ALL_ORIGINS,
+      allowMethods: ['PUT', 'OPTIONS'],
+      allowHeaders: ['Content-Type', 'Authorization']
+    });
+
     const athleteCurriculum = athleteById.addResource('curriculum');
     athleteCurriculum.addMethod('GET', new apigateway.LambdaIntegration(listCurriculumLambda), methodOptions);
     athleteCurriculum.addCorsPreflight({
@@ -1236,6 +1367,11 @@ export class RollModelStack extends cdk.Stack {
       treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
       alarmDescription:
         'Triggers when structured request latency p95 exceeds 3000ms for two consecutive 5 minute periods.'
+    });
+
+    new events.Rule(this, 'AutomationDispatchSchedule', {
+      schedule: events.Schedule.rate(cdk.Duration.minutes(30)),
+      targets: [new eventsTargets.LambdaFunction(runAutomationDispatchLambda)]
     });
 
     // TODO: Attach alarm actions (for example SNS / Slack / PagerDuty) to structuredRequestErrorAlarm and structuredLatencyAlarm.

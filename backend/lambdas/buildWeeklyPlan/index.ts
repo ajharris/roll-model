@@ -1,6 +1,7 @@
 import type { APIGatewayProxyHandler } from 'aws-lambda';
 
 import { getAuthContext, hasRole, requireRole } from '../../shared/auth';
+import { parseWeeklyDigestRecord, selectedDigestFocus } from '../../shared/automation';
 import { getItem, putItem, queryItems } from '../../shared/db';
 import { parseEntryRecord } from '../../shared/entries';
 import { isCoachLinkActive } from '../../shared/links';
@@ -76,7 +77,7 @@ const baseHandler: APIGatewayProxyHandler = async (event) => {
     const nowIso = new Date().toISOString();
     const weekOf = payload.weekOf ?? defaultWeekOf(new Date(nowIso));
 
-    const [entriesResult, checkoffsResult, graphResult, priorPlansResult] = await Promise.all([
+    const [entriesResult, checkoffsResult, graphResult, priorPlansResult, digestsResult] = await Promise.all([
       queryItems({
         KeyConditionExpression: 'PK = :pk AND begins_with(SK, :prefix)',
         ExpressionAttributeValues: {
@@ -108,6 +109,15 @@ const baseHandler: APIGatewayProxyHandler = async (event) => {
         },
         ScanIndexForward: false,
         Limit: 8
+      }),
+      queryItems({
+        KeyConditionExpression: 'PK = :pk AND begins_with(SK, :prefix)',
+        ExpressionAttributeValues: {
+          ':pk': `USER#${athleteId}`,
+          ':prefix': 'WEEKLY_DIGEST#'
+        },
+        ScanIndexForward: false,
+        Limit: 1
       })
     ]);
 
@@ -123,6 +133,9 @@ const baseHandler: APIGatewayProxyHandler = async (event) => {
       .filter((item) => item.entityType === 'WEEKLY_PLAN')
       .map((item) => parseWeeklyPlanRecord(item as Record<string, unknown>));
 
+    const latestDigest = parseWeeklyDigestRecord((digestsResult.Items?.[0] ?? {}) as Record<string, unknown>);
+    const carriedFocus = latestDigest ? selectedDigestFocus(latestDigest).slice(0, 2) : [];
+
     const plan = buildWeeklyPlanFromSignals({
       entries,
       checkoffs,
@@ -132,11 +145,29 @@ const baseHandler: APIGatewayProxyHandler = async (event) => {
       nowIso
     });
 
-    const persistedPlan: WeeklyPlan = {
+    const persistedPlanBase: WeeklyPlan = {
       ...plan,
       athleteId,
       updatedAt: nowIso,
       generatedAt: nowIso
+    };
+    const mergedPrimarySkills = [...carriedFocus, ...persistedPlanBase.primarySkills].filter(
+      (value, index, arr) => value.trim() && arr.findIndex((other) => other.toLowerCase() === value.toLowerCase()) === index
+    );
+    const persistedPlan: WeeklyPlan = {
+      ...persistedPlanBase,
+      primarySkills: mergedPrimarySkills.slice(0, 2),
+      drills:
+        carriedFocus.length > 0
+          ? [
+              ...carriedFocus.map((focus, index) => ({
+                id: `digest-focus-${index + 1}`,
+                label: `Carry-over focus: ${focus}`,
+                status: 'pending' as const
+              })),
+              ...persistedPlanBase.drills
+            ].slice(0, 4)
+          : persistedPlanBase.drills
     };
 
     await putItem({

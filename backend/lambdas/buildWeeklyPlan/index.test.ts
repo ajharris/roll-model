@@ -62,6 +62,7 @@ describe('buildWeeklyPlan handler', () => {
         ]
       } as unknown as QueryCommandOutput)
       .mockResolvedValueOnce({ Items: [] } as unknown as QueryCommandOutput)
+      .mockResolvedValueOnce({ Items: [] } as unknown as QueryCommandOutput)
       .mockResolvedValueOnce({ Items: [] } as unknown as QueryCommandOutput);
 
     mockGetItem.mockResolvedValueOnce({} as unknown as GetCommandOutput);
