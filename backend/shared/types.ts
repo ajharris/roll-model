@@ -913,6 +913,109 @@ export interface WeeklyPlan {
   completion?: WeeklyPlanCompletion;
 }
 
+export interface AutomationQuietHours {
+  enabled: boolean;
+  start: string;
+  end: string;
+}
+
+export interface AfterClassReminderSettings {
+  enabled: boolean;
+  daysOfWeek: number[];
+  localTime: string;
+  remindAfterMinutes: number;
+}
+
+export interface WeeklyDigestSettings {
+  enabled: boolean;
+  dayOfWeek: number;
+  localTime: string;
+}
+
+export interface AutomationSettings {
+  athleteId: string;
+  timezone: string;
+  afterClassReminder: AfterClassReminderSettings;
+  weeklyDigest: WeeklyDigestSettings;
+  quietHours: AutomationQuietHours;
+  updatedAt: string;
+  updatedBy: string;
+}
+
+export interface AutomationSettingsUpdateRequest {
+  timezone?: string;
+  afterClassReminder?: Partial<AfterClassReminderSettings>;
+  weeklyDigest?: Partial<WeeklyDigestSettings>;
+  quietHours?: Partial<AutomationQuietHours>;
+}
+
+export type NotificationKind = 'after-class-reminder' | 'weekly-digest';
+export type NotificationStatus = 'sent' | 'acted' | 'dismissed';
+
+export interface AutomationNotification {
+  notificationId: string;
+  athleteId: string;
+  kind: NotificationKind;
+  status: NotificationStatus;
+  title: string;
+  body: string;
+  localDate: string;
+  localTime: string;
+  timezone: string;
+  dispatchKey: string;
+  createdAt: string;
+  updatedAt: string;
+  actedAt?: string;
+  payload?: {
+    digestId?: string;
+    weekOf?: string;
+    captureHint?: string;
+  };
+}
+
+export interface WeeklyDigestRecommendation {
+  recommendationId: string;
+  text: string;
+  selected: boolean;
+  selectedAt?: string;
+  selectedBy?: string;
+}
+
+export interface WeeklyDigestCoachReview {
+  reviewedBy: string;
+  reviewedAt: string;
+  notes?: string;
+}
+
+export interface WeeklyDigestArtifact {
+  digestId: string;
+  athleteId: string;
+  weekOf: string;
+  timezone: string;
+  generatedAt: string;
+  updatedAt: string;
+  trained: string[];
+  notTrained: string[];
+  recommendedFocus: WeeklyDigestRecommendation[];
+  summary: string;
+  sourceSummary: {
+    entryCount: number;
+    checkoffCount: number;
+    weeklyPlanCount: number;
+  };
+  generatedBy: 'gpt' | 'heuristic';
+  coachReview?: WeeklyDigestCoachReview;
+}
+
+export interface WeeklyDigestUpdateRequest {
+  selectedRecommendationIds?: string[];
+  recommendationEdits?: Array<{
+    recommendationId: string;
+    text: string;
+  }>;
+  coachReviewNote?: string;
+}
+
 export type SkillCategory =
   | 'escape'
   | 'pass'
