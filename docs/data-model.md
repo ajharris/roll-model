@@ -20,6 +20,8 @@
 - Curriculum skill
 - Curriculum relationship
 - Curriculum progression
+- Curriculum version state
+- Migration run record
 
 ## PK/SK patterns
 - **Coach-athlete link**: `PK = USER#{athleteId}`, `SK = COACH#{coachId}`
@@ -35,6 +37,8 @@
 - **Curriculum skill**: `PK = USER#{athleteId}`, `SK = CURRICULUM_SKILL#{skillId}`
 - **Curriculum relationship**: `PK = USER#{athleteId}`, `SK = CURRICULUM_REL#FROM#{fromSkillId}#TO#{toSkillId}`
 - **Curriculum progression**: `PK = USER#{athleteId}`, `SK = CURRICULUM_PROGRESS#{skillId}`
+- **Curriculum version state**: `PK = USER#{athleteId}`, `SK = CURRICULUM_VERSION#ACTIVE`
+- **Migration run record**: `PK = USER#{athleteId}`, `SK = MIGRATION#{scope}#{runId}`
 
 ## Attributes
 ### Entry
@@ -97,13 +101,24 @@
 ```
 
 ## Entry Schema Versioning
-- `Entry.schemaVersion` is the per-entry canonical schema version (current: `1`).
+- `Entry.schemaVersion` is the per-entry canonical schema version (current: `5`).
 - New writes (`createEntry`, `updateEntry`) always persist the current version.
 - Reads normalize legacy entries that predate `schemaVersion` (treated as legacy v0) into the current in-memory shape.
 - Legacy v0 migration currently backfills:
   - `schemaVersion: 1`
   - `rawTechniqueMentions: []` when missing or invalid
 - Unsupported future entry schema versions fail closed (server error) until an explicit migration is added.
+
+## Curriculum Versioning And Migration Observability
+- `CURRICULUM_VERSION#ACTIVE` stores the active rollout state for curriculum compatibility gates.
+- Curriculum writes run through versioned rollout states: `rolling_out -> active` or `failed` with automatic rollback of curriculum rows.
+- Migration outcomes are persisted as `MIGRATION_RUN` rows with:
+  - `scope`, `sourceVersion`, `targetVersion`
+  - `status`, `retries`, `attempts[]`, `lastErrorMessage?`
+- Compatibility checks enforce the GPT workflow contract (`capture -> outputs -> optional coach review -> storage`) by validating:
+  - entry schema version bounds for the active curriculum version
+  - required recommendation evidence links
+  - session review cue integrity when session reviews are present
 
 ## Version Bump / Compatibility Policy
 - Additive, backward-compatible entry changes:

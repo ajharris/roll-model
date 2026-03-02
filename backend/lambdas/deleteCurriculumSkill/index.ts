@@ -2,7 +2,13 @@ import type { APIGatewayProxyHandler } from 'aws-lambda';
 
 import { getAuthContext, requireRole } from '../../shared/auth';
 import { relationshipSk, skillSk, progressSk } from '../../shared/curriculum';
-import { listCurriculumSnapshot, resolveCurriculumAccess } from '../../shared/curriculumStore';
+import {
+  listCurriculumSnapshot,
+  listProgressSignals,
+  replaceCurriculumSnapshot,
+  resolveCurriculumAccess
+} from '../../shared/curriculumStore';
+import { assertCurriculumCompatibility, getCurriculumVersionState, runCurriculumVersionedMutation } from '../../shared/curriculumVersioning';
 import { deleteItem } from '../../shared/db';
 import { withRequestLogging } from '../../shared/logger';
 import { ApiError, errorResponse, response } from '../../shared/responses';
@@ -13,6 +19,7 @@ const baseHandler: APIGatewayProxyHandler = async (event) => {
     requireRole(auth, ['coach', 'admin']);
 
     const { athleteId } = await resolveCurriculumAccess(event, auth, ['coach', 'admin']);
+    const versionState = await getCurriculumVersionState(athleteId);
     const skillId = event.pathParameters?.skillId?.trim().toLowerCase();
     if (!skillId) {
       throw new ApiError({
@@ -35,34 +42,58 @@ const baseHandler: APIGatewayProxyHandler = async (event) => {
       (edge) => edge.fromSkillId === skillId || edge.toSkillId === skillId
     );
 
-    await Promise.all([
-      deleteItem({
-        Key: {
-          PK: `USER#${athleteId}`,
-          SK: skillSk(skillId)
-        }
-      }),
-      deleteItem({
-        Key: {
-          PK: `USER#${athleteId}`,
-          SK: progressSk(skillId)
-        }
-      }),
-      ...relatedEdges.map((edge) =>
-        deleteItem({
-          Key: {
-            PK: `USER#${athleteId}`,
-            SK: relationshipSk(edge.fromSkillId, edge.toSkillId)
-          }
-        })
-      )
-    ]);
+    const mutationResult = await runCurriculumVersionedMutation({
+      athleteId,
+      startedBy: auth.userId,
+      sourceVersion: versionState.version,
+      execute: async () => {
+        const beforeSnapshot = await listCurriculumSnapshot(athleteId);
+        try {
+          await Promise.all([
+            deleteItem({
+              Key: {
+                PK: `USER#${athleteId}`,
+                SK: skillSk(skillId)
+              }
+            }),
+            deleteItem({
+              Key: {
+                PK: `USER#${athleteId}`,
+                SK: progressSk(skillId)
+              }
+            }),
+            ...relatedEdges.map((edge) =>
+              deleteItem({
+                Key: {
+                  PK: `USER#${athleteId}`,
+                  SK: relationshipSk(edge.fromSkillId, edge.toSkillId)
+                }
+              })
+            )
+          ]);
 
-    return response(200, {
-      deleted: true,
-      skillId,
-      removedRelationships: relatedEdges.length
+          const [afterSnapshot, signals] = await Promise.all([
+            listCurriculumSnapshot(athleteId),
+            listProgressSignals(athleteId)
+          ]);
+          assertCurriculumCompatibility({
+            curriculumVersion: versionState.version,
+            entries: signals.entries,
+            recommendations: afterSnapshot.recommendations
+          });
+          return {
+            deleted: true,
+            skillId,
+            removedRelationships: relatedEdges.length
+          };
+        } catch (error) {
+          await replaceCurriculumSnapshot(athleteId, beforeSnapshot);
+          throw error;
+        }
+      }
     });
+
+    return response(200, { ...mutationResult.result, curriculumVersion: mutationResult.versionState });
   } catch (error) {
     return errorResponse(error);
   }
