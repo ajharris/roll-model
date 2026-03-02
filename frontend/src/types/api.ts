@@ -63,12 +63,22 @@ export interface PartnerProfile {
   updatedAt: string;
 }
 
+export interface EntryQuickAdd {
+  time: string;
+  class: string;
+  gym: string;
+  partners: string[];
+  rounds: number;
+  notes: string;
+}
+
 export interface Entry {
   entryId: string;
   athleteId: string;
   createdAt: string;
   updatedAt?: string;
   schemaVersion?: number;
+  quickAdd?: EntryQuickAdd;
   structured?: EntryStructuredFields;
   structuredExtraction?: EntryStructuredExtraction;
   sections: EntrySections;
@@ -728,7 +738,7 @@ export interface SharePolicy {
 export interface SharedSessionHighlight {
   entryId: string;
   createdAt: string;
-  quickAdd?: Entry['quickAdd'];
+  quickAdd?: EntryQuickAdd;
   sharedSection?: string;
   sessionMetrics?: SessionMetrics;
   sessionContext?: SessionContext;
