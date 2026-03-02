@@ -1077,8 +1077,10 @@ export class RollModelStack extends cdk.Stack {
     const observabilityNamespace = 'RollModel/Backend';
     const structuredRequestErrorMetricName = 'StructuredRequestErrors';
     const structuredLatencyMetricName = 'StructuredRequestLatencyMs';
+    const observedLambdaCount = 12;
+    const observedLambdas = backendLambdas.slice(0, observedLambdaCount);
 
-    for (const { name, fn } of backendLambdas) {
+    for (const { name, fn } of observedLambdas) {
       new logs.MetricFilter(this, `${name}StructuredRequestErrorMetricFilter`, {
         logGroup: fn.logGroup,
         filterPattern: logs.FilterPattern.literal('{ $.event = "request.error" }'),
