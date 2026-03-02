@@ -561,10 +561,12 @@ export const migrateEntrySchemaPayload = (
 
 export const withCurrentEntrySchemaVersion = (
   entry: Omit<Entry, 'schemaVersion'> & Partial<Pick<Entry, 'schemaVersion'>>
-): Entry => ({
-  ...entry,
-  schemaVersion: CURRENT_ENTRY_SCHEMA_VERSION
-});
+): Entry => {
+  return {
+    ...entry,
+    schemaVersion: CURRENT_ENTRY_SCHEMA_VERSION
+  };
+};
 
 export const normalizeEntry = (entry: NormalizableEntryInput): Entry => {
   const migrated = migrateEntrySchemaPayload(entry);
