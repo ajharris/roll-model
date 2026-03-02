@@ -95,7 +95,7 @@ const stripMarkdown = (value: string): string =>
 const stripHtml = (value: string): string =>
   value
     .replace(/<style[\s\S]*?<\/style>/gi, ' ')
-    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<script[\s\S]*?<\/script[^>]*>/gi, ' ')
     .replace(/<[^>]+>/g, ' ')
     .replace(/&nbsp;/g, ' ');
 
