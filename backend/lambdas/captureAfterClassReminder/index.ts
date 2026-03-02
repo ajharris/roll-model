@@ -1,8 +1,6 @@
 import type { APIGatewayProxyHandler } from 'aws-lambda';
-
 import { v4 as uuidv4 } from 'uuid';
 
-import { buildEntry } from '../createEntry/index';
 import { getAuthContext, requireRole } from '../../shared/auth';
 import { parseNotificationRecord } from '../../shared/automation';
 import { parseReminderCapturePayload } from '../../shared/automationPayload';
@@ -12,6 +10,7 @@ import { callOpenAI } from '../../shared/openai';
 import { recomputeAndPersistProgressViews } from '../../shared/progressStore';
 import { ApiError, errorResponse, response } from '../../shared/responses';
 import type { CreateEntryRequest } from '../../shared/types';
+import { buildEntry } from '../createEntry/index';
 
 const requireNotificationId = (value?: string): string => {
   if (!value) {

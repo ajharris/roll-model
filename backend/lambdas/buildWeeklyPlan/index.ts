@@ -1,13 +1,13 @@
 import type { APIGatewayProxyHandler } from 'aws-lambda';
 
 import { getAuthContext, hasRole, requireRole } from '../../shared/auth';
+import { parseWeeklyDigestRecord, selectedDigestFocus } from '../../shared/automation';
 import { getItem, putItem, queryItems } from '../../shared/db';
 import { parseEntryRecord } from '../../shared/entries';
 import { isCoachLinkActive } from '../../shared/links';
 import { withRequestLogging } from '../../shared/logger';
 import { ApiError, errorResponse, response } from '../../shared/responses';
 import type { Checkoff, CurriculumGraph, Entry, WeeklyPlan } from '../../shared/types';
-import { parseWeeklyDigestRecord, selectedDigestFocus } from '../../shared/automation';
 import { parseBuildWeeklyPlanPayload } from '../../shared/weeklyPlanPayload';
 import {
   buildGraphSk,

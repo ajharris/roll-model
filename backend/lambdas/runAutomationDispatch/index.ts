@@ -14,8 +14,8 @@ import {
 } from '../../shared/automation';
 import { getItem, putItem, queryItems } from '../../shared/db';
 import { parseEntryRecord } from '../../shared/entries';
-import { parseWeeklyPlanRecord } from '../../shared/weeklyPlans';
 import type { Checkoff, Entry, WeeklyPlan } from '../../shared/types';
+import { parseWeeklyPlanRecord } from '../../shared/weeklyPlans';
 
 const loadAllSettings = async (): Promise<Array<ReturnType<typeof parseAutomationSettingsRecord>>> => {
   const out: Array<ReturnType<typeof parseAutomationSettingsRecord>> = [];

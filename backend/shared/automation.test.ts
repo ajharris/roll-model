@@ -1,4 +1,3 @@
-import type { Checkoff, Entry, WeeklyPlan } from './types';
 import {
   buildWeeklyDigestHeuristic,
   evaluateAutomationDue,
@@ -6,6 +5,7 @@ import {
   isWithinQuietHours,
   type ZonedNow
 } from './automation';
+import type { Checkoff, Entry, WeeklyPlan } from './types';
 
 const buildSettings = (overrides?: Partial<Parameters<typeof evaluateAutomationDue>[0]>) => ({
   athleteId: 'athlete-1',

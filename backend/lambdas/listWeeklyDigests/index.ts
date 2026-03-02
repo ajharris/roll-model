@@ -1,11 +1,11 @@
 import type { APIGatewayProxyHandler } from 'aws-lambda';
 
 import { getAuthContext, hasRole, requireRole } from '../../shared/auth';
+import { parseWeeklyDigestRecord } from '../../shared/automation';
 import { getItem, queryItems } from '../../shared/db';
 import { isCoachLinkActive } from '../../shared/links';
 import { withRequestLogging } from '../../shared/logger';
 import { ApiError, errorResponse, response } from '../../shared/responses';
-import { parseWeeklyDigestRecord } from '../../shared/automation';
 
 const resolveAthleteId = (requestedAthleteId: string | undefined, authUserId: string): string => requestedAthleteId ?? authUserId;
 
@@ -63,4 +63,3 @@ const baseHandler: APIGatewayProxyHandler = async (event) => {
 };
 
 export const handler: APIGatewayProxyHandler = withRequestLogging('listWeeklyDigests', baseHandler);
-
