@@ -1,8 +1,16 @@
 import type { APIGatewayProxyEvent } from 'aws-lambda';
 
 import type { AuthContext } from './auth';
-import { parseCurriculumSnapshot, type CurriculumSnapshot } from './curriculum';
-import { getItem, queryItems } from './db';
+import {
+  buildProgressRecord,
+  buildRecommendationRecord,
+  buildRelationshipRecord,
+  buildSkillRecord,
+  buildStageRecord,
+  parseCurriculumSnapshot,
+  type CurriculumSnapshot
+} from './curriculum';
+import { deleteItem, getItem, putItem, queryItems } from './db';
 import { parseEntryRecord } from './entries';
 import { isCoachLinkActive } from './links';
 import { ApiError } from './responses';
@@ -67,6 +75,69 @@ export const listCurriculumSnapshot = async (athleteId: string): Promise<Curricu
 
   const items = (result.Items ?? []) as Array<Record<string, unknown>>;
   return parseCurriculumSnapshot(items);
+};
+
+const curriculumSkPrefixes = [
+  'CURRICULUM_STAGE#',
+  'CURRICULUM_SKILL#',
+  'CURRICULUM_REL#FROM#',
+  'CURRICULUM_PROGRESS#',
+  'CURRICULUM_RECOMMENDATION#'
+];
+
+const isCurriculumRow = (item: Record<string, unknown>): boolean => {
+  const sk = item.SK;
+  return typeof sk === 'string' && curriculumSkPrefixes.some((prefix) => sk.startsWith(prefix));
+};
+
+export const replaceCurriculumSnapshot = async (athleteId: string, snapshot: CurriculumSnapshot): Promise<void> => {
+  const currentRows = await queryItems({
+    KeyConditionExpression: 'PK = :pk',
+    ExpressionAttributeValues: {
+      ':pk': `USER#${athleteId}`
+    }
+  });
+
+  const existingCurriculumRows = (currentRows.Items ?? []).filter((item) => isCurriculumRow(item as Record<string, unknown>));
+  const existingSkSet = new Set(
+    existingCurriculumRows
+      .map((item) => {
+        const sk = (item as { SK?: unknown }).SK;
+        return typeof sk === 'string' ? sk : null;
+      })
+      .filter((sk): sk is string => sk !== null)
+  );
+
+  const nextRows = [
+    ...snapshot.stages.map((stage) => buildStageRecord(athleteId, stage)),
+    ...snapshot.skills.map((skill) => buildSkillRecord(athleteId, skill)),
+    ...snapshot.relationships.map((relationship) => buildRelationshipRecord(athleteId, relationship)),
+    ...snapshot.progressions.map((progression) => buildProgressRecord(progression)),
+    ...snapshot.recommendations.map((recommendation) => buildRecommendationRecord(recommendation))
+  ];
+  const nextSkSet = new Set(
+    nextRows
+      .map((item) => (typeof item.SK === 'string' ? item.SK : null))
+      .filter((sk): sk is string => sk !== null)
+  );
+
+  for (const row of nextRows) {
+    await putItem({
+      Item: row
+    });
+  }
+
+  for (const sk of existingSkSet) {
+    if (nextSkSet.has(sk)) {
+      continue;
+    }
+    await deleteItem({
+      Key: {
+        PK: `USER#${athleteId}`,
+        SK: sk
+      }
+    });
+  }
 };
 
 export const listProgressSignals = async (

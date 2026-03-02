@@ -979,6 +979,61 @@ export interface CurriculumGraph {
   edges: CurriculumGraphEdge[];
 }
 
+export type MigrationRunStatus = 'pending' | 'running' | 'succeeded' | 'failed' | 'rolled_back';
+export type MigrationScope = 'entry-schema' | 'curriculum-schema' | 'curriculum-version';
+
+export interface MigrationRunAttempt {
+  attempt: number;
+  status: MigrationRunStatus;
+  startedAt: string;
+  completedAt?: string;
+  errorMessage?: string;
+}
+
+export interface MigrationRunRecord {
+  runId: string;
+  athleteId: string;
+  scope: MigrationScope;
+  status: MigrationRunStatus;
+  sourceVersion: number;
+  targetVersion: number;
+  createdAt: string;
+  updatedAt: string;
+  startedBy: string;
+  retries: number;
+  attempts: MigrationRunAttempt[];
+  rollbackOfRunId?: string;
+  lastErrorMessage?: string;
+}
+
+export interface CurriculumCompatibilityRule {
+  minEntrySchemaVersion: number;
+  maxEntrySchemaVersion: number;
+  requiresRecommendationSourceEvidence: boolean;
+  requiresSessionReviewCue: boolean;
+}
+
+export interface CurriculumVersionDefinition {
+  version: number;
+  name: string;
+  workflowContract: 'capture-outputs-coach-review-storage-v1';
+  compatibility: CurriculumCompatibilityRule;
+}
+
+export type CurriculumVersionStatus = 'active' | 'rolling_out' | 'failed' | 'rolling_back';
+
+export interface CurriculumVersionState {
+  athleteId: string;
+  version: number;
+  status: CurriculumVersionStatus;
+  activatedAt: string;
+  updatedAt: string;
+  updatedBy: string;
+  previousVersion?: number;
+  rolloutRunId?: string;
+  lastError?: string;
+}
+
 export type ShareVisibility = 'private';
 export type ShareLinkStatus = 'active' | 'revoked';
 export type ShareEventType = 'created' | 'viewed' | 'revoked' | 'access_denied_expired' | 'access_denied_revoked';

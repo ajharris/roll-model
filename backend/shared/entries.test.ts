@@ -3,6 +3,7 @@ import {
   isValidClipTimestamp,
   isValidMediaAttachmentsInput,
   isValidMediaUrl,
+  migrateEntrySchemaPayload,
   normalizeEntry,
   parseEntryRecord,
   withCurrentEntrySchemaVersion
@@ -23,7 +24,7 @@ describe('entry schema versioning', () => {
         rounds: 6,
         notes: 'shared'
       },
-      tags: ['guard-type'],
+      tags: ['guard-type' as const],
       sections: { shared: 'shared', private: 'private' },
       sessionMetrics: {
         durationMinutes: 60,
@@ -172,5 +173,40 @@ describe('entry schema versioning', () => {
     });
 
     expect(entry.sessionReviewDraft?.oneThing).toBe('Pummel first');
+  });
+
+  it('applies versioned migration steps idempotently', () => {
+    const source = {
+      entryId: 'entry-v2',
+      athleteId: 'athlete-1',
+      schemaVersion: 2,
+      createdAt: '2024-01-01T00:00:00.000Z',
+      updatedAt: '2024-01-01T00:00:00.000Z',
+      quickAdd: {
+        time: '2024-01-01T18:00:00.000Z',
+        class: 'Open mat',
+        gym: 'North Academy',
+        partners: ['Alex'],
+        rounds: 6,
+        notes: 'shared'
+      },
+      tags: ['guard-type'],
+      sections: { shared: 'shared', private: 'private' },
+      sessionMetrics: {
+        durationMinutes: 60,
+        intensity: 7,
+        rounds: 6,
+        giOrNoGi: 'gi',
+        tags: ['guard']
+      },
+      rawTechniqueMentions: []
+    };
+
+    const first = migrateEntrySchemaPayload(source as never);
+    const second = migrateEntrySchemaPayload(first.payload);
+
+    expect(first.appliedSteps).toEqual(['entry-v2-to-v3', 'entry-v3-to-v4', 'entry-v4-to-v5']);
+    expect(second.appliedSteps).toEqual([]);
+    expect((first.payload as { schemaVersion: number }).schemaVersion).toBe(CURRENT_ENTRY_SCHEMA_VERSION);
   });
 });

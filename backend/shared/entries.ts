@@ -1,3 +1,4 @@
+import { migratePayload, type MigrationStep } from './migrations';
 import { normalizeFinalizedSessionReview, normalizeSessionReviewArtifact } from './sessionReview';
 import type {
   Entry,
@@ -39,6 +40,7 @@ type VersionedEntryInput = Omit<Entry, 'rawTechniqueMentions'> & {
 };
 
 type NormalizableEntryInput = LegacyEntryV0 | VersionedEntryInput;
+type EntrySchemaPayload = Record<string, unknown>;
 const CLIP_TIMESTAMP_REGEX = /^(?:\d+:[0-5]\d:[0-5]\d|\d+:[0-5]\d)$/;
 const ENTRY_TAG_VALUES = new Set<EntryTag>([
   'guard-type',
@@ -489,18 +491,73 @@ export const sanitizeMediaAttachments = (value: unknown): MediaAttachment[] => {
     .filter((attachment): attachment is MediaAttachment => attachment !== null);
 };
 
-const migrateLegacyEntryV0 = (legacy: LegacyEntryV0): Entry => ({
-  ...legacy,
-  schemaVersion: CURRENT_ENTRY_SCHEMA_VERSION,
-  quickAdd: sanitizeQuickAdd((legacy as Record<string, unknown>).quickAdd, legacy as unknown as Record<string, unknown>),
-  structured: sanitizeStructuredFields((legacy as Record<string, unknown>).structured),
-  structuredExtraction: sanitizeStructuredExtraction((legacy as Record<string, unknown>).structuredExtraction),
-  tags: sanitizeEntryTags((legacy as Record<string, unknown>).tags, legacy.sessionMetrics?.tags),
-  sessionContext: sanitizeSessionContext((legacy as Record<string, unknown>).sessionContext),
-  partnerOutcomes: sanitizePartnerOutcomes((legacy as Record<string, unknown>).partnerOutcomes),
-  rawTechniqueMentions: sanitizeRawTechniqueMentions(legacy.rawTechniqueMentions),
-  mediaAttachments: sanitizeMediaAttachments(legacy.mediaAttachments)
+const applySchemaVersion = (payload: EntrySchemaPayload, schemaVersion: number): EntrySchemaPayload => ({
+  ...payload,
+  schemaVersion
 });
+
+const entrySchemaMigrations: Array<MigrationStep<EntrySchemaPayload>> = [
+  {
+    fromVersion: 0,
+    toVersion: 2,
+    label: 'entry-v0-to-v2',
+    migrate: (payload) => applySchemaVersion(payload, 2),
+    rollback: (payload) => {
+      const { schemaVersion: _schemaVersion, ...legacy } = payload;
+      void _schemaVersion;
+      return legacy;
+    }
+  },
+  {
+    fromVersion: 2,
+    toVersion: 3,
+    label: 'entry-v2-to-v3',
+    migrate: (payload) => applySchemaVersion(payload, 3),
+    rollback: (payload) => applySchemaVersion(payload, 2)
+  },
+  {
+    fromVersion: 3,
+    toVersion: 4,
+    label: 'entry-v3-to-v4',
+    migrate: (payload) => applySchemaVersion(payload, 4),
+    rollback: (payload) => applySchemaVersion(payload, 3)
+  },
+  {
+    fromVersion: 4,
+    toVersion: 5,
+    label: 'entry-v4-to-v5',
+    migrate: (payload) => applySchemaVersion(payload, 5),
+    rollback: (payload) => applySchemaVersion(payload, 4)
+  }
+];
+
+export const migrateEntrySchemaPayload = (
+  entry: NormalizableEntryInput
+): { payload: NormalizableEntryInput; appliedSteps: string[] } => {
+  const schemaVersion = (entry as { schemaVersion?: number }).schemaVersion;
+  const sourceVersion = schemaVersion === undefined ? 0 : schemaVersion;
+  if (
+    sourceVersion !== 0 &&
+    sourceVersion !== 2 &&
+    sourceVersion !== 3 &&
+    sourceVersion !== 4 &&
+    sourceVersion !== CURRENT_ENTRY_SCHEMA_VERSION
+  ) {
+    throw new Error(`Unsupported entry schema version: ${String(schemaVersion)}`);
+  }
+
+  const migrated = migratePayload({
+    sourceVersion,
+    targetVersion: CURRENT_ENTRY_SCHEMA_VERSION,
+    payload: entry as EntrySchemaPayload,
+    steps: entrySchemaMigrations
+  });
+
+  return {
+    payload: migrated.payload as NormalizableEntryInput,
+    appliedSteps: migrated.appliedSteps
+  };
+};
 
 export const withCurrentEntrySchemaVersion = (
   entry: Omit<Entry, 'schemaVersion'> & Partial<Pick<Entry, 'schemaVersion'>>
@@ -510,30 +567,26 @@ export const withCurrentEntrySchemaVersion = (
 });
 
 export const normalizeEntry = (entry: NormalizableEntryInput): Entry => {
-  const schemaVersion = (entry as { schemaVersion?: number }).schemaVersion;
+  const migrated = migrateEntrySchemaPayload(entry);
+  const migratedEntry = migrated.payload as VersionedEntryInput;
 
-  if (schemaVersion === undefined) {
-    return migrateLegacyEntryV0(entry as LegacyEntryV0);
-  }
-
-  if (schemaVersion !== 2 && schemaVersion !== 3 && schemaVersion !== 4 && schemaVersion !== CURRENT_ENTRY_SCHEMA_VERSION) {
-    throw new Error(`Unsupported entry schema version: ${String(schemaVersion)}`);
-  }
-
-  const sessionReviewDraft = normalizeSessionReviewArtifact((entry as Record<string, unknown>).sessionReviewDraft);
-  const sessionReviewFinal = normalizeFinalizedSessionReview((entry as Record<string, unknown>).sessionReviewFinal);
+  const sessionReviewDraft = normalizeSessionReviewArtifact((migratedEntry as Record<string, unknown>).sessionReviewDraft);
+  const sessionReviewFinal = normalizeFinalizedSessionReview((migratedEntry as Record<string, unknown>).sessionReviewFinal);
 
   return {
-    ...entry,
+    ...migratedEntry,
     schemaVersion: CURRENT_ENTRY_SCHEMA_VERSION,
-    quickAdd: sanitizeQuickAdd((entry as Record<string, unknown>).quickAdd, entry as unknown as Record<string, unknown>),
-    structured: sanitizeStructuredFields((entry as Record<string, unknown>).structured),
-    structuredExtraction: sanitizeStructuredExtraction((entry as Record<string, unknown>).structuredExtraction),
-    tags: sanitizeEntryTags((entry as Record<string, unknown>).tags, entry.sessionMetrics?.tags),
-    sessionContext: sanitizeSessionContext((entry as Record<string, unknown>).sessionContext),
-    partnerOutcomes: sanitizePartnerOutcomes((entry as Record<string, unknown>).partnerOutcomes),
-    rawTechniqueMentions: sanitizeRawTechniqueMentions(entry.rawTechniqueMentions),
-    mediaAttachments: sanitizeMediaAttachments(entry.mediaAttachments),
+    quickAdd: sanitizeQuickAdd(
+      (migratedEntry as Record<string, unknown>).quickAdd,
+      migratedEntry as unknown as Record<string, unknown>
+    ),
+    structured: sanitizeStructuredFields((migratedEntry as Record<string, unknown>).structured),
+    structuredExtraction: sanitizeStructuredExtraction((migratedEntry as Record<string, unknown>).structuredExtraction),
+    tags: sanitizeEntryTags((migratedEntry as Record<string, unknown>).tags, migratedEntry.sessionMetrics?.tags),
+    sessionContext: sanitizeSessionContext((migratedEntry as Record<string, unknown>).sessionContext),
+    partnerOutcomes: sanitizePartnerOutcomes((migratedEntry as Record<string, unknown>).partnerOutcomes),
+    rawTechniqueMentions: sanitizeRawTechniqueMentions(migratedEntry.rawTechniqueMentions),
+    mediaAttachments: sanitizeMediaAttachments(migratedEntry.mediaAttachments),
     ...(sessionReviewDraft ? { sessionReviewDraft } : {}),
     ...(sessionReviewFinal ? { sessionReviewFinal } : {})
   };
