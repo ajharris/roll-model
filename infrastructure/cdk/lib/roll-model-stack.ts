@@ -150,6 +150,16 @@ export class RollModelStack extends cdk.Stack {
     const getEntriesLambda = this.createLambda('getEntries', 'backend/lambdas/getEntries/index.ts', table);
     const getEntryLambda = this.createLambda('getEntry', 'backend/lambdas/getEntry/index.ts', table);
     const updateEntryLambda = this.createLambda('updateEntry', 'backend/lambdas/updateEntry/index.ts', table);
+    const previewLegacyEntryImportLambda = this.createLambda(
+      'previewLegacyEntryImport',
+      'backend/lambdas/previewLegacyEntryImport/index.ts',
+      table
+    );
+    const commitLegacyEntryImportLambda = this.createLambda(
+      'commitLegacyEntryImport',
+      'backend/lambdas/commitLegacyEntryImport/index.ts',
+      table
+    );
     const reviewStructuredMetadataLambda = this.createLambda(
       'reviewStructuredMetadata',
       'backend/lambdas/reviewStructuredMetadata/index.ts',
@@ -313,6 +323,8 @@ export class RollModelStack extends cdk.Stack {
       { name: 'getEntries', fn: getEntriesLambda },
       { name: 'getEntry', fn: getEntryLambda },
       { name: 'updateEntry', fn: updateEntryLambda },
+      { name: 'previewLegacyEntryImport', fn: previewLegacyEntryImportLambda },
+      { name: 'commitLegacyEntryImport', fn: commitLegacyEntryImportLambda },
       { name: 'reviewStructuredMetadata', fn: reviewStructuredMetadataLambda },
       { name: 'deleteEntry', fn: deleteEntryLambda },
       { name: 'listSavedSearches', fn: listSavedSearchesLambda },
@@ -366,6 +378,14 @@ export class RollModelStack extends cdk.Stack {
       })
     );
     getCoachQuestionsLambda.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: ['ssm:GetParameter'],
+        resources: [
+          `arn:aws:ssm:${cdk.Stack.of(this).region}:${cdk.Stack.of(this).account}:parameter/roll-model/openai_api_key`
+        ]
+      })
+    );
+    previewLegacyEntryImportLambda.addToRolePolicy(
       new iam.PolicyStatement({
         actions: ['ssm:GetParameter'],
         resources: [
@@ -492,6 +512,23 @@ export class RollModelStack extends cdk.Stack {
     entries.addCorsPreflight({
       allowOrigins: apigateway.Cors.ALL_ORIGINS,
       allowMethods: ['GET', 'POST', 'OPTIONS'],
+      allowHeaders: ['Content-Type', 'Authorization']
+    });
+
+    const imports = api.root.addResource('imports');
+    const importsEntries = imports.addResource('entries');
+    const importsEntriesPreview = importsEntries.addResource('preview');
+    importsEntriesPreview.addMethod('POST', new apigateway.LambdaIntegration(previewLegacyEntryImportLambda), methodOptions);
+    importsEntriesPreview.addCorsPreflight({
+      allowOrigins: apigateway.Cors.ALL_ORIGINS,
+      allowMethods: ['POST', 'OPTIONS'],
+      allowHeaders: ['Content-Type', 'Authorization']
+    });
+    const importsEntriesCommit = importsEntries.addResource('commit');
+    importsEntriesCommit.addMethod('POST', new apigateway.LambdaIntegration(commitLegacyEntryImportLambda), methodOptions);
+    importsEntriesCommit.addCorsPreflight({
+      allowOrigins: apigateway.Cors.ALL_ORIGINS,
+      allowMethods: ['POST', 'OPTIONS'],
       allowHeaders: ['Content-Type', 'Authorization']
     });
 
