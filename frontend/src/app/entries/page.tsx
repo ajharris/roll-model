@@ -434,6 +434,9 @@ export default function EntriesPage() {
         <Link href="/entries/new" className="button-link">
           Create a new entry
         </Link>
+        <Link href="/entries/import" className="button-link">
+          Import legacy notes
+        </Link>
 
         <div className="panel">
           <h3>Quick add (&lt;30s mobile flow)</h3>

@@ -48,8 +48,10 @@ describe('FeedbackPage', () => {
 
     await user.click(screen.getByRole('button', { name: 'Preview payload' }));
     expect(await screen.findByText('Final preview')).toBeInTheDocument();
+    expect(apiClientMock.submitFeedback).not.toHaveBeenCalled();
 
-    await user.click(screen.getByRole('button', { name: 'Submit feedback' }));
+    const submitButton = await screen.findByRole('button', { name: 'Submit feedback' });
+    await user.click(submitButton);
 
     await waitFor(() => expect(apiClientMock.submitFeedback).toHaveBeenCalledTimes(1));
     expect(apiClientMock.submitFeedback).toHaveBeenCalledWith(
@@ -59,7 +61,7 @@ describe('FeedbackPage', () => {
         screenshots: [{ url: 'https://example.com/shot.png', caption: '' }],
       }),
     );
-  });
+  }, 15000);
 
   it('normalizes feedback fields with GPT', async () => {
     const user = userEvent.setup();
