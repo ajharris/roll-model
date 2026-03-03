@@ -49,6 +49,8 @@ export default function EntriesPage() {
   const [editingSavedSearchId, setEditingSavedSearchId] = useState<string | null>(null);
   const [editingSavedSearchName, setEditingSavedSearchName] = useState('');
   const [savedSearchStatus, setSavedSearchStatus] = useState('');
+  const [entriesStatus, setEntriesStatus] = useState('');
+  const [deletingEntryId, setDeletingEntryId] = useState<string | null>(null);
   const [quickAdd, setQuickAdd] = useState(defaultQuickAdd);
   const [quickAddStatus, setQuickAddStatus] = useState('');
 
@@ -426,6 +428,25 @@ export default function EntriesPage() {
     }
   };
 
+  const deleteEntryFromOverview = async (entryId: string) => {
+    const confirmed = window.confirm('Delete this entry? This cannot be undone.');
+    if (!confirmed) {
+      return;
+    }
+
+    setEntriesStatus('');
+    setDeletingEntryId(entryId);
+    try {
+      await apiClient.deleteEntry(entryId);
+      setEntries((current) => current.filter((entry) => entry.entryId !== entryId));
+      setEntriesStatus('Entry deleted.');
+    } catch {
+      setEntriesStatus('Could not delete entry.');
+    } finally {
+      setDeletingEntryId(null);
+    }
+  };
+
   return (
     <Protected allow={['athlete']}>
       <section>
@@ -692,6 +713,7 @@ export default function EntriesPage() {
 
         {loading && <p>Loading entries...</p>}
         {error && <p>{error}</p>}
+        {entriesStatus && <p className="small">{entriesStatus}</p>}
         {!loading &&
           filteredEntries.map((entry) => (
             <div key={entry.entryId} className="list-item">
@@ -724,10 +746,18 @@ export default function EntriesPage() {
                   {entry.mediaAttachments.reduce((sum, attachment) => sum + attachment.clipNotes.length, 0)}
                 </p>
               )}
-              <p className="small">
+              <p className="small row">
                 <Link href={`/entries/${entry.entryId}`} className="button-link">
                   View / Edit
                 </Link>
+                <button
+                  type="button"
+                  onClick={() => void deleteEntryFromOverview(entry.entryId)}
+                  disabled={deletingEntryId === entry.entryId}
+                  aria-label={`Delete entry ${entry.entryId}`}
+                >
+                  {deletingEntryId === entry.entryId ? 'Deleting...' : 'Delete'}
+                </button>
               </p>
             </div>
           ))}

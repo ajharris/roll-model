@@ -11,6 +11,7 @@ const { apiClientMock, flushOfflineMutationQueueMock, readSavedEntrySearchesMock
   vi.hoisted(() => ({
     apiClientMock: {
       getEntries: vi.fn(),
+      deleteEntry: vi.fn(),
       listSavedSearches: vi.fn(),
       createSavedSearch: vi.fn(),
       updateSavedSearch: vi.fn(),
@@ -70,6 +71,7 @@ const sampleEntries = [
 describe('EntriesPage search UI', () => {
   beforeEach(() => {
     apiClientMock.getEntries.mockReset();
+    apiClientMock.deleteEntry.mockReset();
     apiClientMock.listSavedSearches.mockReset();
     apiClientMock.createSavedSearch.mockReset();
     apiClientMock.updateSavedSearch.mockReset();
@@ -80,6 +82,7 @@ describe('EntriesPage search UI', () => {
     writeSavedEntrySearchesMock.mockReset();
 
     apiClientMock.getEntries.mockResolvedValue(sampleEntries);
+    apiClientMock.deleteEntry.mockResolvedValue({});
     apiClientMock.listSavedSearches.mockResolvedValue([]);
     flushOfflineMutationQueueMock.mockResolvedValue({
       processed: 0,
@@ -131,5 +134,31 @@ describe('EntriesPage search UI', () => {
         sortDirection: 'desc',
       }),
     );
+  });
+
+  it('does not delete an overview entry when confirmation is cancelled', async () => {
+    const user = userEvent.setup();
+    const confirmMock = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    render(<EntriesPage />);
+
+    await screen.findByLabelText('Delete entry entry-1');
+    await user.click(screen.getByLabelText('Delete entry entry-1'));
+
+    expect(apiClientMock.deleteEntry).not.toHaveBeenCalled();
+    confirmMock.mockRestore();
+  });
+
+  it('deletes an overview entry after confirmation', async () => {
+    const user = userEvent.setup();
+    const confirmMock = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    render(<EntriesPage />);
+
+    await screen.findByLabelText('Delete entry entry-1');
+    await user.click(screen.getByLabelText('Delete entry entry-1'));
+
+    await waitFor(() => expect(apiClientMock.deleteEntry).toHaveBeenCalledWith('entry-1'));
+    await waitFor(() => expect(screen.queryByText('Open mat with Alex. Knee shield wins.')).not.toBeInTheDocument());
+    expect(screen.getByText('Entry deleted.')).toBeInTheDocument();
+    confirmMock.mockRestore();
   });
 });
