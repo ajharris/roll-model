@@ -21,6 +21,7 @@ import type {
 interface SanitizedContext {
   athleteId: string;
   includePrivate: boolean;
+  includeIntegrationSignals: boolean;
   entryIds?: string[];
   from?: string;
   to?: string;
@@ -50,6 +51,7 @@ export const sanitizeContext = (
   context: AIChatContext | undefined
 ): SanitizedContext => {
   const includePrivate = role === 'athlete' ? Boolean(context?.includePrivate) : false;
+  const includeIntegrationSignals = context?.includeIntegrationSignals !== false;
 
   if (role === 'coach') {
     if (!context?.athleteId) {
@@ -63,6 +65,7 @@ export const sanitizeContext = (
     return {
       athleteId: context.athleteId,
       includePrivate,
+      includeIntegrationSignals,
       entryIds: context.entryIds,
       from: context.dateRange?.from,
       to: context.dateRange?.to,
@@ -73,6 +76,7 @@ export const sanitizeContext = (
   return {
     athleteId: userId,
     includePrivate,
+    includeIntegrationSignals,
     entryIds: context?.entryIds,
     from: context?.dateRange?.from,
     to: context?.dateRange?.to,
@@ -172,7 +176,11 @@ const getKeywordDrivenEntries = async (context: SanitizedContext): Promise<Entry
   return batchGetEntries(sortedIds);
 };
 
-export const buildPromptContext = (entries: Entry[], includePrivate: boolean): string => {
+export const buildPromptContext = (
+  entries: Entry[],
+  includePrivate: boolean,
+  includeIntegrationSignals: boolean
+): string => {
   // OPENAI_TWEAK_POINT: Change what training/context data gets sent to the model here.
   return JSON.stringify(
     entries.map((entry) => ({
@@ -183,6 +191,27 @@ export const buildPromptContext = (entries: Entry[], includePrivate: boolean): s
         : { shared: entry.sections.shared },
       sessionMetrics: entry.sessionMetrics,
       sessionContext: entry.sessionContext,
+      ...(includeIntegrationSignals && entry.integrationContext
+        ? {
+            integrationContext: {
+              confirmedTags: entry.integrationContext.confirmedTags,
+              inferredTags: entry.integrationContext.inferredTags
+                .filter((tag) => tag.status === 'confirmed' || tag.status === 'overridden')
+                .map((tag) => ({
+                  tag: tag.status === 'overridden' && tag.overriddenTag ? tag.overriddenTag : tag.tag,
+                  confidence: tag.confidence,
+                  provider: tag.provider
+                })),
+              wearable: entry.integrationContext.wearable
+                ? {
+                    trained: entry.integrationContext.wearable.trained,
+                    confidence: entry.integrationContext.wearable.confidence,
+                    status: entry.integrationContext.wearable.status
+                  }
+                : undefined
+            }
+          }
+        : {}),
       partnerOutcomes: entry.partnerOutcomes
     }))
   );
@@ -322,7 +351,7 @@ const baseHandler: APIGatewayProxyHandler = async (event) => {
     );
 
     const entries = [...filteredRecent, ...filteredKeyword];
-    const promptContext = buildPromptContext(entries, sanitized.includePrivate);
+    const promptContext = buildPromptContext(entries, sanitized.includePrivate, sanitized.includeIntegrationSignals);
 
     const historyText = threadMessages
       .map((msg) => `${msg.role.toUpperCase()}: ${msg.content}`)

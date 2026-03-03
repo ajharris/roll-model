@@ -2,7 +2,7 @@ import type { GetCommandOutput } from '@aws-sdk/lib-dynamodb';
 import type { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 
 import { buildActionPackDeleteKeys, buildActionPackIndexItems } from '../../shared/actionPackIndex';
-import { batchWriteItems, deleteItem, getItem, putItem } from '../../shared/db';
+import { batchWriteItems, deleteItem, getItem, putItem, queryItems } from '../../shared/db';
 import { CURRENT_ENTRY_SCHEMA_VERSION } from '../../shared/entries';
 import { buildKeywordIndexItems, extractEntryTokens } from '../../shared/keywords';
 import { recomputeAndPersistProgressViews } from '../../shared/progressStore';
@@ -25,6 +25,7 @@ const mockGetItem = jest.mocked(getItem);
 const mockPutItem = jest.mocked(putItem);
 const mockDeleteItem = jest.mocked(deleteItem);
 const mockBatchWriteItems = jest.mocked(batchWriteItems);
+const mockQueryItems = jest.mocked(queryItems);
 const mockExtractEntryTokens = jest.mocked(extractEntryTokens);
 const mockBuildKeywordIndexItems = jest.mocked(buildKeywordIndexItems);
 const mockBuildActionPackDeleteKeys = jest.mocked(buildActionPackDeleteKeys);
@@ -76,6 +77,7 @@ describe('updateEntry handler', () => {
     mockPutItem.mockReset();
     mockDeleteItem.mockReset();
     mockBatchWriteItems.mockReset();
+    mockQueryItems.mockReset();
     mockExtractEntryTokens.mockReset();
     mockBuildKeywordIndexItems.mockReset();
     mockBuildActionPackDeleteKeys.mockReset();
@@ -85,6 +87,7 @@ describe('updateEntry handler', () => {
     mockPutItem.mockResolvedValue();
     mockDeleteItem.mockResolvedValue();
     mockBatchWriteItems.mockResolvedValue();
+    mockQueryItems.mockResolvedValue({ Items: [] } as never);
     mockBuildKeywordIndexItems.mockReturnValue([]);
     mockBuildActionPackDeleteKeys.mockReturnValue([]);
     mockBuildActionPackIndexItems.mockReturnValue([]);

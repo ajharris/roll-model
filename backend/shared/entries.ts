@@ -1,6 +1,7 @@
 import { migratePayload, type MigrationStep } from './migrations';
 import { normalizeFinalizedSessionReview, normalizeSessionReviewArtifact } from './sessionReview';
 import type {
+  EntryIntegrationContext,
   Entry,
   EntryImportMetadata,
   EntryStructuredExtraction,
@@ -17,10 +18,11 @@ import type {
   MediaClipNote,
   PartnerGuidance,
   PartnerOutcomeNote,
-  SessionContext
+  SessionContext,
+  IntegrationWearableContext
 } from './types';
 
-export const CURRENT_ENTRY_SCHEMA_VERSION = 5;
+export const CURRENT_ENTRY_SCHEMA_VERSION = 6;
 
 type EntryRecordEnvelope = {
   PK: string;
@@ -78,6 +80,7 @@ const LEGACY_IMPORT_CONFLICT_STATUSES = new Set<LegacyImportConflictStatus>([
   'possible-duplicate',
   'requires-review'
 ]);
+const INTEGRATION_STATUSES = new Set(['suggested', 'confirmed', 'rejected', 'overridden']);
 
 const sanitizeRawTechniqueMentions = (value: unknown): string[] => {
   if (!Array.isArray(value)) {
@@ -408,6 +411,105 @@ const sanitizeSessionContext = (value: unknown): SessionContext | undefined => {
   };
 };
 
+const sanitizeIntegrationContext = (value: unknown): EntryIntegrationContext | undefined => {
+  const record = asRecord(value);
+  if (!record) {
+    return undefined;
+  }
+
+  const inferredTags = Array.isArray(record.inferredTags)
+    ? record.inferredTags
+        .map((item) => {
+          const tag = asRecord(item);
+          if (!tag) {
+            return null;
+          }
+          const inferenceId = sanitizeString(tag.inferenceId);
+          const provider = sanitizeString(tag.provider);
+          const signalId = sanitizeString(tag.inferredFromSignalId);
+          const inferredAt = sanitizeString(tag.inferredAt);
+          const rawTag = sanitizeString(tag.tag).toLowerCase();
+          const confidence = sanitizeString(tag.confidence);
+          const status = sanitizeString(tag.status);
+          if (
+            !inferenceId ||
+            (provider !== 'calendar' && provider !== 'wearable') ||
+            !signalId ||
+            !inferredAt ||
+            !rawTag ||
+            (confidence !== 'high' && confidence !== 'medium' && confidence !== 'low') ||
+            !INTEGRATION_STATUSES.has(status)
+          ) {
+            return null;
+          }
+          const note = sanitizeString(tag.note);
+          const overriddenTag = sanitizeString(tag.overriddenTag).toLowerCase();
+          const reviewedAt = sanitizeString(tag.reviewedAt);
+          const reviewedByRole = sanitizeString(tag.reviewedByRole);
+
+          return {
+            inferenceId,
+            provider: provider as EntryIntegrationContext['inferredTags'][number]['provider'],
+            tag: rawTag,
+            confidence: confidence as EntryIntegrationContext['inferredTags'][number]['confidence'],
+            status: status as EntryIntegrationContext['inferredTags'][number]['status'],
+            inferredFromSignalId: signalId,
+            inferredAt,
+            ...(note ? { note } : {}),
+            ...(overriddenTag ? { overriddenTag } : {}),
+            ...(reviewedAt ? { reviewedAt } : {}),
+            ...(reviewedByRole === 'athlete' || reviewedByRole === 'coach' ? { reviewedByRole } : {})
+          };
+        })
+        .filter((item): item is EntryIntegrationContext['inferredTags'][number] => item !== null)
+    : [];
+
+  const confirmedTags = Array.isArray(record.confirmedTags)
+    ? [...new Set(record.confirmedTags.filter((item): item is string => typeof item === 'string').map((item) => item.trim().toLowerCase()).filter(Boolean))]
+    : [];
+  const sourceSignalIds = Array.isArray(record.sourceSignalIds)
+    ? [...new Set(record.sourceSignalIds.filter((item): item is string => typeof item === 'string').map((item) => item.trim()).filter(Boolean))]
+    : [];
+  const updatedAt = sanitizeString(record.updatedAt) || new Date().toISOString();
+
+  const wearableRecord = asRecord(record.wearable);
+  const wearable =
+    wearableRecord &&
+    sanitizeString(wearableRecord.signalId) &&
+    sanitizeString(wearableRecord.date) &&
+    typeof wearableRecord.trained === 'boolean' &&
+    (sanitizeString(wearableRecord.confidence) === 'high' ||
+      sanitizeString(wearableRecord.confidence) === 'medium' ||
+      sanitizeString(wearableRecord.confidence) === 'low') &&
+    INTEGRATION_STATUSES.has(sanitizeString(wearableRecord.status))
+      ? {
+          signalId: sanitizeString(wearableRecord.signalId),
+          date: sanitizeString(wearableRecord.date),
+          trained: Boolean(wearableRecord.trained),
+          confidence: sanitizeString(wearableRecord.confidence) as IntegrationWearableContext['confidence'],
+          status: sanitizeString(wearableRecord.status) as IntegrationWearableContext['status'],
+          ...(sanitizeString(wearableRecord.note) ? { note: sanitizeString(wearableRecord.note) } : {}),
+          ...(sanitizeString(wearableRecord.reviewedAt) ? { reviewedAt: sanitizeString(wearableRecord.reviewedAt) } : {}),
+          ...(sanitizeString(wearableRecord.reviewedByRole) === 'athlete' ||
+          sanitizeString(wearableRecord.reviewedByRole) === 'coach'
+            ? { reviewedByRole: sanitizeString(wearableRecord.reviewedByRole) as 'athlete' | 'coach' }
+            : {})
+        }
+      : undefined;
+
+  if (inferredTags.length === 0 && confirmedTags.length === 0 && !wearable) {
+    return undefined;
+  }
+
+  return {
+    inferredTags,
+    ...(wearable ? { wearable } : {}),
+    confirmedTags,
+    sourceSignalIds,
+    updatedAt
+  };
+};
+
 const sanitizePartnerOutcomes = (value: unknown): PartnerOutcomeNote[] => {
   if (!Array.isArray(value)) {
     return [];
@@ -598,6 +700,13 @@ const entrySchemaMigrations: Array<MigrationStep<EntrySchemaPayload>> = [
     label: 'entry-v4-to-v5',
     migrate: (payload) => applySchemaVersion(payload, 5),
     rollback: (payload) => applySchemaVersion(payload, 4)
+  },
+  {
+    fromVersion: 5,
+    toVersion: 6,
+    label: 'entry-v5-to-v6',
+    migrate: (payload) => applySchemaVersion(payload, 6),
+    rollback: (payload) => applySchemaVersion(payload, 5)
   }
 ];
 
@@ -611,6 +720,7 @@ export const migrateEntrySchemaPayload = (
     sourceVersion !== 2 &&
     sourceVersion !== 3 &&
     sourceVersion !== 4 &&
+    sourceVersion !== 5 &&
     sourceVersion !== CURRENT_ENTRY_SCHEMA_VERSION
   ) {
     throw new Error(`Unsupported entry schema version: ${String(schemaVersion)}`);
@@ -656,6 +766,7 @@ export const normalizeEntry = (entry: NormalizableEntryInput): Entry => {
     structuredExtraction: sanitizeStructuredExtraction((migratedEntry as Record<string, unknown>).structuredExtraction),
     tags: sanitizeEntryTags((migratedEntry as Record<string, unknown>).tags, migratedEntry.sessionMetrics?.tags),
     sessionContext: sanitizeSessionContext((migratedEntry as Record<string, unknown>).sessionContext),
+    integrationContext: sanitizeIntegrationContext((migratedEntry as Record<string, unknown>).integrationContext),
     partnerOutcomes: sanitizePartnerOutcomes((migratedEntry as Record<string, unknown>).partnerOutcomes),
     rawTechniqueMentions: sanitizeRawTechniqueMentions(migratedEntry.rawTechniqueMentions),
     mediaAttachments: sanitizeMediaAttachments(migratedEntry.mediaAttachments),

@@ -2,9 +2,10 @@ import type { APIGatewayProxyHandler } from 'aws-lambda';
 
 import { buildActionPackDeleteKeys, buildActionPackIndexItems } from '../../shared/actionPackIndex';
 import { getAuthContext, requireRole } from '../../shared/auth';
-import { batchWriteItems, deleteItem, getItem, putItem } from '../../shared/db';
+import { batchWriteItems, deleteItem, getItem, putItem, queryItems } from '../../shared/db';
 import { parseEntryRecord, sanitizeMediaAttachments, withCurrentEntrySchemaVersion } from '../../shared/entries';
 import { parseEntryPayload } from '../../shared/entryPayload';
+import { inferIntegrationContextForEntry, mergeConfirmedIntegrationTags, parseIntegrationSignalsFromItems } from '../../shared/integrations';
 import { buildKeywordIndexItems, extractEntryTokens } from '../../shared/keywords';
 import { withRequestLogging } from '../../shared/logger';
 import { hydratePartnerOutcomes } from '../../shared/partners';
@@ -56,6 +57,20 @@ const baseHandler: APIGatewayProxyHandler = async (event) => {
     const payload = parseEntryPayload(event);
     const hydratedPartnerOutcomes = await hydratePartnerOutcomes(auth.userId, payload.partnerOutcomes);
     const nowIso = new Date().toISOString();
+    const signalItems = await queryItems({
+      KeyConditionExpression: 'PK = :pk AND begins_with(SK, :signalPrefix)',
+      ExpressionAttributeValues: {
+        ':pk': `USER#${auth.userId}`,
+        ':signalPrefix': 'INTEGRATION_SIGNAL#'
+      },
+      ScanIndexForward: false
+    });
+    const integrationSignals = parseIntegrationSignalsFromItems((signalItems.Items ?? []) as Array<Record<string, unknown>>);
+    const inferredIntegrationContext = inferIntegrationContextForEntry(payload, integrationSignals, nowIso);
+    const payloadWithIntegration = mergeConfirmedIntegrationTags({
+      ...payload,
+      ...(inferredIntegrationContext ? { integrationContext: inferredIntegrationContext } : {})
+    });
 
     const metaResult = await getItem({
       Key: {
@@ -108,18 +123,19 @@ const baseHandler: APIGatewayProxyHandler = async (event) => {
       quickAdd: payload.quickAdd,
       structured: structuredExtraction.structured,
       structuredExtraction: structuredExtraction.extraction,
-      tags: payload.tags,
-      sections: payload.sections,
-      sessionMetrics: payload.sessionMetrics,
-      sessionContext: payload.sessionContext,
+      tags: payloadWithIntegration.tags,
+      sections: payloadWithIntegration.sections,
+      sessionMetrics: payloadWithIntegration.sessionMetrics,
+      sessionContext: payloadWithIntegration.sessionContext,
+      integrationContext: payloadWithIntegration.integrationContext,
       partnerOutcomes: hydratedPartnerOutcomes,
-      rawTechniqueMentions: sanitizeTechniqueMentions(payload.rawTechniqueMentions),
-      mediaAttachments: sanitizeMediaAttachments(payload.mediaAttachments),
-      templateId: payload.templateId,
-      actionPackDraft: payload.actionPackDraft,
-      actionPackFinal: payload.actionPackFinal,
-      sessionReviewDraft: payload.sessionReviewDraft,
-      sessionReviewFinal: payload.sessionReviewFinal,
+      rawTechniqueMentions: sanitizeTechniqueMentions(payloadWithIntegration.rawTechniqueMentions),
+      mediaAttachments: sanitizeMediaAttachments(payloadWithIntegration.mediaAttachments),
+      templateId: payloadWithIntegration.templateId,
+      actionPackDraft: payloadWithIntegration.actionPackDraft,
+      actionPackFinal: payloadWithIntegration.actionPackFinal,
+      sessionReviewDraft: payloadWithIntegration.sessionReviewDraft,
+      sessionReviewFinal: payloadWithIntegration.sessionReviewFinal,
       updatedAt: nowIso
     });
 

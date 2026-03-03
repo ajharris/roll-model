@@ -10,7 +10,7 @@ import { getDefaultRouteForRole } from '@/lib/roleRouting';
 import type { UserRole } from '@/types/api';
 
 const navLinksByRole: Record<'athlete' | 'coach' | 'admin', string[]> = {
-  athlete: ['/entries', '/entries/new', '/analytics', '/chat', '/export', '/coach-link'],
+  athlete: ['/entries', '/entries/new', '/integrations', '/analytics', '/chat', '/export', '/coach-link'],
   coach: ['/coach'],
   admin: ['/admin', '/admin/diagnostics', '/admin/config-health'],
 };

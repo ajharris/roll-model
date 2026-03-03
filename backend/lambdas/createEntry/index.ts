@@ -3,9 +3,10 @@ import { v4 as uuidv4 } from 'uuid';
 
 import { buildActionPackIndexItems } from '../../shared/actionPackIndex';
 import { getAuthContext, requireRole } from '../../shared/auth';
-import { batchWriteItems, putItem } from '../../shared/db';
+import { batchWriteItems, putItem, queryItems } from '../../shared/db';
 import { sanitizeMediaAttachments, withCurrentEntrySchemaVersion } from '../../shared/entries';
 import { parseEntryPayload } from '../../shared/entryPayload';
+import { inferIntegrationContextForEntry, mergeConfirmedIntegrationTags, parseIntegrationSignalsFromItems } from '../../shared/integrations';
 import { buildKeywordIndexItems, extractEntryTokens } from '../../shared/keywords';
 import { withRequestLogging } from '../../shared/logger';
 import { hydratePartnerOutcomes } from '../../shared/partners';
@@ -36,6 +37,7 @@ export const buildEntry = (
     sections: input.sections,
     sessionMetrics: input.sessionMetrics,
     sessionContext: input.sessionContext,
+    integrationContext: input.integrationContext,
     partnerOutcomes: input.partnerOutcomes,
     rawTechniqueMentions: sanitizeTechniqueMentions(input.rawTechniqueMentions),
     mediaAttachments: sanitizeMediaAttachments(input.mediaAttachments),
@@ -54,11 +56,25 @@ const baseHandler: APIGatewayProxyHandler = async (event) => {
 
     const payload = parseEntryPayload(event);
     const nowIso = new Date().toISOString();
+    const signalItems = await queryItems({
+      KeyConditionExpression: 'PK = :pk AND begins_with(SK, :signalPrefix)',
+      ExpressionAttributeValues: {
+        ':pk': `USER#${auth.userId}`,
+        ':signalPrefix': 'INTEGRATION_SIGNAL#'
+      },
+      ScanIndexForward: false
+    });
+    const integrationSignals = parseIntegrationSignalsFromItems((signalItems.Items ?? []) as Array<Record<string, unknown>>);
+    const inferredIntegrationContext = inferIntegrationContextForEntry(payload, integrationSignals, nowIso);
+    const payloadWithIntegration = mergeConfirmedIntegrationTags({
+      ...payload,
+      ...(inferredIntegrationContext ? { integrationContext: inferredIntegrationContext } : {})
+    });
     const entry = buildEntry(
       auth.userId,
       {
-        ...payload,
-        partnerOutcomes: await hydratePartnerOutcomes(auth.userId, payload.partnerOutcomes)
+        ...payloadWithIntegration,
+        partnerOutcomes: await hydratePartnerOutcomes(auth.userId, payloadWithIntegration.partnerOutcomes)
       },
       nowIso
     );

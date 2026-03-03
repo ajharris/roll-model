@@ -270,6 +270,21 @@ export class RollModelStack extends cdk.Stack {
       'backend/lambdas/listWeeklyPlans/index.ts',
       table
     );
+    const getIntegrationSettingsLambda = this.createLambda(
+      'getIntegrationSettings',
+      'backend/lambdas/getIntegrationSettings/index.ts',
+      table
+    );
+    const upsertIntegrationSettingsLambda = this.createLambda(
+      'upsertIntegrationSettings',
+      'backend/lambdas/upsertIntegrationSettings/index.ts',
+      table
+    );
+    const syncIntegrationSignalsLambda = this.createLambda(
+      'syncIntegrationSignals',
+      'backend/lambdas/syncIntegrationSignals/index.ts',
+      table
+    );
     const updateWeeklyPlanLambda = this.createLambda(
       'updateWeeklyPlan',
       'backend/lambdas/updateWeeklyPlan/index.ts',
@@ -396,6 +411,9 @@ export class RollModelStack extends cdk.Stack {
       { name: 'upsertGapPriorities', fn: upsertGapPrioritiesLambda },
       { name: 'buildWeeklyPlan', fn: buildWeeklyPlanLambda },
       { name: 'listWeeklyPlans', fn: listWeeklyPlansLambda },
+      { name: 'getIntegrationSettings', fn: getIntegrationSettingsLambda },
+      { name: 'upsertIntegrationSettings', fn: upsertIntegrationSettingsLambda },
+      { name: 'syncIntegrationSignals', fn: syncIntegrationSignalsLambda },
       { name: 'updateWeeklyPlan', fn: updateWeeklyPlanLambda },
       { name: 'getAutomationSettings', fn: getAutomationSettingsLambda },
       { name: 'upsertAutomationSettings', fn: upsertAutomationSettingsLambda },
@@ -690,6 +708,22 @@ export class RollModelStack extends cdk.Stack {
     const aiChat = ai.addResource('chat');
     aiChat.addMethod('POST', new apigateway.LambdaIntegration(aiChatLambda), methodOptions);
     aiChat.addCorsPreflight({
+      allowOrigins: apigateway.Cors.ALL_ORIGINS,
+      allowMethods: ['POST', 'OPTIONS'],
+      allowHeaders: ['Content-Type', 'Authorization']
+    });
+
+    const integrations = api.root.addResource('integrations');
+    integrations.addMethod('GET', new apigateway.LambdaIntegration(getIntegrationSettingsLambda), methodOptions);
+    integrations.addMethod('PUT', new apigateway.LambdaIntegration(upsertIntegrationSettingsLambda), methodOptions);
+    integrations.addCorsPreflight({
+      allowOrigins: apigateway.Cors.ALL_ORIGINS,
+      allowMethods: ['GET', 'PUT', 'OPTIONS'],
+      allowHeaders: ['Content-Type', 'Authorization']
+    });
+    const integrationsSync = integrations.addResource('sync');
+    integrationsSync.addMethod('POST', new apigateway.LambdaIntegration(syncIntegrationSignalsLambda), methodOptions);
+    integrationsSync.addCorsPreflight({
       allowOrigins: apigateway.Cors.ALL_ORIGINS,
       allowMethods: ['POST', 'OPTIONS'],
       allowHeaders: ['Content-Type', 'Authorization']
