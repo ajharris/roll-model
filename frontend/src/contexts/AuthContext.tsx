@@ -256,18 +256,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     [refreshSession],
   );
 
-  const getLatestIdToken = useCallback(() => {
+  const getLatestIdToken = useCallback(async () => {
     const currentTokens = tokensRef.current;
     if (!currentTokens?.idToken) return null;
 
     const msUntilExpiry = getMsUntilTokenExpiry(currentTokens.idToken);
     if (msUntilExpiry !== null) {
       if (msUntilExpiry <= 0) {
-        void refreshCurrentSession({ redirectOnFailure: true });
-        return null;
+        const refreshed = await refreshCurrentSession({ redirectOnFailure: true });
+        return refreshed?.idToken ?? null;
       }
       if (msUntilExpiry <= refreshLeadTimeMs) {
-        void refreshCurrentSession({ redirectOnFailure: true });
+        const refreshed = await refreshCurrentSession({ redirectOnFailure: true });
+        return refreshed?.idToken ?? currentTokens.idToken;
       }
     }
 

@@ -6,7 +6,7 @@ import { AuthProvider, useAuth } from './AuthContext';
 
 const sessionKey = 'roll-model-auth';
 
-type TokenGetter = () => string | null;
+type TokenGetter = () => string | null | Promise<string | null>;
 
 const configureApiClientMock = vi.fn<(getter: TokenGetter) => void>();
 let latestApiTokenGetter: TokenGetter | null = null;
@@ -150,7 +150,7 @@ describe('AuthContext refresh flow', () => {
     });
 
     expect(screen.getByTestId('role')).toHaveTextContent('athlete');
-    expect(latestApiTokenGetter?.()).toBe(refreshedIdToken);
+    await expect(latestApiTokenGetter?.()).resolves.toBe(refreshedIdToken);
     expect(JSON.parse(sessionStorage.getItem(sessionKey) ?? '{}')).toMatchObject({
       idToken: refreshedIdToken,
       accessToken: 'fresh-access',
@@ -271,7 +271,7 @@ describe('AuthContext refresh flow', () => {
     expect(cognitoRefreshSessionMock).toHaveBeenCalledTimes(1);
     expect(screen.getByTestId('id-token')).toHaveTextContent(refreshedIdToken);
 
-    expect(latestApiTokenGetter?.()).toBe(refreshedIdToken);
+    await expect(latestApiTokenGetter?.()).resolves.toBe(refreshedIdToken);
   });
 
   it('hydrates multiple roles from cognito groups and allows switching active role', async () => {
