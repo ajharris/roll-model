@@ -40,6 +40,24 @@ const buildKeywordDeleteKeys = (entry: Entry): Array<{ PK: string; SK: string }>
   ];
 };
 
+const safeDelete = async (key: { PK: string; SK: string }, context: string): Promise<void> => {
+  try {
+    await deleteItem({ Key: key });
+  } catch (error) {
+    console.error(
+      JSON.stringify({
+        msg: 'deleteEntry.cleanup.delete_failed',
+        context,
+        key,
+        error:
+          error instanceof Error
+            ? { name: error.name, message: error.message }
+            : { message: String(error) }
+      })
+    );
+  }
+};
+
 const baseHandler: APIGatewayProxyHandler = async (event) => {
   try {
     const auth = getAuthContext(event);
@@ -88,40 +106,71 @@ const baseHandler: APIGatewayProxyHandler = async (event) => {
       });
     }
 
-    const entry = parseEntryRecord(entryResult.Item as Record<string, unknown>);
+    let parsedEntry: Entry | null = null;
+    try {
+      parsedEntry = parseEntryRecord(entryResult.Item as Record<string, unknown>);
+    } catch (error) {
+      console.error(
+        JSON.stringify({
+          msg: 'deleteEntry.cleanup.parse_entry_failed',
+          entryId,
+          error:
+            error instanceof Error
+              ? { name: error.name, message: error.message }
+              : { message: String(error) }
+        })
+      );
+    }
 
-    const commentsResult = await queryItems({
-      KeyConditionExpression: 'PK = :pk AND begins_with(SK, :commentPrefix)',
-      ExpressionAttributeValues: {
-        ':pk': `ENTRY#${entryId}`,
-        ':commentPrefix': 'COMMENT#'
-      }
-    });
+    try {
+      const commentsResult = await queryItems({
+        KeyConditionExpression: 'PK = :pk AND begins_with(SK, :commentPrefix)',
+        ExpressionAttributeValues: {
+          ':pk': `ENTRY#${entryId}`,
+          ':commentPrefix': 'COMMENT#'
+        }
+      });
 
-    for (const item of commentsResult.Items ?? []) {
-      if (typeof item.PK === 'string' && typeof item.SK === 'string') {
-        await deleteItem({
-          Key: {
-            PK: item.PK,
-            SK: item.SK
+      for (const item of commentsResult.Items ?? []) {
+        if (typeof item.PK === 'string' && typeof item.SK === 'string') {
+          await safeDelete(
+            {
+              PK: item.PK,
+              SK: item.SK
+            },
+            'comment_item'
+          );
+          if (typeof item.commentId === 'string') {
+            await safeDelete(
+              {
+                PK: `COMMENT#${item.commentId}`,
+                SK: 'META'
+              },
+              'comment_meta'
+            );
           }
-        });
-        if (typeof item.commentId === 'string') {
-          await deleteItem({
-            Key: {
-              PK: `COMMENT#${item.commentId}`,
-              SK: 'META'
-            }
-          });
         }
       }
+    } catch (error) {
+      console.error(
+        JSON.stringify({
+          msg: 'deleteEntry.cleanup.query_comments_failed',
+          entryId,
+          error:
+            error instanceof Error
+              ? { name: error.name, message: error.message }
+              : { message: String(error) }
+        })
+      );
     }
 
-    for (const key of buildKeywordDeleteKeys(entry)) {
-      await deleteItem({ Key: key });
-    }
-    for (const key of buildActionPackDeleteKeys(entry)) {
-      await deleteItem({ Key: key });
+    if (parsedEntry) {
+      for (const key of buildKeywordDeleteKeys(parsedEntry)) {
+        await safeDelete(key, 'keyword_index');
+      }
+      for (const key of buildActionPackDeleteKeys(parsedEntry)) {
+        await safeDelete(key, 'action_pack_index');
+      }
     }
 
     await deleteItem({ Key: entryKey });
