@@ -47,7 +47,7 @@ export class ApiError extends Error {
 
 const baseUrl = frontendConfig.apiBaseUrl;
 
-type TokenGetter = () => string | null;
+type TokenGetter = () => string | null | Promise<string | null>;
 
 let getToken: TokenGetter = () => null;
 
@@ -169,8 +169,8 @@ const withCoachQuestionsQueryString = (path: string, query?: CoachQuestionsQuery
   return `${path}?${params.toString()}`;
 };
 
-const buildAuthHeaders = () => {
-  const token = getToken();
+const buildAuthHeaders = async () => {
+  const token = await getToken();
   if (!token) return {};
 
   return {
@@ -194,7 +194,7 @@ const sendRequest = async (path: string, init?: RequestInit): Promise<Response> 
     headers.set('Content-Type', 'application/json');
   }
 
-  for (const [key, value] of Object.entries(buildAuthHeaders())) {
+  for (const [key, value] of Object.entries(await buildAuthHeaders())) {
     headers.set(key, value);
   }
 
@@ -536,11 +536,24 @@ export const apiClient = {
       method: 'POST',
       body: JSON.stringify(payload),
     }),
-  submitFeedback: (payload: FeedbackPayload) =>
-    request<FeedbackSubmissionResult>('/feedback', {
+  submitFeedback: (payload: FeedbackPayload) => {
+    const normalizedType = payload.type === 'feature' || payload.type === 'ui' ? 'feature' : 'bug';
+    const legacyDetails = [
+      `Problem:\n${payload.problem.trim()}`,
+      `Proposed change:\n${payload.proposedChange.trim()}`,
+      `Reproduction steps / context:\n${payload.contextSteps.trim()}`,
+    ].join('\n\n');
+
+    return request<FeedbackSubmissionResult>('/feedback', {
       method: 'POST',
-      body: JSON.stringify(payload),
-    }),
+      body: JSON.stringify({
+        ...payload,
+        type: normalizedType,
+        title: payload.problem.trim(),
+        details: legacyDetails,
+      }),
+    });
+  },
   upsertEntryCheckoffEvidence: async (
     entryId: string,
     payload: {

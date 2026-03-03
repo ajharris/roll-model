@@ -44,6 +44,25 @@ describe('apiClient', () => {
     expect(headers.get('Authorization')).toBe('Bearer jwt-token');
   });
 
+  it('supports async token getters when building auth headers', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ assistant_text: 'ok' }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { apiClient, configureApiClient } = await import('./apiClient');
+    configureApiClient(async () => 'jwt-token-async');
+
+    await apiClient.chat({ message: 'hello' });
+
+    const requestInit = fetchMock.mock.calls[0]?.[1] as RequestInit;
+    expect(requestInit.headers).toBeInstanceOf(Headers);
+    const headers = requestInit.headers as Headers;
+    expect(headers.get('Authorization')).toBe('Bearer jwt-token-async');
+  });
+
   it('throws ApiError with API response message on failure', async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: false,
@@ -191,6 +210,44 @@ describe('apiClient', () => {
         method: 'POST',
       }),
     );
+    const requestInit = fetchMock.mock.calls[0]?.[1] as RequestInit;
+    const parsedBody = JSON.parse(String(requestInit.body)) as Record<string, unknown>;
+    expect(parsedBody.type).toBe('bug');
+    expect(parsedBody.title).toBe('When I submit feedback from mobile, the form hangs.');
+    expect(parsedBody.details).toContain('Problem:');
+    expect(parsedBody.details).toContain('Proposed change:');
+    expect(parsedBody.details).toContain('Reproduction steps / context:');
+  });
+
+  it('maps ui feedback type to feature for API compatibility', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 201,
+      json: async () => ({
+        feedbackId: 'feedback-2',
+        issueNumber: 6,
+        issueUrl: 'https://github.com/example/issues/6',
+      }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { apiClient, configureApiClient } = await import('./apiClient');
+    configureApiClient(() => 'jwt-token');
+
+    await apiClient.submitFeedback({
+      type: 'ui',
+      problem: 'The navigation loses focus styles on keyboard tab in Safari.',
+      proposedChange: 'Restore visible focus state for all interactive nav links.',
+      contextSteps: 'Open app in Safari, press Tab through nav links, focus ring disappears.',
+      severity: 'medium',
+      screenshots: [],
+      previewConfirmed: true,
+      reviewerWorkflow: { requiresReview: false },
+    });
+
+    const requestInit = fetchMock.mock.calls[0]?.[1] as RequestInit;
+    const parsedBody = JSON.parse(String(requestInit.body)) as Record<string, unknown>;
+    expect(parsedBody.type).toBe('feature');
   });
 
   it('downloads CSV export as text', async () => {

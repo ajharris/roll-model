@@ -4,7 +4,7 @@ import type { FormEvent } from 'react';
 import { useState } from 'react';
 
 import { Protected } from '@/components/Protected';
-import { apiClient } from '@/lib/apiClient';
+import { ApiError, apiClient } from '@/lib/apiClient';
 import type {
   FeedbackNormalizationState,
   FeedbackPayload,
@@ -184,8 +184,12 @@ export default function FeedbackPage() {
     try {
       const response = await apiClient.submitFeedback(previewPayload);
       setSubmitted({ issueNumber: response.issueNumber, issueUrl: response.issueUrl });
-    } catch {
-      setError('Could not submit feedback. Please try again.');
+    } catch (submitError) {
+      if (submitError instanceof ApiError) {
+        setError(submitError.message);
+      } else {
+        setError('Could not submit feedback. Please try again.');
+      }
     } finally {
       setIsSubmitting(false);
     }
