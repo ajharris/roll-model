@@ -8,7 +8,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { ChipInput } from '@/components/ChipInput';
 import { MediaAttachmentsInput } from '@/components/MediaAttachmentsInput';
 import { Protected } from '@/components/Protected';
-import { apiClient } from '@/lib/apiClient';
+import { ApiError, apiClient } from '@/lib/apiClient';
 import { clearEntryDraft, readEntryDraft, writeEntryDraft } from '@/lib/journalLocal';
 import type {
   CheckoffEvidence,
@@ -229,8 +229,12 @@ export default function EntryDetailPage() {
       await apiClient.deleteEntry(entryId);
       clearEntryDraft(draftKey);
       router.push('/entries');
-    } catch {
-      setStatus('Delete failed.');
+    } catch (deleteError) {
+      if (deleteError instanceof ApiError) {
+        setStatus(`Delete failed: ${deleteError.message}`);
+      } else {
+        setStatus('Delete failed.');
+      }
     }
   };
 

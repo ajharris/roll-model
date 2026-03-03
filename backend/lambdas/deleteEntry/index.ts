@@ -4,6 +4,7 @@ import type { APIGatewayProxyHandler } from 'aws-lambda';
 import { buildActionPackDeleteKeys } from '../../shared/actionPackIndex';
 import { getAuthContext, requireRole } from '../../shared/auth';
 import { deleteItem, getItem, queryItems } from '../../shared/db';
+import { parseEntryRecord } from '../../shared/entries';
 import { extractEntryTokens } from '../../shared/keywords';
 import { withRequestLogging } from '../../shared/logger';
 import { ApiError, errorResponse, response } from '../../shared/responses';
@@ -19,18 +20,6 @@ const getEntryIdFromPath = (entryId?: string): string => {
   }
 
   return entryId;
-};
-
-const stripEntryKeys = (item: Record<string, unknown>): Entry => {
-  const { PK: _pk, SK: _sk, entityType: _entityType, ...entry } = item as unknown as Entry & {
-    PK: string;
-    SK: string;
-    entityType: string;
-  };
-  void _pk;
-  void _sk;
-  void _entityType;
-  return entry;
 };
 
 const buildKeywordDeleteKeys = (entry: Entry): Array<{ PK: string; SK: string }> => {
@@ -99,7 +88,7 @@ const baseHandler: APIGatewayProxyHandler = async (event) => {
       });
     }
 
-    const entry = stripEntryKeys(entryResult.Item as Record<string, unknown>);
+    const entry = parseEntryRecord(entryResult.Item as Record<string, unknown>);
 
     const commentsResult = await queryItems({
       KeyConditionExpression: 'PK = :pk AND begins_with(SK, :commentPrefix)',

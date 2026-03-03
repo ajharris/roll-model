@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 
 import { Protected } from '@/components/Protected';
-import { apiClient } from '@/lib/apiClient';
+import { ApiError, apiClient } from '@/lib/apiClient';
 import {
   entryMatchesSavedSearch,
   readSavedEntrySearches,
@@ -440,8 +440,12 @@ export default function EntriesPage() {
       await apiClient.deleteEntry(entryId);
       setEntries((current) => current.filter((entry) => entry.entryId !== entryId));
       setEntriesStatus('Entry deleted.');
-    } catch {
-      setEntriesStatus('Could not delete entry.');
+    } catch (deleteError) {
+      if (deleteError instanceof ApiError) {
+        setEntriesStatus(`Could not delete entry: ${deleteError.message}`);
+      } else {
+        setEntriesStatus('Could not delete entry.');
+      }
     } finally {
       setDeletingEntryId(null);
     }
