@@ -1,7 +1,7 @@
 import type { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 
 import { buildActionPackIndexItems } from '../../shared/actionPackIndex';
-import { batchWriteItems, getItem, putItem } from '../../shared/db';
+import { batchWriteItems, getItem, putItem, queryItems } from '../../shared/db';
 import { CURRENT_ENTRY_SCHEMA_VERSION } from '../../shared/entries';
 import { buildKeywordIndexItems, extractEntryTokens } from '../../shared/keywords';
 import { recomputeAndPersistProgressViews } from '../../shared/progressStore';
@@ -23,6 +23,7 @@ jest.mock('../../shared/techniques', () => ({
 const mockPutItem = jest.mocked(putItem);
 const mockBatchWriteItems = jest.mocked(batchWriteItems);
 const mockGetItem = jest.mocked(getItem);
+const mockQueryItems = jest.mocked(queryItems);
 const mockExtractEntryTokens = jest.mocked(extractEntryTokens);
 const mockBuildKeywordIndexItems = jest.mocked(buildKeywordIndexItems);
 const mockBuildActionPackIndexItems = jest.mocked(buildActionPackIndexItems);
@@ -71,6 +72,7 @@ describe('createEntry handler auth', () => {
     mockPutItem.mockResolvedValue();
     mockBatchWriteItems.mockResolvedValue();
     mockGetItem.mockResolvedValue({} as never);
+    mockQueryItems.mockResolvedValue({ Items: [] } as never);
     mockExtractEntryTokens.mockReset();
     mockBuildKeywordIndexItems.mockReturnValue([]);
     mockBuildActionPackIndexItems.mockReset();

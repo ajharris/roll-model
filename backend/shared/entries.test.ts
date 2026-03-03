@@ -205,7 +205,7 @@ describe('entry schema versioning', () => {
     const first = migrateEntrySchemaPayload(source as never);
     const second = migrateEntrySchemaPayload(first.payload);
 
-    expect(first.appliedSteps).toEqual(['entry-v2-to-v3', 'entry-v3-to-v4', 'entry-v4-to-v5']);
+    expect(first.appliedSteps).toEqual(['entry-v2-to-v3', 'entry-v3-to-v4', 'entry-v4-to-v5', 'entry-v5-to-v6']);
     expect(second.appliedSteps).toEqual([]);
     expect((first.payload as { schemaVersion: number }).schemaVersion).toBe(CURRENT_ENTRY_SCHEMA_VERSION);
   });

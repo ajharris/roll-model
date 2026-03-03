@@ -47,6 +47,7 @@ describe('aiChat context/privacy', () => {
     expect(ctx).toEqual({
       athleteId: 'athlete-1',
       includePrivate: true,
+      includeIntegrationSignals: true,
       entryIds: undefined,
       from: undefined,
       to: undefined,
@@ -81,7 +82,7 @@ describe('aiChat context/privacy', () => {
       }
     ];
 
-    const prompt = JSON.parse(buildPromptContext(entries, true)) as Array<{
+    const prompt = JSON.parse(buildPromptContext(entries, true, true)) as Array<{
       sections: { private?: string; shared: string };
     }>;
     expect(prompt[0].sections.private).toBe('private text');
@@ -95,6 +96,7 @@ describe('aiChat context/privacy', () => {
 
     expect(ctx.includePrivate).toBe(false);
     expect(ctx.athleteId).toBe('athlete-9');
+    expect(ctx.includeIntegrationSignals).toBe(true);
   });
 });
 
@@ -194,6 +196,22 @@ describe('aiChat handler', () => {
                 rounds: 5,
                 giOrNoGi: 'gi',
                 tags: []
+              },
+              integrationContext: {
+                inferredTags: [
+                  {
+                    inferenceId: 'calendar:event-1:fundamentals',
+                    provider: 'calendar',
+                    tag: 'fundamentals',
+                    confidence: 'high',
+                    status: 'confirmed',
+                    inferredFromSignalId: 'calendar:event-1',
+                    inferredAt: '2026-01-01T18:00:00.000Z'
+                  }
+                ],
+                confirmedTags: ['fundamentals'],
+                sourceSignalIds: ['calendar:event-1'],
+                updatedAt: '2026-01-01T18:00:00.000Z'
               }
             }
           ]
@@ -232,6 +250,7 @@ describe('aiChat handler', () => {
     const userMessage = callArgs.find((msg) => msg.role === 'user')?.content ?? '';
     expect(userMessage).toContain('private text');
     expect(userMessage).toContain('shared text');
+    expect(userMessage).toContain('fundamentals');
   });
 
   it('rejects coaches with revoked links', async () => {

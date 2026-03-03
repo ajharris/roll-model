@@ -34,6 +34,84 @@ export interface SessionContext {
   tags: string[];
 }
 
+export type IntegrationProvider = 'calendar' | 'wearable';
+export type IntegrationInferenceStatus = 'suggested' | 'confirmed' | 'rejected' | 'overridden';
+
+export interface IntegrationProviderConfig {
+  enabled: boolean;
+  connected: boolean;
+  selectedSourceId?: string;
+  selectedSourceLabel?: string;
+  updatedAt?: string;
+}
+
+export interface IntegrationSettings {
+  athleteId: string;
+  calendar: IntegrationProviderConfig;
+  wearable: IntegrationProviderConfig;
+  updatedAt: string;
+  updatedBy: string;
+}
+
+export interface IntegrationSignalImport {
+  provider: IntegrationProvider;
+  externalId?: string;
+  occurredAt?: string;
+  title?: string;
+  tags?: string[];
+  metadata?: Record<string, unknown>;
+  trained?: boolean;
+  confidence?: number;
+}
+
+export interface IntegrationSyncFailure {
+  index: number;
+  provider?: IntegrationProvider;
+  externalId?: string;
+  reason: string;
+  recoverable: boolean;
+}
+
+export interface IntegrationSyncResult {
+  imported: number;
+  duplicates: number;
+  failures: IntegrationSyncFailure[];
+  partialFailure: boolean;
+}
+
+export interface IntegrationInferredTag {
+  inferenceId: string;
+  provider: IntegrationProvider;
+  tag: string;
+  confidence: ConfidenceLevel;
+  status: IntegrationInferenceStatus;
+  inferredFromSignalId: string;
+  inferredAt: string;
+  note?: string;
+  overriddenTag?: string;
+  reviewedAt?: string;
+  reviewedByRole?: 'athlete' | 'coach';
+}
+
+export interface IntegrationWearableContext {
+  signalId: string;
+  date: string;
+  trained: boolean;
+  confidence: ConfidenceLevel;
+  status: IntegrationInferenceStatus;
+  note?: string;
+  reviewedAt?: string;
+  reviewedByRole?: 'athlete' | 'coach';
+}
+
+export interface EntryIntegrationContext {
+  inferredTags: IntegrationInferredTag[];
+  wearable?: IntegrationWearableContext;
+  confirmedTags: string[];
+  sourceSignalIds: string[];
+  updatedAt: string;
+}
+
 export interface PartnerGuidance {
   draft?: string;
   final?: string;
@@ -118,6 +196,7 @@ export interface Entry {
   sections: EntrySections;
   sessionMetrics: SessionMetrics;
   sessionContext?: SessionContext;
+  integrationContext?: EntryIntegrationContext;
   partnerOutcomes?: PartnerOutcomeNote[];
   rawTechniqueMentions: string[];
   mediaAttachments?: MediaAttachment[];
@@ -185,6 +264,7 @@ export interface EntryCreatePayload {
   structured?: EntryStructuredFields;
   structuredMetadataConfirmations?: EntryStructuredMetadataConfirmation[];
   sessionContext?: SessionContext;
+  integrationContext?: EntryIntegrationContext;
   partnerOutcomes?: PartnerOutcomeNote[];
   rawTechniqueMentions: string[];
   mediaAttachments?: MediaAttachment[];

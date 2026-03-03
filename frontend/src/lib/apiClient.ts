@@ -14,6 +14,9 @@ import type {
   FeedbackPayload,
   FeedbackSubmissionResult,
   GapPriorityOverride,
+  IntegrationSettings,
+  IntegrationSignalImport,
+  IntegrationSyncResult,
   GapInsightsReport,
   ProgressAnnotationScope,
   ProgressCoachAnnotation,
@@ -25,6 +28,7 @@ import type {
   SignupRequestPayload,
   EntryStructuredMetadataConfirmation,
   EntryStructuredFields,
+  EntryIntegrationContext,
   UpsertGapPriorityInput,
   UpsertPartnerProfilePayload,
   LegacyImportCommitRequest,
@@ -389,6 +393,7 @@ export const apiClient = {
     payload: {
       structured?: EntryStructuredFields;
       confirmations?: EntryStructuredMetadataConfirmation[];
+      integrationContext?: EntryIntegrationContext;
     }
   ) => {
     const result = await request<unknown>(`/entries/${entryId}/structured-review`, {
@@ -514,6 +519,18 @@ export const apiClient = {
       body: JSON.stringify(payload),
       },
     ),
+  getIntegrationSettings: () =>
+    request<{ settings: IntegrationSettings }>('/integrations').then((result) => result.settings),
+  updateIntegrationSettings: (payload: Partial<Pick<IntegrationSettings, 'calendar' | 'wearable'>>) =>
+    request<{ settings: IntegrationSettings }>('/integrations', {
+      method: 'PUT',
+      body: JSON.stringify(payload)
+    }).then((result) => result.settings),
+  syncIntegrationSignals: (payload: { signals: IntegrationSignalImport[] }) =>
+    request<{ result: IntegrationSyncResult }>('/integrations/sync', {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    }).then((result) => result.result),
   requestSignup: (payload: SignupRequestPayload) =>
     request('/signup-requests', {
       method: 'POST',

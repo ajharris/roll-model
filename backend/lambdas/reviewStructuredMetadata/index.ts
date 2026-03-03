@@ -3,6 +3,7 @@ import type { APIGatewayProxyHandler } from 'aws-lambda';
 import { getAuthContext, hasRole, requireRole } from '../../shared/auth';
 import { batchWriteItems, deleteItem, getItem, putItem } from '../../shared/db';
 import { parseEntryRecord, withCurrentEntrySchemaVersion } from '../../shared/entries';
+import { mergeConfirmedIntegrationTags } from '../../shared/integrations';
 import { buildKeywordIndexItems, extractEntryTokens } from '../../shared/keywords';
 import { isCoachLinkActive } from '../../shared/links';
 import { withRequestLogging } from '../../shared/logger';
@@ -11,6 +12,7 @@ import { ApiError, errorResponse, response } from '../../shared/responses';
 import { extractStructuredMetadata } from '../../shared/structuredExtraction';
 import type {
   Entry,
+  EntryIntegrationContext,
   EntryStructuredFieldKey,
   EntryStructuredFields,
   EntryStructuredMetadataConfirmation,
@@ -119,9 +121,34 @@ const parseRequest = (body: string | null): StructuredMetadataReviewRequest => {
       }, {})
     : undefined;
 
+  let integrationContext: EntryIntegrationContext | undefined;
+  if (payload.integrationContext !== undefined) {
+    const integrationRecord = requireRecord(payload.integrationContext, 'integrationContext must be an object when provided.');
+    if (!Array.isArray(integrationRecord.inferredTags)) {
+      invalid('integrationContext.inferredTags must be an array.');
+    }
+    if (
+      !Array.isArray(integrationRecord.confirmedTags) ||
+      integrationRecord.confirmedTags.some((item) => typeof item !== 'string')
+    ) {
+      invalid('integrationContext.confirmedTags must be an array of strings.');
+    }
+    if (
+      !Array.isArray(integrationRecord.sourceSignalIds) ||
+      integrationRecord.sourceSignalIds.some((item) => typeof item !== 'string')
+    ) {
+      invalid('integrationContext.sourceSignalIds must be an array of strings.');
+    }
+    if (typeof integrationRecord.updatedAt !== 'string') {
+      invalid('integrationContext.updatedAt must be a string.');
+    }
+    integrationContext = integrationRecord as unknown as EntryIntegrationContext;
+  }
+
   return {
     ...(structuredOutput ? { structured: structuredOutput } : {}),
     ...(confirmations.length > 0 ? { confirmations } : {}),
+    ...(integrationContext ? { integrationContext } : {})
   };
 };
 
@@ -279,12 +306,14 @@ const baseHandler: APIGatewayProxyHandler = async (event) => {
       }
     );
 
-    const updatedEntry: Entry = withCurrentEntrySchemaVersion({
+    const updatedEntryBase: Entry = withCurrentEntrySchemaVersion({
       ...existingEntry,
       structured: structuredExtraction.structured,
       structuredExtraction: structuredExtraction.extraction,
+      ...(payload.integrationContext ? { integrationContext: payload.integrationContext } : {}),
       updatedAt: nowIso,
     });
+    const updatedEntry = mergeConfirmedIntegrationTags(updatedEntryBase);
 
     await putItem({
       Item: {

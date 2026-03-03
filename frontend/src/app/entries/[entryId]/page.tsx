@@ -13,6 +13,7 @@ import { clearEntryDraft, readEntryDraft, writeEntryDraft } from '@/lib/journalL
 import type {
   CheckoffEvidence,
   Entry,
+  EntryIntegrationContext,
   EntryStructuredFieldKey,
   EntryStructuredMetadataConfirmation,
   MediaAttachment
@@ -85,6 +86,7 @@ export default function EntryDetailPage() {
   const [checkoffEvidence, setCheckoffEvidence] = useState<CheckoffEvidence[]>([]);
   const [structuredDraft, setStructuredDraft] = useState<Partial<Record<EntryStructuredFieldKey, string>>>({});
   const [structuredConfirmations, setStructuredConfirmations] = useState<EntryStructuredMetadataConfirmation[]>([]);
+  const [integrationContextDraft, setIntegrationContextDraft] = useState<EntryIntegrationContext | undefined>(undefined);
   const canEdit = Boolean(entry) && !isLoading;
 
   useEffect(() => {
@@ -129,6 +131,7 @@ export default function EntryDetailPage() {
           cue: loadedEntry.structured?.cue ?? '',
         });
         setStructuredConfirmations([]);
+        setIntegrationContextDraft(loadedEntry.integrationContext);
 
         const evidence = await apiClient.getEntryCheckoffEvidence(entryId);
         if (!cancelled) {
@@ -190,6 +193,7 @@ export default function EntryDetailPage() {
         sessionMetrics: { durationMinutes, intensity, rounds, giOrNoGi, tags },
         rawTechniqueMentions: techniques,
         mediaAttachments: sanitizeAttachments(mediaAttachments),
+        ...(integrationContextDraft ? { integrationContext: integrationContextDraft } : {}),
         structured,
         ...(structuredConfirmations.length > 0 ? { structuredMetadataConfirmations: structuredConfirmations } : {}),
       });
@@ -257,6 +261,7 @@ export default function EntryDetailPage() {
       const updated = await apiClient.reviewEntryStructuredMetadata(entry.entryId, {
         structured,
         confirmations: structuredConfirmations,
+        ...(integrationContextDraft ? { integrationContext: integrationContextDraft } : {})
       });
       setEntry(updated);
       setStructuredDraft({
@@ -267,10 +272,45 @@ export default function EntryDetailPage() {
         cue: updated.structured?.cue ?? '',
       });
       setStructuredConfirmations([]);
+      setIntegrationContextDraft(updated.integrationContext);
       setStatus('Structured review saved.');
     } catch {
       setStatus('Structured review save failed.');
     }
+  };
+
+  const updateIntegrationTagStatus = (
+    inferenceId: string,
+    status: 'confirmed' | 'rejected' | 'overridden',
+    overriddenTag?: string
+  ) => {
+    if (!integrationContextDraft) return;
+    const nextTags = integrationContextDraft.inferredTags.map((item) =>
+      item.inferenceId === inferenceId
+        ? {
+            ...item,
+            status,
+            ...(status === 'overridden' ? { overriddenTag: overriddenTag?.trim().toLowerCase() ?? item.tag } : {}),
+            reviewedAt: new Date().toISOString(),
+            reviewedByRole: 'athlete' as const
+          }
+        : item
+    );
+    const confirmedTags = Array.from(
+      new Set(
+        nextTags.flatMap((item) => {
+          if (item.status === 'confirmed') return [item.tag];
+          if (item.status === 'overridden' && item.overriddenTag) return [item.overriddenTag];
+          return [];
+        })
+      )
+    );
+    setIntegrationContextDraft({
+      ...integrationContextDraft,
+      inferredTags: nextTags,
+      confirmedTags,
+      updatedAt: new Date().toISOString()
+    });
   };
 
   return (
@@ -390,6 +430,40 @@ export default function EntryDetailPage() {
             </button>
           </div>
         )}
+        {integrationContextDraft?.inferredTags?.length ? (
+          <div className="panel">
+            <h3>Inferred training context</h3>
+            <p className="small">
+              Confirm or override inferred tags before saving. Confirmed tags are used in analytics and GPT summaries.
+            </p>
+            {integrationContextDraft.inferredTags.map((item) => (
+              <div key={item.inferenceId} className="panel">
+                <p>
+                  <strong>{item.tag}</strong> ({item.provider}) • confidence {item.confidence} • status {item.status}
+                </p>
+                <div className="row">
+                  <button type="button" onClick={() => updateIntegrationTagStatus(item.inferenceId, 'confirmed')}>
+                    Confirm
+                  </button>
+                  <button type="button" onClick={() => updateIntegrationTagStatus(item.inferenceId, 'rejected')}>
+                    Reject
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const next = window.prompt('Override tag value', item.overriddenTag ?? item.tag);
+                      if (!next) return;
+                      updateIntegrationTagStatus(item.inferenceId, 'overridden', next);
+                    }}
+                  >
+                    Override
+                  </button>
+                </div>
+              </div>
+            ))}
+            <p className="small">Confirmed tags: {integrationContextDraft.confirmedTags.join(', ') || 'none'}</p>
+          </div>
+        ) : null}
         <form onSubmit={save}>
           <label htmlFor="shared-notes">Shared notes</label>
           <textarea

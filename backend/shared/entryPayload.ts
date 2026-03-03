@@ -5,6 +5,9 @@ import { ApiError } from './responses';
 import { normalizeFinalizedSessionReview, normalizeSessionReviewArtifact } from './sessionReview';
 import type {
   CreateEntryRequest,
+  EntryIntegrationContext,
+  IntegrationInferredTag,
+  IntegrationWearableContext,
   EntryStructuredFieldKey,
   EntryStructuredFields,
   EntryTag
@@ -68,6 +71,107 @@ const validateStringArray = (value: unknown, fieldPath: string): void => {
   if (!Array.isArray(value) || value.some((item) => typeof item !== 'string')) {
     invalid(`Entry payload is invalid: ${fieldPath} must be an array of strings.`);
   }
+};
+
+const isConfidence = (value: unknown): boolean => value === 'high' || value === 'medium' || value === 'low';
+const isIntegrationStatus = (value: unknown): boolean =>
+  value === 'suggested' || value === 'confirmed' || value === 'rejected' || value === 'overridden';
+
+const parseIntegrationContext = (value: unknown): EntryIntegrationContext => {
+  const context = requireRecord(value, 'Entry payload is invalid: integrationContext must be an object.');
+  if (!Array.isArray(context.inferredTags)) {
+    invalid('Entry payload is invalid: integrationContext.inferredTags must be an array.');
+  }
+  if (!Array.isArray(context.confirmedTags) || context.confirmedTags.some((item) => typeof item !== 'string')) {
+    invalid('Entry payload is invalid: integrationContext.confirmedTags must be an array of strings.');
+  }
+  if (!Array.isArray(context.sourceSignalIds) || context.sourceSignalIds.some((item) => typeof item !== 'string')) {
+    invalid('Entry payload is invalid: integrationContext.sourceSignalIds must be an array of strings.');
+  }
+  if (typeof context.updatedAt !== 'string') {
+    invalid('Entry payload is invalid: integrationContext.updatedAt must be a string.');
+  }
+
+  const inferredTags: IntegrationInferredTag[] = (context.inferredTags as unknown[]).map((item, index) => {
+    const tag = requireRecord(item, `Entry payload is invalid: integrationContext.inferredTags[${index}] must be an object.`);
+    if (tag.provider !== 'calendar' && tag.provider !== 'wearable') {
+      invalid(`Entry payload is invalid: integrationContext.inferredTags[${index}].provider is unsupported.`);
+    }
+    if (
+      typeof tag.inferenceId !== 'string' ||
+      typeof tag.tag !== 'string' ||
+      typeof tag.inferredFromSignalId !== 'string' ||
+      typeof tag.inferredAt !== 'string'
+    ) {
+      invalid(
+        `Entry payload is invalid: integrationContext.inferredTags[${index}] requires inferenceId, tag, inferredFromSignalId, inferredAt strings.`
+      );
+    }
+    if (!isConfidence(tag.confidence)) {
+      invalid(`Entry payload is invalid: integrationContext.inferredTags[${index}].confidence is unsupported.`);
+    }
+    if (!isIntegrationStatus(tag.status)) {
+      invalid(`Entry payload is invalid: integrationContext.inferredTags[${index}].status is unsupported.`);
+    }
+    if (tag.overriddenTag !== undefined && typeof tag.overriddenTag !== 'string') {
+      invalid(`Entry payload is invalid: integrationContext.inferredTags[${index}].overriddenTag must be a string.`);
+    }
+    if (tag.note !== undefined && typeof tag.note !== 'string') {
+      invalid(`Entry payload is invalid: integrationContext.inferredTags[${index}].note must be a string.`);
+    }
+    return {
+      inferenceId: tag.inferenceId as string,
+      provider: tag.provider as IntegrationInferredTag['provider'],
+      tag: tag.tag as string,
+      confidence: tag.confidence as IntegrationInferredTag['confidence'],
+      status: tag.status as IntegrationInferredTag['status'],
+      inferredFromSignalId: tag.inferredFromSignalId as string,
+      inferredAt: tag.inferredAt as string,
+      ...(typeof tag.note === 'string' ? { note: tag.note } : {}),
+      ...(typeof tag.overriddenTag === 'string' ? { overriddenTag: tag.overriddenTag } : {}),
+      ...(typeof tag.reviewedAt === 'string' ? { reviewedAt: tag.reviewedAt } : {}),
+      ...(tag.reviewedByRole === 'athlete' || tag.reviewedByRole === 'coach' ? { reviewedByRole: tag.reviewedByRole } : {})
+    };
+  });
+
+  const wearableContext = context.wearable as Record<string, unknown> | undefined;
+  const wearable: IntegrationWearableContext | undefined = wearableContext
+    ? ({
+        signalId: wearableContext.signalId as string,
+        date: wearableContext.date as string,
+        trained: wearableContext.trained as boolean,
+        confidence: wearableContext.confidence as IntegrationWearableContext['confidence'],
+        status: wearableContext.status as IntegrationWearableContext['status'],
+        ...(typeof wearableContext.note === 'string' ? { note: wearableContext.note } : {}),
+        ...(typeof wearableContext.reviewedAt === 'string' ? { reviewedAt: wearableContext.reviewedAt } : {}),
+        ...(wearableContext.reviewedByRole === 'athlete' || wearableContext.reviewedByRole === 'coach'
+          ? { reviewedByRole: wearableContext.reviewedByRole }
+          : {})
+      } as IntegrationWearableContext)
+    : undefined;
+
+  if (context.wearable !== undefined) {
+    const wearable = requireRecord(context.wearable, 'Entry payload is invalid: integrationContext.wearable must be an object.');
+    if (
+      typeof wearable.signalId !== 'string' ||
+      typeof wearable.date !== 'string' ||
+      typeof wearable.trained !== 'boolean' ||
+      !isConfidence(wearable.confidence) ||
+      !isIntegrationStatus(wearable.status)
+    ) {
+      invalid(
+        'Entry payload is invalid: integrationContext.wearable requires signalId/date/trained/confidence/status fields.'
+      );
+    }
+  }
+
+  return {
+    inferredTags,
+    confirmedTags: context.confirmedTags as string[],
+    sourceSignalIds: context.sourceSignalIds as string[],
+    updatedAt: context.updatedAt as string,
+    ...(wearable ? { wearable } : {})
+  };
 };
 
 export const parseEntryPayload = (event: APIGatewayProxyEvent): CreateEntryRequest => {
@@ -288,11 +392,13 @@ export const parseEntryPayload = (event: APIGatewayProxyEvent): CreateEntryReque
     );
   }
 
+  const integrationContext = payload.integrationContext !== undefined ? parseIntegrationContext(payload.integrationContext) : undefined;
   const normalizedDraft = normalizeSessionReviewArtifact(payload.sessionReviewDraft);
   const normalizedFinal = normalizeFinalizedSessionReview(payload.sessionReviewFinal);
 
   return {
     ...(payload as unknown as CreateEntryRequest),
+    ...(integrationContext ? { integrationContext } : {}),
     ...(normalizedDraft ? { sessionReviewDraft: normalizedDraft } : {}),
     ...(normalizedFinal ? { sessionReviewFinal: normalizedFinal } : {})
   };

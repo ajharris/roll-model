@@ -5,7 +5,7 @@ import { useState } from 'react';
 
 import { Protected } from '@/components/Protected';
 import { apiClient } from '@/lib/apiClient';
-import type { Entry, EntryStructuredFieldKey, EntryStructuredMetadataConfirmation } from '@/types/api';
+import type { Entry, EntryIntegrationContext, EntryStructuredFieldKey, EntryStructuredMetadataConfirmation } from '@/types/api';
 
 const STRUCTURED_FIELDS: Array<{ key: EntryStructuredFieldKey; label: string }> = [
   { key: 'position', label: 'Position' },
@@ -23,6 +23,7 @@ export default function CoachPage() {
   const [localComments, setLocalComments] = useState<Record<string, string[]>>({});
   const [structuredDraft, setStructuredDraft] = useState<Partial<Record<EntryStructuredFieldKey, string>>>({});
   const [confirmations, setConfirmations] = useState<EntryStructuredMetadataConfirmation[]>([]);
+  const [integrationContextDraft, setIntegrationContextDraft] = useState<EntryIntegrationContext | undefined>(undefined);
   const [status, setStatus] = useState('');
 
   const load = async (event: FormEvent) => {
@@ -59,6 +60,7 @@ export default function CoachPage() {
       cue: entry.structured?.cue ?? '',
     });
     setConfirmations([]);
+    setIntegrationContextDraft(entry.integrationContext);
   };
 
   const upsertConfirmation = (next: EntryStructuredMetadataConfirmation) => {
@@ -87,6 +89,7 @@ export default function CoachPage() {
       const updated = await apiClient.reviewEntryStructuredMetadata(selected.entryId, {
         structured,
         confirmations,
+        ...(integrationContextDraft ? { integrationContext: integrationContextDraft } : {})
       });
       setSelected(updated);
       setEntries((current) => current.map((entry) => (entry.entryId === updated.entryId ? updated : entry)));
@@ -98,10 +101,45 @@ export default function CoachPage() {
         cue: updated.structured?.cue ?? '',
       });
       setConfirmations([]);
+      setIntegrationContextDraft(updated.integrationContext);
       setStatus('Structured metadata review saved.');
     } catch {
       setStatus('Could not save structured metadata review.');
     }
+  };
+
+  const updateIntegrationTagStatus = (
+    inferenceId: string,
+    status: 'confirmed' | 'rejected' | 'overridden',
+    overriddenTag?: string
+  ) => {
+    if (!integrationContextDraft) return;
+    const nextTags = integrationContextDraft.inferredTags.map((item) =>
+      item.inferenceId === inferenceId
+        ? {
+            ...item,
+            status,
+            ...(status === 'overridden' ? { overriddenTag: overriddenTag?.trim().toLowerCase() ?? item.tag } : {}),
+            reviewedAt: new Date().toISOString(),
+            reviewedByRole: 'coach' as const
+          }
+        : item
+    );
+    const confirmedTags = Array.from(
+      new Set(
+        nextTags.flatMap((item) => {
+          if (item.status === 'confirmed') return [item.tag];
+          if (item.status === 'overridden' && item.overriddenTag) return [item.overriddenTag];
+          return [];
+        })
+      )
+    );
+    setIntegrationContextDraft({
+      ...integrationContextDraft,
+      inferredTags: nextTags,
+      confirmedTags,
+      updatedAt: new Date().toISOString()
+    });
   };
 
   return (
@@ -182,6 +220,37 @@ export default function CoachPage() {
                 <button type="button" onClick={saveStructuredReview}>
                   Save structured review
                 </button>
+                {integrationContextDraft?.inferredTags?.length ? (
+                  <div className="panel">
+                    <h4>Integration-derived context</h4>
+                    {integrationContextDraft.inferredTags.map((item) => (
+                      <div key={item.inferenceId}>
+                        <p className="small">
+                          {item.tag} ({item.provider}) • confidence {item.confidence} • status {item.status}
+                        </p>
+                        <div className="row">
+                          <button type="button" onClick={() => updateIntegrationTagStatus(item.inferenceId, 'confirmed')}>
+                            Confirm
+                          </button>
+                          <button type="button" onClick={() => updateIntegrationTagStatus(item.inferenceId, 'rejected')}>
+                            Reject
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const next = window.prompt('Override tag value', item.overriddenTag ?? item.tag);
+                              if (!next) return;
+                              updateIntegrationTagStatus(item.inferenceId, 'overridden', next);
+                            }}
+                          >
+                            Override
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                    <p className="small">Confirmed tags: {integrationContextDraft.confirmedTags.join(' | ') || 'none'}</p>
+                  </div>
+                ) : null}
                 <h4>Comment</h4>
                 <textarea value={comment} onChange={(e) => setComment(e.target.value)} />
                 <button onClick={post}>Post comment</button>
