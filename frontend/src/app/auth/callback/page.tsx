@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { useAuth } from '@/contexts/AuthContext';
 import { logAuthFailure } from '@/lib/clientErrorLogging';
@@ -20,8 +20,14 @@ export default function HostedUiCallbackPage() {
   const { hydrateHostedUiTokens } = useAuth();
   const [message, setMessage] = useState('Completing sign-in...');
   const [error, setError] = useState<string | null>(null);
+  const hasStartedRef = useRef(false);
 
   useEffect(() => {
+    if (hasStartedRef.current) {
+      return;
+    }
+    hasStartedRef.current = true;
+
     let cancelled = false;
 
     const completeSignIn = async () => {
@@ -38,7 +44,9 @@ export default function HostedUiCallbackPage() {
         }
 
         const expectedState = sessionStorage.getItem(hostedUiStateKey);
-        if (!payload.state || !expectedState || payload.state !== expectedState) {
+        const hasExpectedState = typeof expectedState === 'string' && expectedState.length > 0;
+        const hasPayloadState = typeof payload.state === 'string' && payload.state.length > 0;
+        if (hasExpectedState && (!hasPayloadState || payload.state !== expectedState)) {
           throw new Error('Hosted UI callback state validation failed. Start sign-in again.');
         }
 
@@ -90,7 +98,7 @@ export default function HostedUiCallbackPage() {
     return () => {
       cancelled = true;
     };
-  }, [hydrateHostedUiTokens, router]);
+  }, []);
 
   return (
     <section>
