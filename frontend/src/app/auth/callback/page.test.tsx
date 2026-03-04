@@ -135,4 +135,37 @@ describe('HostedUiCallbackPage', () => {
       }),
     );
   });
+
+  it('accepts callback when expected state is missing but payload has tokens', async () => {
+    const historyReplaceSpy = vi
+      .spyOn(window.history, 'replaceState')
+      .mockImplementation(() => undefined);
+
+    parseHostedUiCallbackMock.mockReturnValue({
+      code: null,
+      state: 'state-from-provider',
+      tokens: {
+        idToken: 'id-token',
+        accessToken: 'access-token',
+      },
+      error: null,
+      errorDescription: null,
+    });
+    hydrateHostedUiTokensMock.mockReturnValue('athlete');
+
+    render(<HostedUiCallbackPage />);
+
+    await waitFor(() => {
+      expect(hydrateHostedUiTokensMock).toHaveBeenCalledWith({
+        idToken: 'id-token',
+        accessToken: 'access-token',
+      });
+      expect(replaceMock).toHaveBeenCalledWith('/entries');
+    });
+
+    expect(logAuthFailureMock).not.toHaveBeenCalled();
+    expect(historyReplaceSpy).toHaveBeenCalledWith(null, '', '/auth/callback');
+
+    historyReplaceSpy.mockRestore();
+  });
 });
