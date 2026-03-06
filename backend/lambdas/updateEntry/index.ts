@@ -204,8 +204,47 @@ const baseHandler: APIGatewayProxyHandler = async (event) => {
     await upsertTechniqueCandidates(updatedEntry.rawTechniqueMentions, updatedEntry.entryId, nowIso);
     await recomputeAndPersistProgressViews(auth.userId);
 
+    console.info(
+      JSON.stringify({
+        msg: 'updateEntry.success',
+        athleteId: auth.userId,
+        entryId: updatedEntry.entryId,
+        quickAddTime: updatedEntry.quickAdd.time,
+        updatedAt: updatedEntry.updatedAt,
+      }),
+    );
+
     return response(200, { entry: updatedEntry });
   } catch (error) {
+    if (error instanceof ApiError) {
+      const payloadSummary =
+        typeof event.body === 'string' && event.body.trim().length > 0
+          ? (() => {
+              try {
+                const parsed = JSON.parse(event.body) as Record<string, unknown>;
+                return {
+                  hasQuickAdd: Boolean(parsed.quickAdd && typeof parsed.quickAdd === 'object'),
+                  hasTags: Array.isArray(parsed.tags),
+                  hasSections: Boolean(parsed.sections && typeof parsed.sections === 'object'),
+                  hasSessionMetrics: Boolean(parsed.sessionMetrics && typeof parsed.sessionMetrics === 'object'),
+                  hasRawTechniqueMentions: Array.isArray(parsed.rawTechniqueMentions),
+                };
+              } catch {
+                return { bodyLength: event.body.length };
+              }
+            })()
+          : { bodyMissing: true };
+
+      console.error(
+        JSON.stringify({
+          msg: 'updateEntry.validation_failed',
+          code: error.code,
+          message: error.message,
+          entryId: event.pathParameters?.entryId,
+          payloadSummary,
+        }),
+      );
+    }
     return errorResponse(error);
   }
 };
