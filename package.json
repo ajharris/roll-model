@@ -19,7 +19,8 @@
     "amplify:debug": "bash scripts/amplify-release-debug.sh",
     "cdk:synth": "npm run build && cdk synth -a \"node dist/infrastructure/cdk/bin/app.js\"",
     "cdk:deploy": "npm run build && cdk deploy -a \"node dist/infrastructure/cdk/bin/app.js\"",
-    "setup:codex": "bash scripts/codex/setup-environment.sh"
+    "setup:codex": "bash scripts/codex/setup-environment.sh",
+    "admin:delete-user": "ts-node --prefer-ts-exts scripts/delete-user.ts"
   },
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.863.0",
