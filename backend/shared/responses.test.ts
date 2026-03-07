@@ -9,7 +9,8 @@ describe('responses helpers', () => {
       'Content-Type': 'application/json',
       'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Headers': 'Content-Type,Authorization',
-      'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS'
+      'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS',
+      'Access-Control-Expose-Headers': 'x-amzn-requestid,x-amz-apigw-id,x-amzn-trace-id,x-request-id'
     });
     expect(result.body).toBe(JSON.stringify({ ok: true }));
   });
