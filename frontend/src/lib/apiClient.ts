@@ -188,6 +188,20 @@ const parseApiErrorMessage = async (response: Response): Promise<string> => {
   }
 };
 
+const summarizeErrorResponse = (response: Response): Record<string, unknown> => {
+  const headerValue = (name: string): string | null => {
+    const headers = (response as { headers?: { get: (key: string) => string | null } }).headers;
+    return headers && typeof headers.get === 'function' ? headers.get(name) : null;
+  };
+
+  return {
+    statusText: response.statusText || null,
+    requestId: headerValue('x-amzn-requestid') ?? headerValue('x-request-id'),
+    extendedRequestId: headerValue('x-amz-apigw-id'),
+    traceId: headerValue('x-amzn-trace-id'),
+  };
+};
+
 const summarizeRequestBody = (body: RequestInit['body']): Record<string, unknown> => {
   if (typeof body !== 'string') {
     return { bodyType: typeof body };
@@ -280,15 +294,18 @@ const sendRequest = async (path: string, init?: RequestInit): Promise<Response> 
 
   if (!response.ok) {
     const message = await parseApiErrorMessage(response);
+    const normalizedMessage = `${method} ${path} failed with ${response.status}${message ? `: ${message}` : ''}`;
+    const responseDetails = summarizeErrorResponse(response);
     if (response.status === 401 || response.status === 403) {
       logAuthFailure({
         source: 'apiClient',
         operation: `${method} ${path}`,
         status: response.status,
-        message,
+        message: normalizedMessage,
         details: {
           url,
           authRequired: headers.has('Authorization'),
+          ...responseDetails,
         },
       });
     } else {
@@ -299,8 +316,11 @@ const sendRequest = async (path: string, init?: RequestInit): Promise<Response> 
         method,
         status: response.status,
         authRequired: headers.has('Authorization'),
-        responseMessage: message,
-        ...(init?.body !== undefined ? { details: summarizeRequestBody(init.body) } : {}),
+        responseMessage: normalizedMessage,
+        details: {
+          ...responseDetails,
+          ...(init?.body !== undefined ? summarizeRequestBody(init.body) : {}),
+        },
       });
     }
     throw new ApiError(message, response.status);
