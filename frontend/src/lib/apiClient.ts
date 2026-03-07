@@ -179,12 +179,24 @@ const buildAuthHeaders = async () => {
   };
 };
 
-const parseApiErrorMessage = async (response: Response): Promise<string> => {
+type ParsedApiError = {
+  message: string;
+  requestId?: string;
+};
+
+const parseApiErrorMessage = async (response: Response): Promise<ParsedApiError> => {
   try {
-    const json = (await response.json()) as { message?: string; error?: { message?: string } };
-    return json.message ?? json.error?.message ?? 'Request failed';
+    const json = (await response.json()) as {
+      message?: string;
+      error?: { message?: string; requestId?: string };
+      requestId?: string;
+    };
+    return {
+      message: json.message ?? json.error?.message ?? 'Request failed',
+      requestId: json.error?.requestId ?? json.requestId,
+    };
   } catch {
-    return response.statusText || 'Request failed';
+    return { message: response.statusText || 'Request failed' };
   }
 };
 
@@ -293,11 +305,20 @@ const sendRequest = async (path: string, init?: RequestInit): Promise<Response> 
   }
 
   if (!response.ok) {
-    const message = await parseApiErrorMessage(response);
+    const parsedError = await parseApiErrorMessage(response);
+    const message = parsedError.message;
     const responseDetails = summarizeErrorResponse(response);
+    const requestIdFromBody =
+      typeof parsedError.requestId === 'string' && parsedError.requestId.trim().length > 0
+        ? parsedError.requestId
+        : null;
+    const responseRequestId =
+      (typeof responseDetails.requestId === 'string' && responseDetails.requestId.trim().length > 0
+        ? responseDetails.requestId
+        : null) ?? requestIdFromBody;
     const requestHint =
-      typeof responseDetails.requestId === 'string' && responseDetails.requestId.trim().length > 0
-        ? ` [requestId=${responseDetails.requestId}]`
+      responseRequestId
+        ? ` [requestId=${responseRequestId}]`
         : '';
     const normalizedMessage = `${method} ${path} failed with ${response.status}${
       message ? `: ${message}` : ''
@@ -312,6 +333,7 @@ const sendRequest = async (path: string, init?: RequestInit): Promise<Response> 
           url,
           authRequired: headers.has('Authorization'),
           ...responseDetails,
+          ...(requestIdFromBody ? { responseRequestId: requestIdFromBody } : {}),
         },
       });
     } else {
@@ -325,6 +347,7 @@ const sendRequest = async (path: string, init?: RequestInit): Promise<Response> 
         responseMessage: normalizedMessage,
         details: {
           ...responseDetails,
+          ...(requestIdFromBody ? { responseRequestId: requestIdFromBody } : {}),
           ...(init?.body !== undefined ? summarizeRequestBody(init.body) : {}),
         },
       });
