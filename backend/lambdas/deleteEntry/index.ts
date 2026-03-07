@@ -1,4 +1,4 @@
-import type { APIGatewayProxyHandler } from 'aws-lambda';
+import type { APIGatewayProxyHandler, Context } from 'aws-lambda';
 
 
 import { buildActionPackDeleteKeys } from '../../shared/actionPackIndex';
@@ -63,7 +63,7 @@ const toErrorDetails = (error: unknown): { name?: string; message: string; stack
     ? { name: error.name, message: error.message, stack: error.stack }
     : { message: String(error) };
 
-const baseHandler: APIGatewayProxyHandler = async (event) => {
+const baseHandler: APIGatewayProxyHandler = async (event, context: Context) => {
   try {
     const auth = getAuthContext(event);
     requireRole(auth, ['athlete']);
@@ -241,6 +241,13 @@ const baseHandler: APIGatewayProxyHandler = async (event) => {
           error: toErrorDetails(error)
         })
       );
+      return response(500, {
+        error: {
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'An unexpected error occurred.',
+          requestId: event.requestContext?.requestId ?? context.awsRequestId
+        }
+      });
     }
     return errorResponse(error);
   }

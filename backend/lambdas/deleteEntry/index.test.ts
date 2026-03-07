@@ -350,4 +350,24 @@ describe('deleteEntry handler', () => {
     expect(result.statusCode).toBe(204);
     expect(mockDeleteItem).toHaveBeenCalledTimes(2);
   });
+
+  it('includes requestId in 500 response for unhandled errors', async () => {
+    mockGetItem.mockRejectedValueOnce(new Error('dynamodb unavailable'));
+
+    const event = buildEvent('athlete');
+    const result = (await handler(
+      event,
+      { awsRequestId: 'lambda-request-123' } as never,
+      () => undefined
+    )) as APIGatewayProxyResult;
+
+    expect(result.statusCode).toBe(500);
+    expect(JSON.parse(result.body)).toEqual({
+      error: {
+        code: 'INTERNAL_SERVER_ERROR',
+        message: 'An unexpected error occurred.',
+        requestId: 'lambda-request-123'
+      }
+    });
+  });
 });
