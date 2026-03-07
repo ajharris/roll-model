@@ -10,6 +10,7 @@ import type {
   CommentPayload,
   Entry,
   EntryCreatePayload,
+  EntryQuickAdd,
   EntrySearchRequest,
   FeedbackPayload,
   FeedbackSubmissionResult,
@@ -187,6 +188,56 @@ const parseApiErrorMessage = async (response: Response): Promise<string> => {
   }
 };
 
+const summarizeRequestBody = (body: RequestInit['body']): Record<string, unknown> => {
+  if (typeof body !== 'string') {
+    return { bodyType: typeof body };
+  }
+
+  try {
+    const parsed = JSON.parse(body) as Record<string, unknown>;
+    return {
+      bodyType: 'json',
+      bodyKeys: Object.keys(parsed),
+      hasQuickAdd: Boolean(parsed.quickAdd && typeof parsed.quickAdd === 'object'),
+      hasTags: Array.isArray(parsed.tags),
+      hasSections: Boolean(parsed.sections && typeof parsed.sections === 'object'),
+      hasSessionMetrics: Boolean(parsed.sessionMetrics && typeof parsed.sessionMetrics === 'object'),
+      hasRawTechniqueMentions: Array.isArray(parsed.rawTechniqueMentions),
+      rawTechniqueMentionsCount: Array.isArray(parsed.rawTechniqueMentions) ? parsed.rawTechniqueMentions.length : undefined,
+    };
+  } catch {
+    return { bodyType: 'string', bodyLength: body.length };
+  }
+};
+
+const normalizeEntryCreatePayload = (payload: EntryCreatePayload): EntryCreatePayload => {
+  const hasQuickAdd =
+    (payload as EntryCreatePayload & { quickAdd?: EntryQuickAdd }).quickAdd &&
+    typeof (payload as EntryCreatePayload & { quickAdd?: EntryQuickAdd }).quickAdd === 'object';
+
+  const hasTags = Array.isArray((payload as EntryCreatePayload & { tags?: unknown }).tags);
+
+  if (hasQuickAdd && hasTags) {
+    return payload;
+  }
+
+  const fallbackQuickAdd: EntryQuickAdd = {
+    time: new Date().toISOString(),
+    class: payload.templateId ?? 'quick-entry',
+    gym: '',
+    partners: [],
+    rounds: payload.sessionMetrics?.rounds ?? 0,
+    notes: payload.sections?.shared ?? '',
+  };
+
+  return {
+    ...payload,
+    quickAdd: (payload as EntryCreatePayload & { quickAdd?: EntryQuickAdd }).quickAdd ?? fallbackQuickAdd,
+    tags: (payload as EntryCreatePayload & { tags?: string[] }).tags ?? [],
+    rawTechniqueMentions: payload.rawTechniqueMentions ?? [],
+  } as EntryCreatePayload;
+};
+
 const sendRequest = async (path: string, init?: RequestInit): Promise<Response> => {
   const method = (init?.method ?? 'GET').toUpperCase();
   const headers = new Headers();
@@ -220,7 +271,9 @@ const sendRequest = async (path: string, init?: RequestInit): Promise<Response> 
       path,
       method,
       authRequired: headers.has('Authorization'),
+      responseMessage: 'Request failed before receiving a response.',
       error,
+      ...(init?.body !== undefined ? { details: summarizeRequestBody(init.body) } : {}),
     });
     throw error;
   }
@@ -247,6 +300,7 @@ const sendRequest = async (path: string, init?: RequestInit): Promise<Response> 
         status: response.status,
         authRequired: headers.has('Authorization'),
         responseMessage: message,
+        ...(init?.body !== undefined ? { details: summarizeRequestBody(init.body) } : {}),
       });
     }
     throw new ApiError(message, response.status);
@@ -378,13 +432,15 @@ export const apiClient = {
     return asEntryObject(result);
   },
   createEntry: async (payload: EntryCreatePayload) => {
-    const result = await request<unknown>('/entries', { method: 'POST', body: JSON.stringify(payload) });
+    const normalizedPayload = normalizeEntryCreatePayload(payload);
+    const result = await request<unknown>('/entries', { method: 'POST', body: JSON.stringify(normalizedPayload) });
     return asEntryObject(result);
   },
   updateEntry: async (entryId: string, payload: EntryCreatePayload) => {
+    const normalizedPayload = normalizeEntryCreatePayload(payload);
     const result = await request<unknown>(`/entries/${entryId}`, {
       method: 'PUT',
-      body: JSON.stringify(payload),
+      body: JSON.stringify(normalizedPayload),
     });
     return asEntryObject(result);
   },

@@ -259,6 +259,8 @@ export interface CommentPayload {
 }
 
 export interface EntryCreatePayload {
+  quickAdd?: EntryQuickAdd;
+  tags?: EntryTag[];
   sections: EntrySections;
   sessionMetrics: SessionMetrics;
   structured?: EntryStructuredFields;

@@ -183,6 +183,18 @@ const baseHandler: APIGatewayProxyHandler = async (event) => {
 
     return response(204, {});
   } catch (error) {
+    if (!(error instanceof ApiError)) {
+      console.error(
+        JSON.stringify({
+          msg: 'deleteEntry.unhandled_error',
+          entryId: event.pathParameters?.entryId,
+          error:
+            error instanceof Error
+              ? { name: error.name, message: error.message, stack: error.stack }
+              : { message: String(error) }
+        })
+      );
+    }
     return errorResponse(error);
   }
 };

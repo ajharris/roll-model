@@ -61,6 +61,7 @@ export const logNetworkFailure = (options: {
   authRequired: boolean;
   error?: unknown;
   responseMessage?: string;
+  details?: Record<string, unknown>;
 }) => {
   logClientError({
     category: 'network',
@@ -75,6 +76,7 @@ export const logNetworkFailure = (options: {
       status: options.status ?? null,
       authRequired: options.authRequired,
       error: toSerializableError(options.error),
+      ...(options.details ?? {}),
     },
   });
 };

@@ -11,7 +11,7 @@ import { buildKeywordIndexItems, extractEntryTokens } from '../../shared/keyword
 import { withRequestLogging } from '../../shared/logger';
 import { hydratePartnerOutcomes } from '../../shared/partners';
 import { recomputeAndPersistProgressViews } from '../../shared/progressStore';
-import { errorResponse, response } from '../../shared/responses';
+import { ApiError, errorResponse, response } from '../../shared/responses';
 import { extractStructuredMetadata } from '../../shared/structuredExtraction';
 import { sanitizeTechniqueMentions, upsertTechniqueCandidates } from '../../shared/techniques';
 import type { CreateEntryRequest, Entry } from '../../shared/types';
@@ -125,8 +125,46 @@ const baseHandler: APIGatewayProxyHandler = async (event) => {
 
     await recomputeAndPersistProgressViews(auth.userId);
 
+    console.info(
+      JSON.stringify({
+        msg: 'createEntry.success',
+        athleteId: auth.userId,
+        entryId: entry.entryId,
+        quickAddTime: entry.quickAdd.time,
+        createdAt: entry.createdAt,
+      }),
+    );
+
     return response(201, { entry });
   } catch (error) {
+    if (error instanceof ApiError) {
+      const payloadSummary =
+        typeof event.body === 'string' && event.body.trim().length > 0
+          ? (() => {
+              try {
+                const parsed = JSON.parse(event.body) as Record<string, unknown>;
+                return {
+                  hasQuickAdd: Boolean(parsed.quickAdd && typeof parsed.quickAdd === 'object'),
+                  hasTags: Array.isArray(parsed.tags),
+                  hasSections: Boolean(parsed.sections && typeof parsed.sections === 'object'),
+                  hasSessionMetrics: Boolean(parsed.sessionMetrics && typeof parsed.sessionMetrics === 'object'),
+                  hasRawTechniqueMentions: Array.isArray(parsed.rawTechniqueMentions),
+                };
+              } catch {
+                return { bodyLength: event.body.length };
+              }
+            })()
+          : { bodyMissing: true };
+
+      console.error(
+        JSON.stringify({
+          msg: 'createEntry.validation_failed',
+          code: error.code,
+          message: error.message,
+          payloadSummary,
+        }),
+      );
+    }
     return errorResponse(error);
   }
 };
