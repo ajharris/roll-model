@@ -58,6 +58,11 @@ const safeDelete = async (key: { PK: string; SK: string }, context: string): Pro
   }
 };
 
+const toErrorDetails = (error: unknown): { name?: string; message: string; stack?: string } =>
+  error instanceof Error
+    ? { name: error.name, message: error.message, stack: error.stack }
+    : { message: String(error) };
+
 const baseHandler: APIGatewayProxyHandler = async (event) => {
   try {
     const auth = getAuthContext(event);
@@ -165,21 +170,66 @@ const baseHandler: APIGatewayProxyHandler = async (event) => {
     }
 
     if (parsedEntry) {
-      for (const key of buildKeywordDeleteKeys(parsedEntry)) {
-        await safeDelete(key, 'keyword_index');
+      try {
+        for (const key of buildKeywordDeleteKeys(parsedEntry)) {
+          await safeDelete(key, 'keyword_index');
+        }
+      } catch (error) {
+        console.error(
+          JSON.stringify({
+            msg: 'deleteEntry.cleanup.keyword_index_build_failed',
+            entryId,
+            error: toErrorDetails(error)
+          })
+        );
       }
-      for (const key of buildActionPackDeleteKeys(parsedEntry)) {
-        await safeDelete(key, 'action_pack_index');
+      try {
+        for (const key of buildActionPackDeleteKeys(parsedEntry)) {
+          await safeDelete(key, 'action_pack_index');
+        }
+      } catch (error) {
+        console.error(
+          JSON.stringify({
+            msg: 'deleteEntry.cleanup.action_pack_index_build_failed',
+            entryId,
+            error: toErrorDetails(error)
+          })
+        );
       }
     }
 
-    await deleteItem({ Key: entryKey });
-    await deleteItem({
-      Key: {
-        PK: `ENTRY#${entryId}`,
-        SK: 'META'
-      }
-    });
+    try {
+      await deleteItem({ Key: entryKey });
+    } catch (error) {
+      console.error(
+        JSON.stringify({
+          msg: 'deleteEntry.primary_delete_failed',
+          entryId,
+          context: 'entry_row',
+          key: entryKey,
+          error: toErrorDetails(error)
+        })
+      );
+      throw error;
+    }
+    const metaKey = {
+      PK: `ENTRY#${entryId}`,
+      SK: 'META'
+    };
+    try {
+      await deleteItem({ Key: metaKey });
+    } catch (error) {
+      console.error(
+        JSON.stringify({
+          msg: 'deleteEntry.primary_delete_failed',
+          entryId,
+          context: 'entry_meta',
+          key: metaKey,
+          error: toErrorDetails(error)
+        })
+      );
+      throw error;
+    }
 
     return response(204, {});
   } catch (error) {
@@ -188,10 +238,7 @@ const baseHandler: APIGatewayProxyHandler = async (event) => {
         JSON.stringify({
           msg: 'deleteEntry.unhandled_error',
           entryId: event.pathParameters?.entryId,
-          error:
-            error instanceof Error
-              ? { name: error.name, message: error.message, stack: error.stack }
-              : { message: String(error) }
+          error: toErrorDetails(error)
         })
       );
     }

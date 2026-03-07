@@ -266,4 +266,88 @@ describe('deleteEntry handler', () => {
     expect(result.statusCode).toBe(204);
     expect(mockDeleteItem).toHaveBeenCalledTimes(2);
   });
+
+  it('continues delete when keyword index cleanup key generation throws', async () => {
+    mockGetItem
+      .mockResolvedValueOnce({
+        Item: {
+          PK: 'ENTRY#entry-1',
+          SK: 'META',
+          athleteId: 'athlete-1',
+          createdAt: '2024-01-01T00:00:00.000Z'
+        }
+      } as unknown as GetCommandOutput)
+      .mockResolvedValueOnce({
+        Item: {
+          PK: 'USER#athlete-1',
+          SK: 'ENTRY#2024-01-01T00:00:00.000Z#entry-1',
+          entityType: 'ENTRY',
+          entryId: 'entry-1',
+          athleteId: 'athlete-1',
+          createdAt: '2024-01-01T00:00:00.000Z',
+          updatedAt: '2024-01-01T00:00:00.000Z',
+          sections: { shared: 'shared', private: 'private' },
+          sessionMetrics: {
+            durationMinutes: 60,
+            intensity: 6,
+            rounds: 5,
+            giOrNoGi: 'gi',
+            tags: ['guard']
+          },
+          rawTechniqueMentions: []
+        }
+      } as unknown as GetCommandOutput);
+    mockQueryItems.mockResolvedValueOnce({ Items: [] } as unknown as QueryCommandOutput);
+    mockExtractEntryTokens.mockImplementationOnce(() => {
+      throw new Error('legacy tag parse failure');
+    });
+    mockBuildActionPackDeleteKeys.mockReturnValueOnce([]);
+
+    const result = (await handler(buildEvent('athlete'), {} as never, () => undefined)) as APIGatewayProxyResult;
+
+    expect(result.statusCode).toBe(204);
+    expect(mockDeleteItem).toHaveBeenCalledTimes(2);
+  });
+
+  it('continues delete when action-pack cleanup key generation throws', async () => {
+    mockGetItem
+      .mockResolvedValueOnce({
+        Item: {
+          PK: 'ENTRY#entry-1',
+          SK: 'META',
+          athleteId: 'athlete-1',
+          createdAt: '2024-01-01T00:00:00.000Z'
+        }
+      } as unknown as GetCommandOutput)
+      .mockResolvedValueOnce({
+        Item: {
+          PK: 'USER#athlete-1',
+          SK: 'ENTRY#2024-01-01T00:00:00.000Z#entry-1',
+          entityType: 'ENTRY',
+          entryId: 'entry-1',
+          athleteId: 'athlete-1',
+          createdAt: '2024-01-01T00:00:00.000Z',
+          updatedAt: '2024-01-01T00:00:00.000Z',
+          sections: { shared: 'shared', private: 'private' },
+          sessionMetrics: {
+            durationMinutes: 60,
+            intensity: 6,
+            rounds: 5,
+            giOrNoGi: 'gi',
+            tags: ['guard']
+          },
+          rawTechniqueMentions: []
+        }
+      } as unknown as GetCommandOutput);
+    mockQueryItems.mockResolvedValueOnce({ Items: [] } as unknown as QueryCommandOutput);
+    mockExtractEntryTokens.mockReturnValueOnce([]).mockReturnValueOnce([]);
+    mockBuildActionPackDeleteKeys.mockImplementationOnce(() => {
+      throw new Error('legacy action pack shape');
+    });
+
+    const result = (await handler(buildEvent('athlete'), {} as never, () => undefined)) as APIGatewayProxyResult;
+
+    expect(result.statusCode).toBe(204);
+    expect(mockDeleteItem).toHaveBeenCalledTimes(2);
+  });
 });
