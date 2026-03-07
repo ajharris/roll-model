@@ -133,7 +133,7 @@ describe('apiClient', () => {
         source: 'apiClient',
         operation: 'GET /entries',
         status: 401,
-        message: 'Unauthorized',
+        message: 'GET /entries failed with 401: Unauthorized',
       }),
     );
   });
