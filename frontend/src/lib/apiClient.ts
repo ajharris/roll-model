@@ -294,8 +294,14 @@ const sendRequest = async (path: string, init?: RequestInit): Promise<Response> 
 
   if (!response.ok) {
     const message = await parseApiErrorMessage(response);
-    const normalizedMessage = `${method} ${path} failed with ${response.status}${message ? `: ${message}` : ''}`;
     const responseDetails = summarizeErrorResponse(response);
+    const requestHint =
+      typeof responseDetails.requestId === 'string' && responseDetails.requestId.trim().length > 0
+        ? ` [requestId=${responseDetails.requestId}]`
+        : '';
+    const normalizedMessage = `${method} ${path} failed with ${response.status}${
+      message ? `: ${message}` : ''
+    }${requestHint}`;
     if (response.status === 401 || response.status === 403) {
       logAuthFailure({
         source: 'apiClient',
